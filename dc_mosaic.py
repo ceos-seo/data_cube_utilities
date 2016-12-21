@@ -37,7 +37,7 @@ from . import dc_utilities as utilities
 # Modified by: AHDS
 # Last modified date:
 
-def create_mosaic_iterative(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
     """
     Description:
       Creates a most recent - oldest mosaic of the input dataset. If no clean mask is given,
