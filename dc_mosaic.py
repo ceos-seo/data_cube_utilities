@@ -73,7 +73,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         dataset_out = intermediate_product.copy(deep=True)
     else:
         dataset_out = None
-    time_slices = reversed(range(len(clean_mask))) if kwargs['reverse_time'] else range(len(clean_mask))
+    time_slices = reversed(range(len(clean_mask))) if kwargs and kwargs['reverse_time'] else range(len(clean_mask))
     for index in time_slices:
         dataset_slice = dataset_in.isel(time=index).astype("int16").drop('time')
         if dataset_out is None:
