@@ -37,7 +37,7 @@ from datetime import datetime
 # Author: KMF
 # Creation date: 2016-06-13
 
-def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, enforce_float64=False):
+def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enforce_float64=False):
     """
     Description:
       Performs WOfS algorithm on given dataset. If no clean mask is given, the 'cf_mask'
@@ -60,6 +60,9 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, enforce_float64=Fa
       clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
         if user does not provide a clean mask, one will be created using cfmask
       no_data (int/float) - no data pixel value; default: -9999
+      mosaic (boolean) - flag to indicate if dataset_in is a mosaic. If mosaic = False, dataset_in
+        should have a time coordinate and wofs will run over each time slice; otherwise, dataset_in
+        should not have a time coordinate and wofs will run over the single mosaicked image
       enforce_float64 (boolean) - flag to indicate whether or not to enforce float64 calculations;
         will use float32 if false
     Output:
@@ -244,20 +247,37 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, enforce_float64=Fa
     classified_clean[clean_mask] = classified[clean_mask] # Contains data for clear pixels
 
     # Create xarray of data
-    time = dataset_in.time
     latitude = dataset_in.latitude
     longitude = dataset_in.longitude
 
-    data_array = xr.DataArray(classified_clean,
-                              coords=[time, latitude, longitude],
-                              dims=['time', 'latitude', 'longitude'])
+    time = None
+    coords = None
+    dims = None
 
-    dataset_out = xr.Dataset({'wofs': data_array},
-                             coords={'time': time,
-                                     'latitude': latitude,
-                                     'longitude': longitude})
+    if mosaic:
+        coords=[latitude, longitude]
+        dims=['latitude', 'longitude']
+    else:
+        time = dataset_in.time
+        coords=[time, latitude, longitude]
+        dims=['time', 'latitude', 'longitude']
+
+    data_array = xr.DataArray(classified_clean,
+                              coords=coords,
+                              dims=dims)
+
+    if mosaic:
+        dataset_out = xr.Dataset({'wofs': data_array},
+                                 coords={'latitude': latitude,
+                                         'longitude': longitude})
+    else:
+        dataset_out = xr.Dataset({'wofs': data_array},
+                                 coords={'time': time,
+                                         'latitude': latitude,
+                                         'longitude': longitude})
 
     return dataset_out
+
 
 def ledaps_classify(water_band, qa_bands, no_data=-9999):
     #TODO: refactor for input/output datasets

@@ -64,7 +64,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
         clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        dataset_in = dataset_in.drop('cf_mask')
+        #dataset_in = dataset_in.drop('cf_mask')
 
     #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
     for key in list(dataset_in.data_vars):

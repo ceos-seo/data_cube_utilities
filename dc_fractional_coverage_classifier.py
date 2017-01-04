@@ -149,7 +149,7 @@ def main(platform, product_type,
 
     # Initialize data cube object
     dc = datacube.Datacube(config=dc_config,
-                           app='dc-mosaicker')
+                           app='dc-frac-cov')
 
     products = dc.list_products()
     platform_names = set([product[6] for product in products.values])
