@@ -64,7 +64,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
         clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        #dataset_in = dataset_in.drop('cf_mask')
+        ##dataset_in = dataset_in.drop('cf_mask')
 
     #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
     for key in list(dataset_in.data_vars):
@@ -99,7 +99,7 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
         clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        dataset_in = dataset_in.drop('cf_mask')
+        #dataset_in = dataset_in.drop('cf_mask')
 
     #required for np.nan
     dataset_in = dataset_in.astype("float64")
@@ -132,7 +132,7 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
         clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        dataset_in = dataset_in.drop('cf_mask')
+        #dataset_in = dataset_in.drop('cf_mask')
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -170,7 +170,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
         clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        dataset_in = dataset_in.drop('cf_mask')
+        #dataset_in = dataset_in.drop('cf_mask')
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
