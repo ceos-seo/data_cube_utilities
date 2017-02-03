@@ -43,6 +43,6 @@ def generate_baseline(dataset, composite_size = 5, mode = "average", custom_labe
 	elif mode == "composite":
 		baselines = (_mosaic(ref, most_recent_first = True, custom_label = custom_label) for ref in reffs)
 
-	baseline = xr.concat(baselines, dim= 'time')
-	baseline.time.values = dataset.time.values[(composite_size):]
+	baseline = xr.concat(baselines, dim='time')
+	baseline['time'] = dataset.time[composite_size:]
 	return baseline

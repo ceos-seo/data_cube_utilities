@@ -258,3 +258,53 @@ def create_rgb_png_from_tiff(tif_path, png_path, bands=[1, 2, 3], png_filled_pat
 def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
+
+"""
+functions used to combine time sliced data after being combined geographically.
+Fill nodata uses the first timeslice as a base, then uses subsequent slices to
+fill in indices with nodata values.
+this should be used for recent/leastrecent + anything that is done in a single time chunk (median pixel?)
+things like max/min ndvi should be able to compound max/min ops between ddifferent timeslices so this will be
+different for that.
+"""
+def fill_nodata(dataset, dataset_intermediate):
+    if dataset_intermediate is None:
+        return dataset.copy(deep=True)
+    dataset_out = dataset_intermediate.copy(deep=True)
+    for key in list(dataset_out.data_vars):
+        # Get raw data for current variable and mask the data
+        dataset_out[key].values[dataset_out[key].values==-9999] = dataset[key].values[dataset_out[key].values==-9999]
+    return dataset_out
+
+def max_value(dataset, dataset_intermediate):
+    if dataset_intermediate is None:
+        return dataset.copy(deep=True)
+    dataset_out = dataset_intermediate.copy(deep=True)
+    for key in list(dataset_out.data_vars):
+        # Get raw data for current variable and mask the data
+        dataset_out[key].values[dataset.ndvi.values > dataset_out.ndvi.values] = dataset[key].values[dataset.ndvi.values > dataset_out.ndvi.values]
+    return dataset_out
+
+def min_value(dataset, dataset_intermediate):
+    if dataset_intermediate is None:
+        return dataset.copy(deep=True)
+    dataset_out = dataset_intermediate.copy(deep=True)
+    for key in list(dataset_out.data_vars):
+        # Get raw data for current variable and mask the data
+        dataset_out[key].values[dataset.ndvi.values < dataset_out.ndvi.values] = dataset[key].values[dataset.ndvi.values < dataset_out.ndvi.values]
+    return dataset_out
+
+def addition(dataset, dataset_intermediate):
+    """
+    functions used to combine time sliced data after being combined geographically.
+    This compounds the results of the time slice and recomputes the normalized data.
+    """
+    if dataset_intermediate is None:
+        return dataset.copy(deep=True)
+    data_vars = ["total_data", "total_clean"]
+    dataset_out = dataset_intermediate.copy(deep=True)
+    for key in data_vars:
+        dataset_out[key].values += dataset[key].values
+    dataset_out['normalized_data'].values = dataset_out["total_data"].values / dataset_out["total_clean"].values
+    dataset_out['normalized_data'].values[np.isnan(dataset_out['normalized_data'].values)] = 0
+    return dataset_out
