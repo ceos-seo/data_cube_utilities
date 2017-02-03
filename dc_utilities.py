@@ -26,7 +26,8 @@ import xarray as xr
 import collections
 import os
 import math
-from datetime import datetime
+import datetime
+import shutil
 
 import datacube
 
@@ -102,6 +103,18 @@ def split_task(resolution=0.000269, latitude=None, longitude=None, acquisitions=
         time_ranges = list(chunks(acquisitions, time_chunk_size))
 
     return lat_ranges, lon_ranges, time_ranges
+
+def generate_time_ranges(acquisition_list, reverse_time, slices_per_iteration):
+        time_index = 0
+        while time_index < len(acquisition_list):
+            start = acquisition_list[time_index] + datetime.timedelta(seconds=1) if reverse_time else acquisition_list[time_index]
+            if slices_per_iteration is not None and (time_index + slices_per_iteration - 1) < len(acquisition_list):
+                end = acquisition_list[time_index + slices_per_iteration - 1]
+            else:
+                end = acquisition_list[-1] if reverse_time else acquisition_list[-1] + datetime.timedelta(seconds=1)
+            time_range = (end, start) if reverse_time else (start, end)
+            yield time_range
+            time_index = time_index + (slices_per_iteration if slices_per_iteration is not None else len(acquisition_list))
 
 def get_spatial_ref(crs):
     """
@@ -252,6 +265,19 @@ def create_rgb_png_from_tiff(tif_path, png_path, bands=[1, 2, 3], png_filled_pat
         os.system(cmd)
         cmd = "convert " + png_path + " -background " + \
             fill_color + " -alpha remove " + png_filled_path
+        os.system(cmd)
+
+def create_single_band_rgb(band=None, tif_path=None, color_scale=None, output_path=None, fill=None):
+    cmd = "gdaldem color-relief -of PNG -b " + \
+        str(band) + " " + tif_path + " " + \
+        color_scale + " " + output_path
+    os.system(cmd)
+    cmd = "convert -transparent \"#FFFFFF\" " + \
+        output_path + " " + output_path
+    os.system(cmd)
+    if fill is not None and fill != "transparent":
+        cmd = "convert " + output_path + " -background " + \
+            fill + " -alpha remove " + output_path
         os.system(cmd)
 
 # Break the list l into n sized chunks.
