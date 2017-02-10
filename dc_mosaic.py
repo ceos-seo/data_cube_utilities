@@ -60,6 +60,8 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         variables: same as dataset_in
     """
 
+    dataset_in = dataset_in.copy(deep=True)
+
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
@@ -75,7 +77,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         dataset_out = None
     time_slices = reversed(range(len(clean_mask))) if kwargs and kwargs['reverse_time'] else range(len(clean_mask))
     for index in time_slices:
-        dataset_slice = dataset_in.isel(time=index).astype("int16").drop('time')
+        dataset_slice = dataset_in.isel(time=index).drop('time')
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
             #clear out the params as they can't be written to nc.
@@ -83,6 +85,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         else:
             for key in list(dataset_in.data_vars):
                 dataset_out[key].values[dataset_out[key].values==-9999] = dataset_slice[key].values[dataset_out[key].values==-9999]
+                dataset_out[key].attrs = OrderedDict()
     return dataset_out
 
 def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
@@ -102,7 +105,7 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
         #dataset_in = dataset_in.drop('cf_mask')
 
     #required for np.nan
-    dataset_in = dataset_in.astype("float64")
+    dataset_in = dataset_in.copy(deep=True).astype("float64")
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -115,7 +118,10 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
         dataset_out[key].values = np.nanmedian(dataset_in[key].values, axis=0)
         dataset_out[key].values[dataset_out[key].values==np.nan] = no_data
 
-    return dataset_out.astype('int16')
+    #manually clear out dates/timestamps/sats.. median won't produce meaningful reslts for these.
+    for key in ['timestamp', 'date', 'satellite']:
+        dataset_out[key].values[::] = no_data
+    return dataset_out.astype('int32')
 
 
 def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
@@ -128,6 +134,8 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
+
+    dataset_in = dataset_in.copy(deep=True)
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
@@ -166,6 +174,8 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
+
+    dataset_in = dataset_in.copy(deep=True)
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
         cfmask = dataset_in.cf_mask

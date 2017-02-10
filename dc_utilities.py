@@ -95,12 +95,11 @@ def split_task(resolution=0.000269, latitude=None, longitude=None, acquisitions=
         lon_ranges = [None]
         lat_ranges = [None]
     #split the acquisition list into chunks as well.
-    if reverse_time:
-        acquisitions.reverse()
-    time_ranges = [acquisitions]
+    acquisitions_sorted = sorted(acquisitions)
+    time_ranges = [list(reversed(acquisitions_sorted)) if reverse_time else acquisitions_sorted]
     if time_chunks is not None:
-        time_chunk_size = math.ceil(len(acquisitions) / time_chunks)
-        time_ranges = list(chunks(acquisitions, time_chunk_size))
+        time_chunk_size = math.ceil(len(acquisitions_sorted) / time_chunks)
+        time_ranges = list(chunks(acquisitions_sorted, time_chunk_size))
 
     return lat_ranges, lon_ranges, time_ranges
 
@@ -112,7 +111,7 @@ def generate_time_ranges(acquisition_list, reverse_time, slices_per_iteration):
                 end = acquisition_list[time_index + slices_per_iteration - 1]
             else:
                 end = acquisition_list[-1] if reverse_time else acquisition_list[-1] + datetime.timedelta(seconds=1)
-            time_range = (end, start) if reverse_time else (start, end)
+            time_range = tuple(sorted((start, end)))
             yield time_range
             time_index = time_index + (slices_per_iteration if slices_per_iteration is not None else len(acquisition_list))
 
@@ -238,7 +237,7 @@ def save_to_geotiff(out_file, data_type, dataset_in, geotransform, spatial_ref,
         keys = band_order
 
     driver = gdal.GetDriverByName('GTiff')
-    raster = driver.Create(out_file, x_pixels, y_pixels, len(data_vars), data_type, options=["BIGTIFF=YES", "INTERLEAVE=BAND"])
+    raster = driver.Create(out_file, x_pixels, y_pixels, len(keys), data_type, options=["BIGTIFF=YES", "INTERLEAVE=BAND"])
     raster.SetGeoTransform(geotransform)
     raster.SetProjection(spatial_ref)
     index = 1
