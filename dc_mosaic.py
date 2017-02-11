@@ -60,7 +60,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         variables: same as dataset_in
     """
 
-    dataset_in = dataset_in.copy(deep=True)
+    dataset_in = dataset_in.copy(deep=True).astype('int32')
 
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
@@ -135,7 +135,7 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 		no_data (int/float) - no data value.
 	"""
 
-    dataset_in = dataset_in.copy(deep=True)
+    dataset_in = dataset_in.copy(deep=True).astype("float64")
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
@@ -151,7 +151,7 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
         dataset_out = None
 
     for timeslice in range(clean_mask.shape[0]):
-        dataset_slice = dataset_in.isel(time=timeslice).astype("float64").drop('time')
+        dataset_slice = dataset_in.isel(time=timeslice).drop('time')
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
         ndvi.values[np.invert(clean_mask)[timeslice,::]] = -1000000000
         dataset_slice['ndvi'] = ndvi
@@ -175,7 +175,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 		no_data (int/float) - no data value.
 	"""
 
-    dataset_in = dataset_in.copy(deep=True)
+    dataset_in = dataset_in.copy(deep=True).astype("float64")
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
         cfmask = dataset_in.cf_mask
@@ -191,7 +191,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
         dataset_out = None
 
     for timeslice in range(clean_mask.shape[0]):
-        dataset_slice = dataset_in.isel(time=timeslice).astype("float64").drop('time')
+        dataset_slice = dataset_in.isel(time=timeslice).drop('time')
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
         ndvi.values[np.invert(clean_mask)[timeslice,::]] = 1000000000
         dataset_slice['ndvi'] = ndvi
