@@ -99,7 +99,7 @@ def split_task(resolution=0.000269, latitude=None, longitude=None, acquisitions=
     time_ranges = [list(reversed(acquisitions_sorted)) if reverse_time else acquisitions_sorted]
     if time_chunks is not None:
         time_chunk_size = math.ceil(len(acquisitions_sorted) / time_chunks)
-        time_ranges = list(chunks(acquisitions_sorted, time_chunk_size))
+        time_ranges = list(chunks(list(reversed(acquisitions_sorted)) if reverse_time else acquisitions_sorted, time_chunk_size))
 
     return lat_ranges, lon_ranges, time_ranges
 
