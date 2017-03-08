@@ -22,11 +22,13 @@
 
 # datacube imports.
 import datacube
+from datacube.api import GridWorkflow
 
 # Author: AHDS
 # Creation date: 2016-06-23
 # Modified by:
 # Last modified date: 2016-08-05
+
 
 class DataAccessApi:
     """
@@ -43,8 +45,6 @@ class DataAccessApi:
         # fetching.
         # hardcoded config location. could parameterize.
         self.dc = datacube.Datacube(config='/home/localuser/Datacube/data_cube_ui/config/.datacube.conf')
-        #self.dc = datacube.Datacube()
-        self.api = datacube.api.API(datacube=self.dc)
 
     """
     query params are defined in datacube.api.query
@@ -91,14 +91,10 @@ class DataAccessApi:
 
         data = self.dc.load(product=product, measurements=measurements,
                             output_crs=output_crs, resolution=resolution, dask_chunks=dask_chunks, **query)
-        # data = self.dc.load(product=product, product_type=product_type, platform=platform, time=time, longitude=longitude,
-        # latitude=latitude, measurements=measurements, output_crs=output_crs,
-        # resolution=resolution)
         return data
 
-
     def get_dataset_tiles(self, product, product_type=None, platform=None, time=None,
-                              longitude=None, latitude=None, measurements=None, output_crs=None, resolution=None):
+                          longitude=None, latitude=None, measurements=None, output_crs=None, resolution=None):
         """
         Gets and returns data based on lat/long bounding box inputs.
         All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -131,12 +127,12 @@ class DataAccessApi:
             query['longitude'] = longitude
             query['latitude'] = latitude
 
-        #set up the grid workflow
+        # set up the grid workflow
         gw = GridWorkflow(self.dc.index, product=product)
 
-        #dict of tiles.
+        # dict of tiles.
         request_tiles = gw.list_cells(product=product, measurements=measurements,
-                       output_crs=output_crs, resolution=resolution, **query)
+                                      output_crs=output_crs, resolution=resolution, **query)
 
         """
         tile_def = defaultdict(dict)
@@ -151,7 +147,7 @@ class DataAccessApi:
             tile = tile_def[key]['request']
             data_tiles[key[0]] = gw.load(key[0], tile)
         """
-        #cells now return stacked xarrays of data.
+        # cells now return stacked xarrays of data.
         data_tiles = {}
         for tile_key in request_tiles:
             tile = request_tiles[tile_key]
@@ -159,14 +155,13 @@ class DataAccessApi:
 
         return data_tiles
 
-
     def get_scene_metadata(self, platform, product, longitude=None, latitude=None, crs=None, time=None):
         """
         Gets a descriptor based on a request.
 
         Args:
             platform (string): Platform for which data is requested
-            product_type (string): Product type for which data is requested
+            product (string): The name of the product associated with the desired dataset.
             longitude (tuple): Tuple of min,max floats for longitude
             latitude (tuple): Tuple of min,max floats for latitutde
             crs (string): Describes the coordinate system of params lat and long
@@ -210,7 +205,7 @@ class DataAccessApi:
 
         Args:
             platform (string): Platform for which data is requested
-            product_type (string): Product type for which data is requested
+            product (string): The name of the product associated with the desired dataset.
             longitude (tuple): Tuple of min,max floats for longitude
             latitude (tuple): Tuple of min,max floats for latitutde
             crs (string): Describes the coordinate system of params lat and long
