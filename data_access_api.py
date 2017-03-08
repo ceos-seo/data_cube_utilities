@@ -33,9 +33,6 @@ class DataAccessApi:
     Class that provides wrapper functionality for the DataCube.
     """
 
-    dc = None
-    api = None
-
     # defaults for all the required fields.
     product_default = 'ls7_ledaps'
     platform_default = 'LANDSAT_7'
