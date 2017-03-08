@@ -192,7 +192,8 @@ class DataAccessApi:
         return {
             'lat_extents': (lat_min, lat_max),
             'lon_extents': (lon_min, lon_max),
-            'time_extents': (dataset.time[0], dataset.time[-1]),
+            'time_extents': (dataset.time[0].values.astype('M8[ms]').tolist(),
+                             dataset.time[-1].values.astype('M8[ms]').tolist()),
             'scene_count': dataset.time.size,
             'pixel_count': dataset.geobox.shape[0] * dataset.geobox.shape[1],
             # TODO: is 'tile_count' needed?
@@ -226,7 +227,7 @@ class DataAccessApi:
         if not dataset:
             return []
 
-        return dataset.time
+        return dataset.time.values.astype('M8[ms]').tolist()
 
     def get_datacube_metadata(self, platform, product):
         """
