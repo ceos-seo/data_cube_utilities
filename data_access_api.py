@@ -176,42 +176,33 @@ class DataAccessApi:
             scene_metadata (dict): Dictionary containing a variety of data that can later be
                                    accessed.
         """
+        dataset = self.get_dataset_by_extent(platform=platform,
+                                             product=product,
+                                             longitude=longitude,
+                                             latitude=latitude,
+                                             crs=crs,
+                                             time=time,
+                                             dask_chunks={})
 
-        descriptor_request = {}
-        if platform is not None:
-            descriptor_request['platform'] = platform
-        if longitude is not None and latitude is not None:
-            dimensions = {}
-            longitude_dict = {}
-            latitude_dict = {}
-            time_dict = {}
-            longitude_dict['range'] = longitude
-            latitude_dict['range'] = latitude
-            if crs is not None:
-                longitude_dict['crs'] = crs
-                latitude_dict['crs'] = crs
-            dimensions['longitude'] = longitude_dict
-            dimensions['latitude'] = latitude_dict
-            if time is not None:
-                time_dict['range'] = time
-                dimensions['time'] = time_dict
-            descriptor_request['dimensions'] = dimensions
+        if not dataset:
+            return {'lat_extents': (0, 0),
+                    'lon_extents': (0, 0),
+                    'time_extents': (0, 0),
+                    'scene_count': 0,
+                    'pixel_count': 0,
+                    'tile_count': 0,
+                    'storage_units': {}}
 
-        descriptor = self.api.get_descriptor(descriptor_request=descriptor_request)
-        scene_metadata = {}
-
-        if product in descriptor and len(descriptor[product]['result_min']) > 2:
-            scene_metadata['lat_extents'] = (descriptor[product]['result_min'][1], descriptor[product]['result_max'][1])
-            scene_metadata['lon_extents'] = (descriptor[product]['result_min'][2], descriptor[product]['result_max'][2])
-            scene_metadata['time_extents'] = (descriptor[product]['result_min'][0], descriptor[product]['result_max'][0])
-            scene_metadata['tile_count'] = len(descriptor[product]['storage_units'])
-            scene_metadata['scene_count'] = descriptor[product]['result_shape'][0]
-            scene_metadata['pixel_count'] = descriptor[product]['result_shape'][1] * descriptor[product]['result_shape'][2]
-            scene_metadata['storage_units'] = descriptor[product]['storage_units']
-        else:
-            scene_metadata = {'lat_extents': (0,0), 'lon_extents': (0,0), 'time_extents': (0,0), 'tile_count': 0, 'scene_count': 0, 'pixel_count': 0, 'storage_units': {}}
-
-        return scene_metadata
+        lon_min, lat_min, lon_max, lat_max = dataset.geobox.extent.envelope
+        return {
+            'lat_extents': (lat_min, lat_max),
+            'lon_extents': (lon_min, lon_max),
+            'time_extents': (dataset.time[0], dataset.time[-1]),
+            'scene_count': dataset.time.size,
+            'pixel_count': dataset.geobox.shape[0] * dataset.geobox.shape[1],
+            # TODO: is 'tile_count' needed?
+            # TODO: is 'storage_units' it needed?
+        }
 
     def list_acquisition_dates(self, platform, product, longitude=None, latitude=None, crs=None, time=None):
         """
@@ -229,35 +220,28 @@ class DataAccessApi:
             times (list): Python list of dates that can be used to query the dc for single time
                           sliced data.
         """
+        dataset = self.get_dataset_by_extent(platform=platform,
+                                             product=product,
+                                             longitude=longitude,
+                                             latitude=latitude,
+                                             crs=crs,
+                                             time=time,
+                                             dask_chunks={})
 
-        metadata = self.get_scene_metadata(platform, product, longitude=longitude, latitude=latitude, crs=crs, time=time)
-        #gets a list of times, corrected for utc offset.
-        # (unit[0] + unit[0].utcoffset()) if unit[0].utcoffset() else
-        times = set([unit[0] for unit in metadata['storage_units'].keys()])
-        return sorted(times)
+        if not dataset:
+            return []
+
+        return dataset.time
 
     def get_datacube_metadata(self, platform, product):
         """
         Gets some details on the cube and its contents.
 
         Args:
-	    platform (string): Desired platform for requested data.
-	    product (string): Desired product for requested data.
+            platform (string): Desired platform for requested data.
+            product (string): Desired product for requested data.
 
         Returns:
             datacube_metadata (dict): a dict with multiple keys containing relevant metadata.
         """
-
-        descriptor = self.api.get_descriptor({'platform': platform})
-        datacube_metadata = {}
-        if product in descriptor:
-            datacube_metadata['lat_extents'] = (descriptor[product]['result_min'][1], descriptor[product]['result_max'][1])
-            datacube_metadata['lon_extents'] = (descriptor[product]['result_min'][2], descriptor[product]['result_max'][2])
-            datacube_metadata['time_extents'] = (descriptor[product]['result_min'][0], descriptor[product]['result_max'][0])
-            datacube_metadata['tile_count'] = len(descriptor[product]['storage_units'])
-            datacube_metadata['scene_count'] = descriptor[product]['result_shape'][0]
-            datacube_metadata['pixel_count'] = descriptor[product]['result_shape'][1] * descriptor[product]['result_shape'][2]
-        else:
-            datacube_metadata = {'lat_extents': (0,0), 'lon_extents': (0,0), 'time_extents': (0,0), 'tile_count': 0, 'scene_count': 0, 'pixel_count': 0}
-
-        return datacube_metadata
+        return self.get_scene_metadata(platform, product)
