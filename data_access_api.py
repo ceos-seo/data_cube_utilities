@@ -22,24 +22,6 @@
 
 # datacube imports.
 import datacube
-from datacube.api import *
-
-# basic stuff.
-from collections import defaultdict
-import time
-from datetime import datetime
-import json
-
-# dc data comes out as xray arrays
-import xarray as xr
-import xarray.ufuncs
-
-# gdal related stuff.
-import gdal
-from gdalconst import *
-
-# np for arrays
-import numpy as np
 
 # Author: AHDS
 # Creation date: 2016-06-23
