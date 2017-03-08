@@ -51,7 +51,8 @@ class DataAccessApi:
     """
 
     def get_dataset_by_extent(self, product, product_type=None, platform=None, time=None,
-                              longitude=None, latitude=None, measurements=None, output_crs=None, resolution=None):
+                              longitude=None, latitude=None, measurements=None, output_crs=None,
+                              resolution=None, crs=None, dask_chunks=None):
         """
         Gets and returns data based on lat/long bounding box inputs.
         All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -64,9 +65,11 @@ class DataAccessApi:
             time (tuple): A tuple consisting of the start time and end time for the dataset.
             longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
             latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
+            crs (string): CRS lat/lon bounds are specified in, defaults to WGS84.
             measurements (list): A list of strings that represents all measurements.
             output_crs (string): Determines reprojection of the data before its returned
             resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
+            dask_chunks (dict): Lazy loaded array block sizes, not lazy loaded by default.
 
         Returns:
             data (xarray): dataset with the desired data.
@@ -83,9 +86,11 @@ class DataAccessApi:
         if longitude is not None and latitude is not None:
             query['longitude'] = longitude
             query['latitude'] = latitude
+        if crs is not None:
+            query['crs'] = crs
 
         data = self.dc.load(product=product, measurements=measurements,
-                       output_crs=output_crs, resolution=resolution, **query)
+                            output_crs=output_crs, resolution=resolution, dask_chunks=dask_chunks, **query)
         # data = self.dc.load(product=product, product_type=product_type, platform=platform, time=time, longitude=longitude,
         # latitude=latitude, measurements=measurements, output_crs=output_crs,
         # resolution=resolution)
