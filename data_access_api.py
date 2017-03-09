@@ -112,6 +112,43 @@ class DataAccessApi:
         # resolution=resolution)
         return data
 
+    def get_stacked_datasets_by_extent(self, products, product_type=None, platforms=None, time=None,
+                              longitude=None, latitude=None, measurements=None, output_crs=None, resolution=None):
+        """
+        Gets and returns data based on lat/long bounding box inputs.
+        All params are optional. Leaving one out will just query the dc without it, (eg leaving out
+        lat/lng but giving product returns dataset containing entire product.)
+
+        Args:
+            products (array of strings): The names of the product associated with the desired dataset.
+            product_type (string): The type of product associated with the desired dataset.
+            platforms (array of strings): The platforms associated with the desired dataset.
+            time (tuple): A tuple consisting of the start time and end time for the dataset.
+            longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
+            latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
+            measurements (list): A list of strings that represents all measurements.
+            output_crs (string): Determines reprojection of the data before its returned
+            resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
+
+        Returns:
+            data (xarray): dataset with the desired data.
+        """
+
+        data_array = []
+
+        for index, product in enumerate(products):
+            product_data = self.get_dataset_by_extent(product, product_type=product_type, platform=platforms[index], time=time,
+                                  longitude=longitude, latitude=latitude, measurements=measurements, output_crs=output_crs, resolution=resolution)
+            if 'time' in product_data:
+                product_data['satellite'] = xr.DataArray(np.full(product_data.cf_mask.values.shape, index, dtype="int16"), dims=('time', 'latitude', 'longitude'))
+                data_array.append(product_data.copy(deep=True))
+
+        data = None
+        if len(data_array) > 0:
+            combined_data = xr.concat(data_array, 'time')
+            data = combined_data.reindex({'time':sorted(combined_data.time.values)})
+
+        return data
 
     def get_dataset_tiles(self, product, product_type=None, platform=None, time=None,
                               longitude=None, latitude=None, measurements=None, output_crs=None, resolution=None):
