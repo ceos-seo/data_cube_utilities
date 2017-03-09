@@ -120,7 +120,8 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
 
     #manually clear out dates/timestamps/sats.. median won't produce meaningful reslts for these.
     for key in ['timestamp', 'date', 'satellite']:
-        dataset_out[key].values[::] = no_data
+        if key in dataset_out:
+            dataset_out[key].values[::] = no_data
     return dataset_out.astype('int32')
 
 
