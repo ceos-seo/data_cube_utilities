@@ -58,12 +58,12 @@ class DataAccessApi:
     product_default = 'ls7_ledaps'
     platform_default = 'LANDSAT_7'
 
-    def __init__(self):
+    def __init__(self, config='/home/localuser/Datacube/data_cube_ui/config/.datacube.conf'):
         # using both the datacube object and the api.
         # dc is useful for all data access, api is only really used for metadata
         # fetching.
         # hardcoded config location. could parameterize.
-        self.dc = datacube.Datacube(config='/home/localuser/Datacube/data_cube_ui/config/.datacube.conf')
+        self.dc = datacube.Datacube(config=config)
         #self.dc = datacube.Datacube()
         self.api = datacube.api.API(datacube=self.dc)
 
