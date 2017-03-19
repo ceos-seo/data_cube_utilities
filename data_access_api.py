@@ -21,24 +21,7 @@
 
 # datacube imports.
 import datacube
-from datacube.api import *
-
-# basic stuff.
-from collections import defaultdict
-import time
-from datetime import datetime
-import json
-
-# dc data comes out as xray arrays
-import xarray as xr
-import xarray.ufuncs
-
-# gdal related stuff.
-import gdal
-from gdalconst import *
-
-# np for arrays
-import numpy as np
+from datacube.api import GridWorkflow
 
 # Author: AHDS
 # Creation date: 2016-06-23
@@ -51,21 +34,12 @@ class DataAccessApi:
     Class that provides wrapper functionality for the DataCube.
     """
 
-    dc = None
-    api = None
-
     # defaults for all the required fields.
     product_default = 'ls7_ledaps'
     platform_default = 'LANDSAT_7'
 
     def __init__(self, config='/home/localuser/Datacube/data_cube_ui/config/.datacube.conf'):
-        # using both the datacube object and the api.
-        # dc is useful for all data access, api is only really used for metadata
-        # fetching.
-        # hardcoded config location. could parameterize.
         self.dc = datacube.Datacube(config=config)
-        #self.dc = datacube.Datacube()
-        self.api = datacube.api.API(datacube=self.dc)
 
     """
     query params are defined in datacube.api.query
@@ -80,7 +54,9 @@ class DataAccessApi:
                               latitude=None,
                               measurements=None,
                               output_crs=None,
-                              resolution=None):
+                              resolution=None,
+                              crs=None,
+                              dask_chunks=None):
         """
         Gets and returns data based on lat/long bounding box inputs.
         All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -93,9 +69,11 @@ class DataAccessApi:
             time (tuple): A tuple consisting of the start time and end time for the dataset.
             longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
             latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
+            crs (string): CRS lat/lon bounds are specified in, defaults to WGS84.
             measurements (list): A list of strings that represents all measurements.
             output_crs (string): Determines reprojection of the data before its returned
             resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
+            dask_chunks (dict): Lazy loaded array block sizes, not lazy loaded by default.
 
         Returns:
             data (xarray): dataset with the desired data.
@@ -112,12 +90,16 @@ class DataAccessApi:
         if longitude is not None and latitude is not None:
             query['longitude'] = longitude
             query['latitude'] = latitude
+        if crs is not None:
+            query['crs'] = crs
 
         data = self.dc.load(
-            product=product, measurements=measurements, output_crs=output_crs, resolution=resolution, **query)
-        # data = self.dc.load(product=product, product_type=product_type, platform=platform, time=time, longitude=longitude,
-        # latitude=latitude, measurements=measurements, output_crs=output_crs,
-        # resolution=resolution)
+            product=product,
+            measurements=measurements,
+            output_crs=output_crs,
+            resolution=resolution,
+            dask_chunks=dask_chunks,
+            **query)
         return data
 
     def get_stacked_datasets_by_extent(self,
@@ -129,26 +111,27 @@ class DataAccessApi:
                                        latitude=None,
                                        measurements=None,
                                        output_crs=None,
-                                       resolution=None):
+                                       resolution=None,
+                                       dask_chunks=None):
         """
-        Gets and returns data based on lat/long bounding box inputs.
-        All params are optional. Leaving one out will just query the dc without it, (eg leaving out
-        lat/lng but giving product returns dataset containing entire product.)
+          Gets and returns data based on lat/long bounding box inputs.
+          All params are optional. Leaving one out will just query the dc without it, (eg leaving out
+          lat/lng but giving product returns dataset containing entire product.)
 
-        Args:
-            products (array of strings): The names of the product associated with the desired dataset.
-            product_type (string): The type of product associated with the desired dataset.
-            platforms (array of strings): The platforms associated with the desired dataset.
-            time (tuple): A tuple consisting of the start time and end time for the dataset.
-            longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
-            latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
-            measurements (list): A list of strings that represents all measurements.
-            output_crs (string): Determines reprojection of the data before its returned
-            resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
+          Args:
+              products (array of strings): The names of the product associated with the desired dataset.
+              product_type (string): The type of product associated with the desired dataset.
+              platforms (array of strings): The platforms associated with the desired dataset.
+              time (tuple): A tuple consisting of the start time and end time for the dataset.
+              longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
+              latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
+              measurements (list): A list of strings that represents all measurements.
+              output_crs (string): Determines reprojection of the data before its returned
+              resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
 
-        Returns:
-            data (xarray): dataset with the desired data.
-        """
+          Returns:
+              data (xarray): dataset with the desired data.
+          """
 
         data_array = []
 
@@ -162,7 +145,8 @@ class DataAccessApi:
                 latitude=latitude,
                 measurements=measurements,
                 output_crs=output_crs,
-                resolution=resolution)
+                resolution=resolution,
+                dask_chunks=dask_chunks)
             if 'time' in product_data:
                 product_data['satellite'] = xr.DataArray(
                     np.full(product_data.cf_mask.values.shape, index, dtype="int16"),
@@ -218,10 +202,10 @@ class DataAccessApi:
             query['longitude'] = longitude
             query['latitude'] = latitude
 
-        #set up the grid workflow
+        # set up the grid workflow
         gw = GridWorkflow(self.dc.index, product=product)
 
-        #dict of tiles.
+        # dict of tiles.
         request_tiles = gw.list_cells(
             product=product, measurements=measurements, output_crs=output_crs, resolution=resolution, **query)
         """
@@ -237,7 +221,7 @@ class DataAccessApi:
             tile = tile_def[key]['request']
             data_tiles[key[0]] = gw.load(key[0], tile)
         """
-        #cells now return stacked xarrays of data.
+        # cells now return stacked xarrays of data.
         data_tiles = {}
         for tile_key in request_tiles:
             tile = request_tiles[tile_key]
@@ -251,7 +235,7 @@ class DataAccessApi:
 
         Args:
             platform (string): Platform for which data is requested
-            product_type (string): Product type for which data is requested
+            product (string): The name of the product associated with the desired dataset.
             longitude (tuple): Tuple of min,max floats for longitude
             latitude (tuple): Tuple of min,max floats for latitutde
             crs (string): Describes the coordinate system of params lat and long
@@ -262,51 +246,39 @@ class DataAccessApi:
                                    accessed.
         """
 
-        descriptor_request = {}
-        if platform is not None:
-            descriptor_request['platform'] = platform
-        if longitude is not None and latitude is not None:
-            dimensions = {}
-            longitude_dict = {}
-            latitude_dict = {}
-            time_dict = {}
-            longitude_dict['range'] = longitude
-            latitude_dict['range'] = latitude
-            if crs is not None:
-                longitude_dict['crs'] = crs
-                latitude_dict['crs'] = crs
-            dimensions['longitude'] = longitude_dict
-            dimensions['latitude'] = latitude_dict
-            if time is not None:
-                time_dict['range'] = time
-                dimensions['time'] = time_dict
-            descriptor_request['dimensions'] = dimensions
+        dataset = self.get_dataset_by_extent(
+            platform=platform,
+            product=product,
+            longitude=longitude,
+            latitude=latitude,
+            crs=crs,
+            time=time,
+            dask_chunks={})
 
-        descriptor = self.api.get_descriptor(descriptor_request=descriptor_request)
-        scene_metadata = {}
-
-        if product in descriptor and len(descriptor[product]['result_min']) > 2:
-            scene_metadata['lat_extents'] = (descriptor[product]['result_min'][1], descriptor[product]['result_max'][1])
-            scene_metadata['lon_extents'] = (descriptor[product]['result_min'][2], descriptor[product]['result_max'][2])
-            scene_metadata['time_extents'] = (descriptor[product]['result_min'][0],
-                                              descriptor[product]['result_max'][0])
-            scene_metadata['tile_count'] = len(descriptor[product]['storage_units'])
-            scene_metadata['scene_count'] = descriptor[product]['result_shape'][0]
-            scene_metadata['pixel_count'] = descriptor[product]['result_shape'][1] * descriptor[product][
-                'result_shape'][2]
-            scene_metadata['storage_units'] = descriptor[product]['storage_units']
-        else:
-            scene_metadata = {
+        if not dataset:
+            return {
                 'lat_extents': (0, 0),
                 'lon_extents': (0, 0),
                 'time_extents': (0, 0),
-                'tile_count': 0,
                 'scene_count': 0,
                 'pixel_count': 0,
+                'tile_count': 0,
                 'storage_units': {}
             }
 
-        return scene_metadata
+        lon_min, lat_min, lon_max, lat_max = dataset.geobox.extent.envelope
+        return {
+            'lat_extents': (lat_min, lat_max),
+            'lon_extents': (lon_min, lon_max),
+            'time_extents': (dataset.time[0].values.astype('M8[ms]').tolist(),
+                             dataset.time[-1].values.astype('M8[ms]').tolist()),
+            'scene_count':
+            dataset.time.size,
+            'pixel_count':
+            dataset.geobox.shape[0] * dataset.geobox.shape[1],
+            # TODO: is 'tile_count' needed?
+            # TODO: is 'storage_units' it needed?
+        }
 
     def list_acquisition_dates(self, platform, product, longitude=None, latitude=None, crs=None, time=None):
         """
@@ -314,7 +286,7 @@ class DataAccessApi:
 
         Args:
             platform (string): Platform for which data is requested
-            product_type (string): Product type for which data is requested
+            product (string): The name of the product associated with the desired dataset.
             longitude (tuple): Tuple of min,max floats for longitude
             latitude (tuple): Tuple of min,max floats for latitutde
             crs (string): Describes the coordinate system of params lat and long
@@ -324,47 +296,30 @@ class DataAccessApi:
             times (list): Python list of dates that can be used to query the dc for single time
                           sliced data.
         """
+        dataset = self.get_dataset_by_extent(
+            platform=platform,
+            product=product,
+            longitude=longitude,
+            latitude=latitude,
+            crs=crs,
+            time=time,
+            dask_chunks={})
 
-        metadata = self.get_scene_metadata(
-            platform, product, longitude=longitude, latitude=latitude, crs=crs, time=time)
-        #gets a list of times, corrected for utc offset.
-        # (unit[0] + unit[0].utcoffset()) if unit[0].utcoffset() else
-        times = set([unit[0] for unit in metadata['storage_units'].keys()])
-        return sorted(times)
+        if not dataset:
+            return []
+
+        return dataset.time.values.astype('M8[ms]').tolist()
 
     def get_datacube_metadata(self, platform, product):
         """
         Gets some details on the cube and its contents.
 
         Args:
-	    platform (string): Desired platform for requested data.
-	    product (string): Desired product for requested data.
+            platform (string): Desired platform for requested data.
+            product (string): Desired product for requested data.
 
         Returns:
             datacube_metadata (dict): a dict with multiple keys containing relevant metadata.
         """
 
-        descriptor = self.api.get_descriptor({'platform': platform})
-        datacube_metadata = {}
-        if product in descriptor:
-            datacube_metadata['lat_extents'] = (descriptor[product]['result_min'][1],
-                                                descriptor[product]['result_max'][1])
-            datacube_metadata['lon_extents'] = (descriptor[product]['result_min'][2],
-                                                descriptor[product]['result_max'][2])
-            datacube_metadata['time_extents'] = (descriptor[product]['result_min'][0],
-                                                 descriptor[product]['result_max'][0])
-            datacube_metadata['tile_count'] = len(descriptor[product]['storage_units'])
-            datacube_metadata['scene_count'] = descriptor[product]['result_shape'][0]
-            datacube_metadata['pixel_count'] = descriptor[product]['result_shape'][1] * descriptor[product][
-                'result_shape'][2]
-        else:
-            datacube_metadata = {
-                'lat_extents': (0, 0),
-                'lon_extents': (0, 0),
-                'time_extents': (0, 0),
-                'tile_count': 0,
-                'scene_count': 0,
-                'pixel_count': 0
-            }
-
-        return datacube_metadata
+        return self.get_scene_metadata(platform, product)
