@@ -1,4 +1,3 @@
-
 # Copyright 2016 United States Government as represented by the Administrator
 # of the National Aeronautics and Space Administration. All Rights Reserved.
 #
@@ -46,6 +45,7 @@ import numpy as np
 # Modified by:
 # Last modified date: 2016-08-05
 
+
 class DataAccessApi:
     """
     Class that provides wrapper functionality for the DataCube.
@@ -71,8 +71,16 @@ class DataAccessApi:
     query params are defined in datacube.api.query
     """
 
-    def get_dataset_by_extent(self, product, product_type=None, platform=None, time=None,
-                              longitude=None, latitude=None, measurements=None, output_crs=None, resolution=None):
+    def get_dataset_by_extent(self,
+                              product,
+                              product_type=None,
+                              platform=None,
+                              time=None,
+                              longitude=None,
+                              latitude=None,
+                              measurements=None,
+                              output_crs=None,
+                              resolution=None):
         """
         Gets and returns data based on lat/long bounding box inputs.
         All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -105,15 +113,23 @@ class DataAccessApi:
             query['longitude'] = longitude
             query['latitude'] = latitude
 
-        data = self.dc.load(product=product, measurements=measurements,
-                       output_crs=output_crs, resolution=resolution, **query)
+        data = self.dc.load(
+            product=product, measurements=measurements, output_crs=output_crs, resolution=resolution, **query)
         # data = self.dc.load(product=product, product_type=product_type, platform=platform, time=time, longitude=longitude,
         # latitude=latitude, measurements=measurements, output_crs=output_crs,
         # resolution=resolution)
         return data
 
-    def get_stacked_datasets_by_extent(self, products, product_type=None, platforms=None, time=None,
-                              longitude=None, latitude=None, measurements=None, output_crs=None, resolution=None):
+    def get_stacked_datasets_by_extent(self,
+                                       products,
+                                       product_type=None,
+                                       platforms=None,
+                                       time=None,
+                                       longitude=None,
+                                       latitude=None,
+                                       measurements=None,
+                                       output_crs=None,
+                                       resolution=None):
         """
         Gets and returns data based on lat/long bounding box inputs.
         All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -137,21 +153,39 @@ class DataAccessApi:
         data_array = []
 
         for index, product in enumerate(products):
-            product_data = self.get_dataset_by_extent(product, product_type=product_type, platform=platforms[index], time=time,
-                                  longitude=longitude, latitude=latitude, measurements=measurements, output_crs=output_crs, resolution=resolution)
+            product_data = self.get_dataset_by_extent(
+                product,
+                product_type=product_type,
+                platform=platforms[index],
+                time=time,
+                longitude=longitude,
+                latitude=latitude,
+                measurements=measurements,
+                output_crs=output_crs,
+                resolution=resolution)
             if 'time' in product_data:
-                product_data['satellite'] = xr.DataArray(np.full(product_data.cf_mask.values.shape, index, dtype="int16"), dims=('time', 'latitude', 'longitude'))
+                product_data['satellite'] = xr.DataArray(
+                    np.full(product_data.cf_mask.values.shape, index, dtype="int16"),
+                    dims=('time', 'latitude', 'longitude'))
                 data_array.append(product_data.copy(deep=True))
 
         data = None
         if len(data_array) > 0:
             combined_data = xr.concat(data_array, 'time')
-            data = combined_data.reindex({'time':sorted(combined_data.time.values)})
+            data = combined_data.reindex({'time': sorted(combined_data.time.values)})
 
         return data
 
-    def get_dataset_tiles(self, product, product_type=None, platform=None, time=None,
-                              longitude=None, latitude=None, measurements=None, output_crs=None, resolution=None):
+    def get_dataset_tiles(self,
+                          product,
+                          product_type=None,
+                          platform=None,
+                          time=None,
+                          longitude=None,
+                          latitude=None,
+                          measurements=None,
+                          output_crs=None,
+                          resolution=None):
         """
         Gets and returns data based on lat/long bounding box inputs.
         All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -188,9 +222,8 @@ class DataAccessApi:
         gw = GridWorkflow(self.dc.index, product=product)
 
         #dict of tiles.
-        request_tiles = gw.list_cells(product=product, measurements=measurements,
-                       output_crs=output_crs, resolution=resolution, **query)
-
+        request_tiles = gw.list_cells(
+            product=product, measurements=measurements, output_crs=output_crs, resolution=resolution, **query)
         """
         tile_def = defaultdict(dict)
         for cell, tiles in request_tiles.items():
@@ -211,7 +244,6 @@ class DataAccessApi:
             data_tiles[tile_key] = gw.load(tile, measurements=measurements)
 
         return data_tiles
-
 
     def get_scene_metadata(self, platform, product, longitude=None, latitude=None, crs=None, time=None):
         """
@@ -256,13 +288,23 @@ class DataAccessApi:
         if product in descriptor and len(descriptor[product]['result_min']) > 2:
             scene_metadata['lat_extents'] = (descriptor[product]['result_min'][1], descriptor[product]['result_max'][1])
             scene_metadata['lon_extents'] = (descriptor[product]['result_min'][2], descriptor[product]['result_max'][2])
-            scene_metadata['time_extents'] = (descriptor[product]['result_min'][0], descriptor[product]['result_max'][0])
+            scene_metadata['time_extents'] = (descriptor[product]['result_min'][0],
+                                              descriptor[product]['result_max'][0])
             scene_metadata['tile_count'] = len(descriptor[product]['storage_units'])
             scene_metadata['scene_count'] = descriptor[product]['result_shape'][0]
-            scene_metadata['pixel_count'] = descriptor[product]['result_shape'][1] * descriptor[product]['result_shape'][2]
+            scene_metadata['pixel_count'] = descriptor[product]['result_shape'][1] * descriptor[product][
+                'result_shape'][2]
             scene_metadata['storage_units'] = descriptor[product]['storage_units']
         else:
-            scene_metadata = {'lat_extents': (0,0), 'lon_extents': (0,0), 'time_extents': (0,0), 'tile_count': 0, 'scene_count': 0, 'pixel_count': 0, 'storage_units': {}}
+            scene_metadata = {
+                'lat_extents': (0, 0),
+                'lon_extents': (0, 0),
+                'time_extents': (0, 0),
+                'tile_count': 0,
+                'scene_count': 0,
+                'pixel_count': 0,
+                'storage_units': {}
+            }
 
         return scene_metadata
 
@@ -283,7 +325,8 @@ class DataAccessApi:
                           sliced data.
         """
 
-        metadata = self.get_scene_metadata(platform, product, longitude=longitude, latitude=latitude, crs=crs, time=time)
+        metadata = self.get_scene_metadata(
+            platform, product, longitude=longitude, latitude=latitude, crs=crs, time=time)
         #gets a list of times, corrected for utc offset.
         # (unit[0] + unit[0].utcoffset()) if unit[0].utcoffset() else
         times = set([unit[0] for unit in metadata['storage_units'].keys()])
@@ -304,13 +347,24 @@ class DataAccessApi:
         descriptor = self.api.get_descriptor({'platform': platform})
         datacube_metadata = {}
         if product in descriptor:
-            datacube_metadata['lat_extents'] = (descriptor[product]['result_min'][1], descriptor[product]['result_max'][1])
-            datacube_metadata['lon_extents'] = (descriptor[product]['result_min'][2], descriptor[product]['result_max'][2])
-            datacube_metadata['time_extents'] = (descriptor[product]['result_min'][0], descriptor[product]['result_max'][0])
+            datacube_metadata['lat_extents'] = (descriptor[product]['result_min'][1],
+                                                descriptor[product]['result_max'][1])
+            datacube_metadata['lon_extents'] = (descriptor[product]['result_min'][2],
+                                                descriptor[product]['result_max'][2])
+            datacube_metadata['time_extents'] = (descriptor[product]['result_min'][0],
+                                                 descriptor[product]['result_max'][0])
             datacube_metadata['tile_count'] = len(descriptor[product]['storage_units'])
             datacube_metadata['scene_count'] = descriptor[product]['result_shape'][0]
-            datacube_metadata['pixel_count'] = descriptor[product]['result_shape'][1] * descriptor[product]['result_shape'][2]
+            datacube_metadata['pixel_count'] = descriptor[product]['result_shape'][1] * descriptor[product][
+                'result_shape'][2]
         else:
-            datacube_metadata = {'lat_extents': (0,0), 'lon_extents': (0,0), 'time_extents': (0,0), 'tile_count': 0, 'scene_count': 0, 'pixel_count': 0}
+            datacube_metadata = {
+                'lat_extents': (0, 0),
+                'lon_extents': (0, 0),
+                'time_extents': (0, 0),
+                'tile_count': 0,
+                'scene_count': 0,
+                'pixel_count': 0
+            }
 
         return datacube_metadata

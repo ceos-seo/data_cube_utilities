@@ -1,4 +1,3 @@
-
 # Copyright 2016 United States Government as represented by the Administrator
 # of the National Aeronautics and Space Administration. All Rights Reserved.
 #
@@ -37,6 +36,7 @@ from . import dc_utilities as utilities
 # Modified by: AHDS
 # Last modified date:
 
+
 def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
     """
     Description:
@@ -60,15 +60,14 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         variables: same as dataset_in
     """
 
-    dataset_in = dataset_in.copy(deep=True).astype('int32')
+    dataset_in = dataset_in.copy(deep=True).astype(kwargs.get('dtype', 'int32'))
 
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
-        cfmask = dataset_in.cf_mask
-        clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        ##dataset_in = dataset_in.drop('cf_mask')
+        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
+            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
 
-    #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
+        #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
     if intermediate_product is not None:
@@ -84,9 +83,11 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
             dataset_out.attrs = OrderedDict()
         else:
             for key in list(dataset_in.data_vars):
-                dataset_out[key].values[dataset_out[key].values==-9999] = dataset_slice[key].values[dataset_out[key].values==-9999]
+                dataset_out[key].values[dataset_out[key].values == -9999] = dataset_slice[key].values[dataset_out[key]
+                                                                                                      .values == -9999]
                 dataset_out[key].attrs = OrderedDict()
     return dataset_out
+
 
 def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
     """
@@ -100,9 +101,8 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
 	"""
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
-        cfmask = dataset_in.cf_mask
-        clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        #dataset_in = dataset_in.drop('cf_mask')
+        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
+            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
 
     #required for np.nan
     dataset_in = dataset_in.copy(deep=True).astype("float64")
@@ -110,19 +110,19 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
 
-    dataset_out = dataset_in.isel(time=0).drop('time').copy(deep=True)
+    dataset_out = dataset_in.isel(time=0).drop('time').copy(deep=True).astype('float64')
     dataset_out.attrs = OrderedDict()
     # Loop over every key.
     for key in list(dataset_in.data_vars):
-        dataset_in[key].values[dataset_in[key].values==no_data] = np.nan
+        dataset_in[key].values[dataset_in[key].values == no_data] = np.nan
         dataset_out[key].values = np.nanmedian(dataset_in[key].values, axis=0)
-        dataset_out[key].values[dataset_out[key].values==np.nan] = no_data
+        dataset_out[key].values[np.isnan(dataset_out[key].values)] = no_data
 
     #manually clear out dates/timestamps/sats.. median won't produce meaningful reslts for these.
     for key in ['timestamp', 'date', 'satellite']:
         if key in dataset_out:
             dataset_out[key].values[::] = no_data
-    return dataset_out.astype('int32')
+    return dataset_out.astype(kwargs.get('dtype', 'int32'))
 
 
 def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
@@ -139,9 +139,8 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     dataset_in = dataset_in.copy(deep=True).astype("float64")
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
-        cfmask = dataset_in.cf_mask
-        clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        #dataset_in = dataset_in.drop('cf_mask')
+        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
+            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -154,7 +153,7 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     for timeslice in range(clean_mask.shape[0]):
         dataset_slice = dataset_in.isel(time=timeslice).drop('time')
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
-        ndvi.values[np.invert(clean_mask)[timeslice,::]] = -1000000000
+        ndvi.values[np.invert(clean_mask)[timeslice, ::]] = -1000000000
         dataset_slice['ndvi'] = ndvi
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
@@ -162,8 +161,11 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
             dataset_out.attrs = OrderedDict()
         else:
             for key in list(dataset_slice.data_vars):
-                dataset_out[key].values[dataset_slice.ndvi.values > dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values > dataset_out.ndvi.values]
+                dataset_out[key].values[dataset_slice.ndvi.values >
+                                        dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values >
+                                                                                             dataset_out.ndvi.values]
     return dataset_out
+
 
 def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
     """
@@ -179,9 +181,8 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     dataset_in = dataset_in.copy(deep=True).astype("float64")
     # Create clean_mask from cfmask if none given
     if clean_mask is None:
-        cfmask = dataset_in.cf_mask
-        clean_mask = utilities.create_cfmask_clean_mask(cfmask)
-        #dataset_in = dataset_in.drop('cf_mask')
+        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
+            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -194,7 +195,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     for timeslice in range(clean_mask.shape[0]):
         dataset_slice = dataset_in.isel(time=timeslice).drop('time')
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
-        ndvi.values[np.invert(clean_mask)[timeslice,::]] = 1000000000
+        ndvi.values[np.invert(clean_mask)[timeslice, ::]] = 1000000000
         dataset_slice['ndvi'] = ndvi
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
@@ -202,5 +203,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
             dataset_out.attrs = OrderedDict()
         else:
             for key in list(dataset_slice.data_vars):
-                dataset_out[key].values[dataset_slice.ndvi.values < dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values < dataset_out.ndvi.values]
+                dataset_out[key].values[dataset_slice.ndvi.values <
+                                        dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values <
+                                                                                             dataset_out.ndvi.values]
     return dataset_out

@@ -1,6 +1,6 @@
 import numpy as np
 import xarray as xr
-import scipy.optimize as opt #nnls
+import scipy.optimize as opt  #nnls
 
 import datacube
 from . import dc_utilities as utilities
@@ -14,6 +14,7 @@ from datetime import datetime
 
 # Author: KMF
 # Creation date: 2016-10-24
+
 
 def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     """
@@ -52,8 +53,10 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
 
     mosaic_clean_mask = clean_mask.flatten()
 
-    for band in [dataset_in.blue.values, dataset_in.green.values, dataset_in.red.values,
-                 dataset_in.nir.values, dataset_in.swir1.values, dataset_in.swir2.values]:
+    for band in [
+            dataset_in.blue.values, dataset_in.green.values, dataset_in.red.values, dataset_in.nir.values,
+            dataset_in.swir1.values, dataset_in.swir2.values
+    ]:
         band = band.astype(np.float32)
         band = band * 0.0001
         band = band.flatten()
@@ -66,49 +69,51 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     for b in range(6):
         band_stack = np.hstack((band_stack, np.expand_dims(np.log(band_stack[:, b]), axis=1)))
     for b in range(6):
-        band_stack = np.hstack((band_stack, np.expand_dims(np.multiply(band_stack[:, b], band_stack[:, b+6]), axis=1)))
+        band_stack = np.hstack(
+            (band_stack, np.expand_dims(np.multiply(band_stack[:, b], band_stack[:, b + 6]), axis=1)))
     for b in range(6):
-        for b2 in range(b+1, 6):
-            band_stack = np.hstack((band_stack, np.expand_dims(np.multiply(band_stack[:, b], band_stack[:, b2]), axis=1)))
+        for b2 in range(b + 1, 6):
+            band_stack = np.hstack(
+                (band_stack, np.expand_dims(np.multiply(band_stack[:, b], band_stack[:, b2]), axis=1)))
     for b in range(6):
-        for b2 in range(b+1, 6):
-            band_stack = np.hstack((band_stack, np.expand_dims(np.multiply(band_stack[:, b+6], band_stack[:, b2+6]), axis=1)))
+        for b2 in range(b + 1, 6):
+            band_stack = np.hstack(
+                (band_stack, np.expand_dims(np.multiply(band_stack[:, b + 6], band_stack[:, b2 + 6]), axis=1)))
     for b in range(6):
-        for b2 in range(b+1, 6):
-            band_stack = np.hstack((band_stack,
-                                    np.expand_dims(np.divide(band_stack[:, b2] - band_stack[:, b],
-                                                             band_stack[:, b2] + band_stack[:, b]),
-                                                   axis=1)))
+        for b2 in range(b + 1, 6):
+            band_stack = np.hstack((band_stack, np.expand_dims(
+                np.divide(band_stack[:, b2] - band_stack[:, b], band_stack[:, b2] + band_stack[:, b]), axis=1)))
 
     band_stack = np.nan_to_num(band_stack)  # Now a n x 63 matrix (assuming one acquisition)
 
     ones = np.ones(band_stack.shape[0])
     ones = ones.reshape(ones.shape[0], 1)
-    band_stack = np.concatenate((band_stack, ones), axis=1) # Now a n x 64 matrix (assuming one acquisition)
+    band_stack = np.concatenate((band_stack, ones), axis=1)  # Now a n x 64 matrix (assuming one acquisition)
 
-    end_members = np.loadtxt('/home/localuser/Datacube/data_cube_ui/utils/endmembers_landsat.csv', delimiter=',') # Creates a 64 x 3 matrix
+    end_members = np.loadtxt(
+        '/home/localuser/Datacube/data_cube_ui/utils/endmembers_landsat.csv', delimiter=',')  # Creates a 64 x 3 matrix
 
     SumToOneWeight = 0.02
     ones = np.ones(end_members.shape[1]) * SumToOneWeight
     ones = ones.reshape(1, end_members.shape[1])
     end_members = np.concatenate((end_members, ones), axis=0).astype(np.float32)
 
-    result = np.zeros((band_stack.shape[0], end_members.shape[1]), dtype=np.float32) # Creates an n x 3 matrix
+    result = np.zeros((band_stack.shape[0], end_members.shape[1]), dtype=np.float32)  # Creates an n x 3 matrix
 
     for i in range(band_stack.shape[0]):
         if mosaic_clean_mask[i]:
-            result[i, :] = (opt.nnls(end_members, band_stack[i, :])[0].clip(0, 2.54)*100).astype(np.int16)
+            result[i, :] = (opt.nnls(end_members, band_stack[i, :])[0].clip(0, 2.54) * 100).astype(np.int16)
         else:
-            result[i, :] = np.ones((end_members.shape[1]), dtype=np.int16)*(-9999) # Set as no data
+            result[i, :] = np.ones((end_members.shape[1]), dtype=np.int16) * (-9999)  # Set as no data
 
     latitude = dataset_in.latitude
     longitude = dataset_in.longitude
 
     result = result.reshape(latitude.size, longitude.size, 3)
 
-    pv_band = result[:,:,0]
-    npv_band = result[:,:,1]
-    bs_band = result[:,:,2]
+    pv_band = result[:, :, 0]
+    npv_band = result[:, :, 1]
+    bs_band = result[:, :, 2]
 
     pv_clean = np.full(pv_band.shape, -9999)
     npv_clean = np.full(npv_band.shape, -9999)
@@ -121,15 +126,12 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
                                           ('pv', (['latitude', 'longitude'], pv_band)),
                                           ('npv', (['latitude', 'longitude'], npv_band))])
 
-    rapp_dataset = xr.Dataset(rapp_bands,
-                              coords={'latitude': latitude,
-                                      'longitude': longitude})
+    rapp_dataset = xr.Dataset(rapp_bands, coords={'latitude': latitude, 'longitude': longitude})
 
     return rapp_dataset
 
-def main(platform, product_type,
-         min_lon, max_lon, min_lat, max_lat,
-         start_date, end_date, dc_config):
+
+def main(platform, product_type, min_lon, max_lon, min_lat, max_lat, start_date, end_date, dc_config):
     """
     Description:
       Command-line fractional coverage tool - TODO
@@ -148,8 +150,7 @@ def main(platform, product_type,
     """
 
     # Initialize data cube object
-    dc = datacube.Datacube(config=dc_config,
-                           app='dc-frac-cov')
+    dc = datacube.Datacube(config=dc_config, app='dc-frac-cov')
 
     products = dc.list_products()
     platform_names = set([product[6] for product in products.values])
@@ -191,11 +192,12 @@ def main(platform, product_type,
         return
 
     # Retrieve data from Data Cube
-    dataset_in = dc.load(platform=platform,
-                         product=product_type,
-                         time=(start_date, end_date),
-                         lon=(min_lon, max_lon),
-                         lat=(min_lat, max_lat))
+    dataset_in = dc.load(
+        platform=platform,
+        product=product_type,
+        time=(start_date, end_date),
+        lon=(min_lon, max_lon),
+        lat=(min_lat, max_lat))
 
     # Get information needed for saving as GeoTIFF
 
@@ -221,13 +223,10 @@ def main(platform, product_type,
 
     dataset_out = frac_coverage_classify(dataset_in)
 
-    out_file = ( str(min_lon) + '_' + str(min_lat) + '_'
-               + start_date_str + '_' + end_date_str
-               + '_frac_coverage.tif' )
+    out_file = (str(min_lon) + '_' + str(min_lat) + '_' + start_date_str + '_' + end_date_str + '_frac_coverage.tif')
 
-    utilities.save_to_geotiff(out_file, gdal.GDT_Float32,
-                              dataset_out,
-                              geotransform, spatial_ref)
+    utilities.save_to_geotiff(out_file, gdal.GDT_Float32, dataset_out, geotransform, spatial_ref)
+
 
 if __name__ == '__main__':
 
@@ -242,15 +241,16 @@ if __name__ == '__main__':
     parser.add_argument('max_lat', help='Maximum latitude')
     parser.add_argument('start_date', help='Start date; format: YYYY-MM-DD')
     parser.add_argument('end_date', help='End date; format: YYYY-MM-DD')
-    parser.add_argument('dc_config', nargs='?', default='~/.datacube.conf', help='Datacube configuration path; default: ~/.datacube.conf')
+    parser.add_argument(
+        'dc_config',
+        nargs='?',
+        default='~/.datacube.conf',
+        help='Datacube configuration path; default: ~/.datacube.conf')
 
     args = parser.parse_args()
 
-    main(args.platform, args.product,
-         args.min_lon, args.max_lon,
-         args.min_lat, args.max_lat,
-         args.start_date, args.end_date,
-         args.dc_config)
+    main(args.platform, args.product, args.min_lon, args.max_lon, args.min_lat, args.max_lat, args.start_date,
+         args.end_date, args.dc_config)
 
     end_time = datetime.now()
     print('Execution time: ' + str(end_time - start_time))

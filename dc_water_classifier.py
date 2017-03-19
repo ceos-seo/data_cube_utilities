@@ -1,4 +1,3 @@
-
 # Copyright 2016 United States Government as represented by the Administrator
 # of the National Aeronautics and Space Administration. All Rights Reserved.
 #
@@ -36,6 +35,7 @@ from datetime import datetime
 
 # Author: KMF
 # Creation date: 2016-06-13
+
 
 def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enforce_float64=False):
     """
@@ -96,7 +96,7 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
         r1 = ndi_52 <= -0.01
 
         r2 = band1 <= 2083.5
-        classified[r1 & ~r2] = 0 #Node 3
+        classified[r1 & ~r2] = 0  #Node 3
 
         r3 = band7 <= 323.5
         _tmp = r1 & r2
@@ -104,15 +104,15 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
         _tmp &= ~r3
 
         r4 = ndi_43 <= 0.61
-        classified[_tmp2 & r4] = 1 #Node 6
-        classified[_tmp2 & ~r4] = 0 #Node 7
+        classified[_tmp2 & r4] = 1  #Node 6
+        classified[_tmp2 & ~r4] = 0  #Node 7
 
         r5 = band1 <= 1400.5
         _tmp2 = _tmp & ~r5
 
         r6 = ndi_43 <= -0.01
-        classified[_tmp2 & r6] = 1 #Node 10
-        classified[_tmp2 & ~r6] = 0 #Node 11
+        classified[_tmp2 & r6] = 1  #Node 10
+        classified[_tmp2 & ~r6] = 0  #Node 11
 
         _tmp &= r5
 
@@ -120,18 +120,18 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
         _tmp2 = _tmp & ~r7
 
         r8 = band1 <= 379
-        classified[_tmp2 & r8] = 1 #Node 14
-        classified[_tmp2 & ~r8] = 0 #Node 15
+        classified[_tmp2 & r8] = 1  #Node 14
+        classified[_tmp2 & ~r8] = 0  #Node 15
 
         _tmp &= r7
 
         r9 = ndi_43 <= 0.22
-        classified[_tmp & r9] = 1 #Node 17
+        classified[_tmp & r9] = 1  #Node 17
         _tmp &= ~r9
 
         r10 = band1 <= 473
-        classified[_tmp & r10] = 1 #Node 19
-        classified[_tmp & ~r10] = 0 #Node 20
+        classified[_tmp & r10] = 1  #Node 19
+        classified[_tmp & ~r10] = 0  #Node 20
 
         # Left branch complete; cleanup
         del r2, r3, r4, r5, r6, r7, r8, r9, r10
@@ -145,19 +145,19 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
 
         r12 = band1 <= 334.5
         _tmp2 = _tmp & ~r12
-        classified[_tmp2] = 0 #Node 23
+        classified[_tmp2] = 0  #Node 23
 
         _tmp &= r12
 
         r13 = ndi_43 <= 0.54
         _tmp2 = _tmp & ~r13
-        classified[_tmp2] = 0 #Node 25
+        classified[_tmp2] = 0  #Node 25
 
         _tmp &= r13
 
         r14 = ndi_52 <= 0.12
         _tmp2 = _tmp & r14
-        classified[_tmp2] = 1 #Node 27
+        classified[_tmp2] = 1  #Node 27
 
         _tmp &= ~r14
 
@@ -165,38 +165,38 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
         _tmp2 = _tmp & r15
 
         r16 = band1 <= 129.5
-        classified[_tmp2 & r16] = 1 #Node 31
-        classified[_tmp2 & ~r16] = 0 #Node 32
+        classified[_tmp2 & r16] = 1  #Node 31
+        classified[_tmp2 & ~r16] = 0  #Node 32
 
         _tmp &= ~r15
 
         r17 = band1 <= 300.5
         _tmp2 = _tmp & ~r17
         _tmp &= r17
-        classified[_tmp] = 1 #Node 33
-        classified[_tmp2] = 0 #Node 34
+        classified[_tmp] = 1  #Node 33
+        classified[_tmp2] = 0  #Node 34
 
         _tmp = r1 & ~r11
 
         r18 = ndi_52 <= 0.34
-        classified[_tmp & ~r18] = 0 #Node 36
+        classified[_tmp & ~r18] = 0  #Node 36
         _tmp &= r18
 
         r19 = band1 <= 249.5
-        classified[_tmp & ~r19] = 0 #Node 38
+        classified[_tmp & ~r19] = 0  #Node 38
         _tmp &= r19
 
         r20 = ndi_43 <= 0.45
-        classified[_tmp & ~r20] = 0 #Node 40
+        classified[_tmp & ~r20] = 0  #Node 40
         _tmp &= r20
 
         r21 = band3 <= 364.5
-        classified[_tmp & ~r21] = 0 #Node 42
+        classified[_tmp & ~r21] = 0  #Node 42
         _tmp &= r21
 
         r22 = band1 <= 129.5
-        classified[_tmp & r22] = 1 #Node 44
-        classified[_tmp & ~r22] = 0 #Node 45
+        classified[_tmp & r22] = 1  #Node 44
+        classified[_tmp & ~r22] = 0  #Node 45
 
         # Completed regression tree
 
@@ -216,9 +216,9 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
         clean_mask = utilities.create_cfmask_clean_mask(cfmask)
 
     # Enforce float calculations - float64 if user specified, otherwise float32 will do
-    dtype = blue.values.dtype # This assumes all dataset bands will have
-                              # the same dtype (should be a reasonable
-                              # assumption)
+    dtype = blue.values.dtype  # This assumes all dataset bands will have
+    # the same dtype (should be a reasonable
+    # assumption)
 
     if enforce_float64:
         if dtype != 'float64':
@@ -240,11 +240,10 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
             swir2.values = swir2.values.astype('float32')
 
     shape = blue.values.shape
-    classified = _run_regression(blue.values, green.values, red.values,
-                                 nir.values, swir1.values, swir2.values)
+    classified = _run_regression(blue.values, green.values, red.values, nir.values, swir1.values, swir2.values)
 
     classified_clean = np.full(classified.shape, no_data, dtype='float64')
-    classified_clean[clean_mask] = classified[clean_mask] # Contains data for clear pixels
+    classified_clean[clean_mask] = classified[clean_mask]  # Contains data for clear pixels
 
     # Create xarray of data
     latitude = dataset_in.latitude
@@ -255,26 +254,24 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
     dims = None
 
     if mosaic:
-        coords=[latitude, longitude]
-        dims=['latitude', 'longitude']
+        coords = [latitude, longitude]
+        dims = ['latitude', 'longitude']
     else:
         time = dataset_in.time
-        coords=[time, latitude, longitude]
-        dims=['time', 'latitude', 'longitude']
+        coords = [time, latitude, longitude]
+        dims = ['time', 'latitude', 'longitude']
 
-    data_array = xr.DataArray(classified_clean,
-                              coords=coords,
-                              dims=dims)
+    data_array = xr.DataArray(classified_clean, coords=coords, dims=dims)
 
     if mosaic:
-        dataset_out = xr.Dataset({'wofs': data_array},
-                                 coords={'latitude': latitude,
-                                         'longitude': longitude})
+        dataset_out = xr.Dataset({'wofs': data_array}, coords={'latitude': latitude, 'longitude': longitude})
     else:
-        dataset_out = xr.Dataset({'wofs': data_array},
-                                 coords={'time': time,
-                                         'latitude': latitude,
-                                         'longitude': longitude})
+        dataset_out = xr.Dataset(
+            {
+                'wofs': data_array
+            }, coords={'time': time,
+                       'latitude': latitude,
+                       'longitude': longitude})
 
     return dataset_out
 
@@ -289,23 +286,16 @@ def ledaps_classify(water_band, qa_bands, no_data=-9999):
     snow_qa = qa_bands[4]
     ddv_qa = qa_bands[5]
 
-    fill_mask = np.reshape(np.in1d(fill_qa.reshape(-1), [0]),
-                           fill_qa.shape)
-    cloud_mask = np.reshape(np.in1d(cloud_qa.reshape(-1), [0]),
-                            cloud_qa.shape)
-    cloud_shadow_mask = np.reshape(np.in1d(cloud_shadow_qa.reshape(-1), [0]),
-                                   cloud_shadow_qa.shape)
-    adjacent_cloud_mask = np.reshape(np.in1d(adjacent_cloud_qa.reshape(-1), [255]),
-                                     adjacent_cloud_qa.shape)
-    snow_mask = np.reshape(np.in1d(snow_qa.reshape(-1), [0]),
-                           snow_qa.shape)
-    ddv_mask = np.reshape(np.in1d(ddv_qa.reshape(-1), [0]),
-                          ddv_qa.shape)
+    fill_mask = np.reshape(np.in1d(fill_qa.reshape(-1), [0]), fill_qa.shape)
+    cloud_mask = np.reshape(np.in1d(cloud_qa.reshape(-1), [0]), cloud_qa.shape)
+    cloud_shadow_mask = np.reshape(np.in1d(cloud_shadow_qa.reshape(-1), [0]), cloud_shadow_qa.shape)
+    adjacent_cloud_mask = np.reshape(np.in1d(adjacent_cloud_qa.reshape(-1), [255]), adjacent_cloud_qa.shape)
+    snow_mask = np.reshape(np.in1d(snow_qa.reshape(-1), [0]), snow_qa.shape)
+    ddv_mask = np.reshape(np.in1d(ddv_qa.reshape(-1), [0]), ddv_qa.shape)
 
     clean_mask = fill_mask & cloud_mask & cloud_shadow_mask & adjacent_cloud_mask & snow_mask & ddv_mask
 
-    water_mask = np.reshape(np.in1d(water_band.reshape(-1), [255]),
-                                    water_band.shape) #Will be true if 255 -> water
+    water_mask = np.reshape(np.in1d(water_band.reshape(-1), [255]), water_band.shape)  #Will be true if 255 -> water
 
     classified = np.copy(water_mask)
     classified.astype(int)
@@ -314,15 +304,14 @@ def ledaps_classify(water_band, qa_bands, no_data=-9999):
     classified_clean[clean_mask] = classified[clean_mask]
 
     return classified_clean
+
 
 def cfmask_classify(cfmask, no_data=-9999):
     #TODO: refactor for input/output datasets
 
-    clean_mask = np.reshape(np.in1d(cfmask.reshape(-1), [2, 3, 4, 255], invert=True),
-                            cfmask.shape)
+    clean_mask = np.reshape(np.in1d(cfmask.reshape(-1), [2, 3, 4, 255], invert=True), cfmask.shape)
 
-    water_mask = np.reshape(np.in1d(cfmask.reshape(-1), [1]),
-                            cfmask.shape)
+    water_mask = np.reshape(np.in1d(cfmask.reshape(-1), [1]), cfmask.shape)
 
     classified = np.copy(water_mask)
     classified.astype(int)
@@ -332,9 +321,8 @@ def cfmask_classify(cfmask, no_data=-9999):
 
     return classified_clean
 
-def main(classifier, platform, product_type,
-         min_lon, max_lon, min_lat, max_lat,
-         start_date, end_date, dc_config):
+
+def main(classifier, platform, product_type, min_lon, max_lon, min_lat, max_lat, start_date, end_date, dc_config):
     """
     Description:
       Command-line water detection tool - creates a time-series from
@@ -358,8 +346,7 @@ def main(classifier, platform, product_type,
     """
 
     # Initialize data cube object
-    dc = datacube.Datacube(config=dc_config,
-                           app='dc-mosaicker')
+    dc = datacube.Datacube(config=dc_config, app='dc-mosaicker')
 
     # Validate arguments
     if classifier not in ['cfmask', 'ledaps', 'wofs']:
@@ -406,11 +393,12 @@ def main(classifier, platform, product_type,
         return
 
     # Retrieve data from Data Cube
-    dataset_in = dc.load(platform=platform,
-                         product=product_type,
-                         time=(start_date, end_date),
-                         lon=(min_lon, max_lon),
-                         lat=(min_lat, max_lat))
+    dataset_in = dc.load(
+        platform=platform,
+        product=product_type,
+        time=(start_date, end_date),
+        lon=(min_lon, max_lon),
+        lat=(min_lat, max_lat))
 
     # Get information needed for saving as GeoTIFF
 
@@ -436,9 +424,9 @@ def main(classifier, platform, product_type,
 
     # Run desired classifier
     water_class = None
-    if classifier == 'cfmask': #TODO: implement when cfmask_classify is refactored
+    if classifier == 'cfmask':  #TODO: implement when cfmask_classify is refactored
         return
-    elif classifier == 'ledaps': #TODO: implement when cfmask_classify is refactored
+    elif classifier == 'ledaps':  #TODO: implement when cfmask_classify is refactored
         return
     elif classifier == 'wofs':
         water_class = wofs_classify(dataset_in)
@@ -447,13 +435,11 @@ def main(classifier, platform, product_type,
 
     print(dataset_out)
 
-    out_file = ( str(min_lon) + '_' + str(min_lat) + '_'
-               + start_date_str + '_' + end_date_str
-               + '_' + classifier + '_.tif' )
+    out_file = (
+        str(min_lon) + '_' + str(min_lat) + '_' + start_date_str + '_' + end_date_str + '_' + classifier + '_.tif')
 
-    utilities.save_to_geotiff(out_file, gdal.GDT_Float32,
-                              dataset_out,
-                              geotransform, spatial_ref)
+    utilities.save_to_geotiff(out_file, gdal.GDT_Float32, dataset_out, geotransform, spatial_ref)
+
 
 if __name__ == '__main__':
 
@@ -469,16 +455,16 @@ if __name__ == '__main__':
     parser.add_argument('max_lat', help='Maximum latitude')
     parser.add_argument('start_date', help='Start date; format: YYYY-MM-DD')
     parser.add_argument('end_date', help='End date; format: YYYY-MM-DD')
-    parser.add_argument('dc_config', nargs='?', default='~/.datacube.conf', help='Datacube configuration path; default: ~/.datacube.conf')
+    parser.add_argument(
+        'dc_config',
+        nargs='?',
+        default='~/.datacube.conf',
+        help='Datacube configuration path; default: ~/.datacube.conf')
 
     args = parser.parse_args()
 
-    main(args.classifier,
-         args.platform, args.product,
-         args.min_lon, args.max_lon,
-         args.min_lat, args.max_lat,
-         args.start_date, args.end_date,
-         args.dc_config)
+    main(args.classifier, args.platform, args.product, args.min_lon, args.max_lon, args.min_lat, args.max_lat,
+         args.start_date, args.end_date, args.dc_config)
 
     end_time = datetime.now()
     print('Execution time: ' + str(end_time - start_time))
