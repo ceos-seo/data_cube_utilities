@@ -22,6 +22,8 @@
 # datacube imports.
 import datacube
 from datacube.api import GridWorkflow
+import xarray as xr
+import numpy as np
 
 # Author: AHDS
 # Creation date: 2016-06-23
@@ -149,7 +151,7 @@ class DataAccessApi:
                 dask_chunks=dask_chunks)
             if 'time' in product_data:
                 product_data['satellite'] = xr.DataArray(
-                    np.full(product_data.cf_mask.values.shape, index, dtype="int16"),
+                    np.full(product_data[list(product_data.data_vars)[0]].values.shape, index, dtype="int16"),
                     dims=('time', 'latitude', 'longitude'))
                 data_array.append(product_data.copy(deep=True))
 
@@ -276,8 +278,6 @@ class DataAccessApi:
             dataset.time.size,
             'pixel_count':
             dataset.geobox.shape[0] * dataset.geobox.shape[1],
-            # TODO: is 'tile_count' needed?
-            # TODO: is 'storage_units' it needed?
         }
 
     def list_acquisition_dates(self, platform, product, longitude=None, latitude=None, crs=None, time=None):
