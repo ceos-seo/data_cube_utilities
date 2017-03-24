@@ -294,7 +294,7 @@ def create_rgb_png_from_tiff(tif_path,
                     scale[index][1]) + " 0 255"
         else:
             scale_string += "-scale " + str(scale[0]) + " " + str(scale[1]) + " 0 255"
-    cmd = "gdal_translate -ot Byte " + scale_string + " -of PNG -b " + str(bands[0]) + " -b " + str(bands[1]) + " -b " + str(bands[2]) + " " + \
+    cmd = "gdal_translate -ot Byte -outsize 25% 25% " + scale_string + " -of PNG -b " + str(bands[0]) + " -b " + str(bands[1]) + " -b " + str(bands[2]) + " " + \
         tif_path + ' ' + png_path
 
     os.system(cmd)
