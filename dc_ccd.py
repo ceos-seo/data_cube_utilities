@@ -7,9 +7,8 @@ import itertools as it
 from functools import reduce
 from datetime import datetime, timedelta
 
-from matplotlib.pyplot import axvline
-import matplotlib.patches as patches
-from matplotlib import pyplot as plt
+import warnings
+
 import numpy as np
 import xarray
 
@@ -59,7 +58,7 @@ def _run_ccd_on_pixel(ds):
 def _convert_ccd_results_into_dataset(results = None, model_dataset = None):
     
     start_times = [ datetime.fromtimestamp(model.start_day * 60 * 60 * 24) for model in results['change_models']]    
-
+    
     intermediate_product = model_dataset.sel(time = start_times, method = 'nearest')
     
     new_dataset = xarray.DataArray(
@@ -84,6 +83,12 @@ def clean_pixel( _ds, saturation_threshold = 10000):
 
 
 ###### Visualization FUNCTIONS #########################
+try:
+	from matplotlib.pyplot import axvline
+	import matplotlib.patches as patches
+	from matplotlib import pyplot as plt
+except:
+	warnings.warn("Failed to load plotting library") 
 
 def _lasso_eval(date=None, weights=None, bias=None):
     curves = [
@@ -175,10 +180,14 @@ def _plot_band(results= None,original_pixel= None, band=None, file_name = None):
 ###### STREAM FUNCTIONS ##########################################
 
 def _generate_CCD_product(ds):
-    return _convert_ccd_results_into_dataset( 
-        results = _run_ccd_on_pixel(ds),
-        model_dataset = ds
-    )
+	try:
+		return _convert_ccd_results_into_dataset(
+			results = _run_ccd_on_pixel(ds),
+			model_dataset = ds
+		)
+	except np.linalg.LinAlgError:
+		# This is used to combat matrix inversion issues for Singular matrices.
+		return None
 
 def _dataset_to_pixel_chunker(_ds):
     lat_size = len(_ds.latitude)
