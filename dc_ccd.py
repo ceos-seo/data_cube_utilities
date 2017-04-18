@@ -1,6 +1,3 @@
-import sys
-sys.path.append('./lcmap-pyccd')
-
 import ccd
 from dc_streamer import Streamer as _stream
 import itertools as it

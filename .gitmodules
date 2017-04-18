@@ -1,3 +1,0 @@
-[submodule "lcmap-pyccd"]
-	path = lcmap-pyccd
-	url = https://github.com/USGS-EROS/lcmap-pyccd.git
