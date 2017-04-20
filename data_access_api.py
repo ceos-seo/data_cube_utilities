@@ -40,7 +40,7 @@ class DataAccessApi:
     product_default = 'ls7_ledaps'
     platform_default = 'LANDSAT_7'
 
-    def __init__(self, config='/home/localuser/Datacube/data_cube_ui/config/.datacube.conf'):
+    def __init__(self, config=None):
         self.dc = datacube.Datacube(config=config)
 
     """
@@ -152,7 +152,10 @@ class DataAccessApi:
             if 'time' in product_data:
                 product_data['satellite'] = xr.DataArray(
                     np.full(product_data[list(product_data.data_vars)[0]].values.shape, index, dtype="int16"),
-                    dims=('time', 'latitude', 'longitude'))
+                    dims=('time', 'latitude', 'longitude'),
+                    coords={'latitude': product_data.latitude,
+                            'longitude': product_data.longitude,
+                            'time': product_data.time})
                 data_array.append(product_data.copy(deep=True))
 
         data = None
