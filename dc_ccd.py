@@ -1,12 +1,13 @@
 import ccd
-from dc_streamer import Streamer as _stream
-import itertools as it
-from functools import reduce
 from datetime import datetime, timedelta
+from functools import reduce, partial
+import itertools as it
+import logging
+import multiprocessing
+import numpy as np
+from operator import is_not
 
 import warnings
-
-import numpy as np
 import xarray
 
 ############################################################################
@@ -49,7 +50,7 @@ def _run_ccd_on_pixel(ds):
     swir1 = np.ones(scene_count) if 'swir1' not in available_bands else ds.swir1.values
     swir2 = np.ones(scene_count) if 'swir2' not in available_bands else ds.swir2.values
 
-    thermals = np.ones(scene_count) * (273.15) * 10 if 'thermal' not in available_bands else ds.thermal.values
+    thermals = np.ones(scene_count) * (273.15) * 10 if 'thermal' not in available_bands else ds.object.values
     qa = np.array(ds.cf_mask.values)
 
     params = (date, blue, green, red, nir, swir1, swir2, thermals, qa)
@@ -59,7 +60,7 @@ def _run_ccd_on_pixel(ds):
 
 def _convert_ccd_results_into_dataset(results=None, model_dataset=None):
 
-    start_times = [datetime.fromtimestamp(model.start_day * 60 * 60 * 24) for model in results['change_models']]
+    start_times = [_dt_to_sec(model.start_day) for model in results['change_models']]
 
     intermediate_product = model_dataset.sel(time=start_times, method='nearest')
 
@@ -79,7 +80,7 @@ def is_pixel(value):
 
 
 def clean_pixel(_ds, saturation_threshold=10000):
-    # Filter out over saturated values  
+    # Filter out over saturated values
     ds = _ds
     mask = (ds < saturation_threshold) & (ds >= 0)
     indices = [x for x, y in enumerate(mask.red.values) if y == True]
@@ -179,26 +180,59 @@ def _plot_band(results=None, original_pixel=None, band=None, file_name=None):
     plt.show()
 
 
-###### STREAM FUNCTIONS ##########################################
+##### THREAD OPS #################################################
 
 
-def _generate_CCD_product(ds):
+def generate_thread_pool():
     try:
-        return _convert_ccd_results_into_dataset(results=_run_ccd_on_pixel(ds), model_dataset=ds)
+        cpus = multiprocessing.cpu_count()
+    except NotImplementedError:
+        cpus = 2
+    return multiprocessing.Pool(processes=(cpus))
+
+
+def destroy_thread_pool(_pool):
+    _pool.close()
+    _pool.join()
+
+
+###### ITERATOR FUNCTIONS ##########################################
+
+
+def pixel_iterator_from_xarray(ds):
+    lat_size = len(ds.latitude)
+    lon_size = len(ds.longitude)
+    cartesian = it.product(range(lat_size), range(lon_size))
+    return map(lambda x: ds.isel(latitude=x[0], longitude=x[1]), cartesian)
+
+
+def ccd_product_from_pixel(pixel):
+    try:
+        ccd_results = _run_ccd_on_pixel(pixel)
+        ccd_product = _convert_ccd_results_into_dataset(results=ccd_results, model_dataset=pixel)
+        return ccd_product
     except np.linalg.LinAlgError:
         # This is used to combat matrix inversion issues for Singular matrices.
         return None
 
 
-def _dataset_to_pixel_chunker(_ds):
-    lat_size = len(_ds.latitude)
-    lon_size = len(_ds.longitude)
-    cartesian = it.product(range(lat_size), range(lon_size))
-    return _stream(cartesian).map(lambda x: _ds.isel(latitude=x[0], longitude=x[1]))
+def ccd_product_iterator_from_pixels(_pixels, distributed=False):
+    if distributed == True:
+        pool = generate_thread_pool()
+        try:
+            ccd_product_pixels = pool.imap_unordered(ccd_product_from_pixel, _pixels)
+            destroy_thread_pool(pool)
+            return ccd_product_pixels
+        except:
+            destroy_thread_pool(pool)
+            raise
+    else:
+        ccd_product_pixels = map(ccd_product_from_pixel, _pixels)
+        return ccd_product_pixels
 
 
-def _combine_pixels_to_form_dataset(stream):
-    return reduce(lambda x, y: x.combine_first(y), stream)
+def rebuild_xarray_from_pixels(_pixels):
+    return reduce(lambda x, y: x.combine_first(y), _pixels)
 
 
 ###################################################################
@@ -207,19 +241,13 @@ def _combine_pixels_to_form_dataset(stream):
 
 
 def process_xarray(ds, distributed=False):
-    change = None
-    if distributed == False:
-        change = _stream([ds])\
-            .flatmap(_dataset_to_pixel_chunker)\
-            .map(_generate_CCD_product)\
-            .reduce(_combine_pixels_to_form_dataset)
-    else:
-        change = _stream([ds])\
-            .flatmap(_dataset_to_pixel_chunker)\
-            .distributed_map(_generate_CCD_product)\
-            .reduce(_combine_pixels_to_form_dataset)
 
-    return (change.sum(dim='time') - 1).rename('change_volume')
+    pixels = pixel_iterator_from_xarray(ds)
+    ccd_products = ccd_product_iterator_from_pixels(pixels, distributed=distributed)
+    ccd_products = filter(partial(is_not, None), ccd_products)
+    ccd_change_count_xarray = rebuild_xarray_from_pixels(ccd_products)
+
+    return (ccd_change_count_xarray.sum(dim='time') - 1).rename('change_volume')
 
 
 def process_pixel(ds):
@@ -235,6 +263,7 @@ def process_pixel(ds):
     duplicate_pixel.attrs['ccd_end_times'] = [_dt_to_sec(model.end_day) for model in ccd_results['change_models']]
     duplicate_pixel.attrs['ccd_break_times'] = [_dt_to_sec(model.break_day) for model in ccd_results['change_models']]
     duplicate_pixel.attrs['ccd'] = True
+
     return duplicate_pixel
 
 
