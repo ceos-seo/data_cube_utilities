@@ -180,6 +180,31 @@ def _plot_band(results=None, original_pixel=None, band=None, file_name=None):
     plt.show()
 
 
+##### Logging Decorators #################################################
+
+
+def disable_logger(function):
+
+    def _func(*params, **kwargs):
+        logging.getLogger("ccd").setLevel(logging.WARNING)
+        logging.getLogger("lcmap-pyccd").setLevel(logging.WARNING)
+        result = function(*params, **kwargs)
+        return result
+
+    return _func
+
+
+def enable_logger(function):
+
+    def _func(*params, **kwargs):
+        logging.getLogger("ccd").setLevel(logging.DEBUG)
+        logging.getLogger("lcmap-pyccd").setLevel(logging.DEBUG)
+        result = function(*params, **kwargs)
+        return result
+
+    return _func
+
+
 ##### THREAD OPS #################################################
 
 
@@ -240,6 +265,7 @@ def rebuild_xarray_from_pixels(_pixels):
 ###################################################################
 
 
+@disable_logger
 def process_xarray(ds, distributed=False):
 
     pixels = pixel_iterator_from_xarray(ds)
@@ -250,6 +276,7 @@ def process_xarray(ds, distributed=False):
     return (ccd_change_count_xarray.sum(dim='time') - 1).rename('change_volume')
 
 
+@enable_logger
 def process_pixel(ds):
     if is_pixel(ds) is not True:
         raise Exception("Incorrect dimensions for pixel operation.")
