@@ -18,16 +18,21 @@ import xarray
 
 
 def _n64_to_int(n64):
+    '''Convert Numpy 64 -bit timestamps to integer timestamps. Units in seconds.'''
+
     b = n64.astype(object)
     return int(b / 1000000000)
 
 
 def _n64_to_datetime(n64):
+    '''Convert Numpy 64 bit timestamps to datetime objects. Units in seconds'''
+
     b = n64.astype(object)
     return datetime.fromtimestamp(int(b / 1000000000))
 
 
-def _dt_to_sec(t):
+def _to_datetime(t):
+    '''Unit conversion from days to datetime'''
     return datetime.fromtimestamp(t * 60 * 60 * 24)
 
 
@@ -35,6 +40,10 @@ def _dt_to_sec(t):
 
 
 def _run_ccd_on_pixel(ds):
+    '''
+        Performs CCD on a 1x1 dataset. Returns CCD results.
+        Inputs allows for missing bands. cf_mask is required.
+    '''
     if 'time' not in ds.dims:
         raise Exception("You're missing time dims!")
 
@@ -59,8 +68,11 @@ def _run_ccd_on_pixel(ds):
 
 
 def _convert_ccd_results_into_dataset(results=None, model_dataset=None):
-
-    start_times = [_dt_to_sec(model.start_day) for model in results['change_models']]
+    '''
+        Creates and returns an intermediate product that stores a 1 in lat,lon,time index if change has occured there.
+        Lat Lon values indices are extracted from a 1x1xt model_dataset.
+    '''
+    start_times = [_to_datetime(model.start_day) for model in results['change_models']]
 
     intermediate_product = model_dataset.sel(time=start_times, method='nearest')
 
@@ -76,11 +88,12 @@ def _convert_ccd_results_into_dataset(results=None, model_dataset=None):
 
 
 def _is_pixel(value):
+    '''checks if dataset has the size of a pixel'''
     return (len(value.latitude.dims) == 0) and (len(value.longitude.dims) == 0)
 
 
 def _clean_pixel(_ds, saturation_threshold=10000):
-    # Filter out over saturated values
+    '''Filters out over-saturated values'''
     ds = _ds
     mask = (ds < saturation_threshold) & (ds >= 0)
     indices = [x for x, y in enumerate(mask.red.values) if y == True]
@@ -97,6 +110,7 @@ except:
 
 
 def _lasso_eval(date=None, weights=None, bias=None):
+    '''Evaluates time-series model for time t using ccd coefficients'''
     curves = [
         date,
         np.cos(2 * np.pi * (date / 365.25)),
@@ -110,10 +124,15 @@ def _lasso_eval(date=None, weights=None, bias=None):
 
 
 def _intersect(a, b):
+    '''Returns the Intersection of two sets.
+    I.E
+        ._intersect("apples", "oranges")  returns "aes"
+    '''
     return list(set(a) & set(b))
 
 
 def _save_plot_to_file(plot=None, file=None, band_name=None):
+    '''Saves a plot to a file and labels it using bland_name'''
     if isinstance(file_name, str):
         file_name = [file_name]
     for fn in file_name:
@@ -121,6 +140,8 @@ def _save_plot_to_file(plot=None, file=None, band_name=None):
 
 
 def _plot_band(results=None, original_pixel=None, band=None, file_name=None):
+    '''Plots CCD results for a given band. Accepts a 1x1xt xarray if a scatter-plot overlay of original acquisitions over the ccd results is needed.'''
+
     fig = plt.figure(1)
     fig.suptitle(band.title(), fontsize=18, verticalalignment='bottom')
 
@@ -184,6 +205,7 @@ def _plot_band(results=None, original_pixel=None, band=None, file_name=None):
 
 
 def disable_logger(function):
+    '''Turn off lcmap-pyccd's verbose logging'''
 
     def _func(*params, **kwargs):
         logging.getLogger("ccd").setLevel(logging.WARNING)
@@ -195,6 +217,7 @@ def disable_logger(function):
 
 
 def enable_logger(function):
+    '''Turn on lcmap-pyccd's verbose logging'''
 
     def _func(*params, **kwargs):
         logging.getLogger("ccd").setLevel(logging.DEBUG)
@@ -209,6 +232,8 @@ def enable_logger(function):
 
 
 def generate_thread_pool():
+    '''Returns a thread pool utilizing all possible cores'''
+
     try:
         cpus = multiprocessing.cpu_count()
     except NotImplementedError:
@@ -217,6 +242,8 @@ def generate_thread_pool():
 
 
 def destroy_thread_pool(_pool):
+    '''Destroys a thread pool'''
+
     _pool.close()
     _pool.join()
 
@@ -225,6 +252,8 @@ def destroy_thread_pool(_pool):
 
 
 def _pixel_iterator_from_xarray(ds):
+    '''Accepts an xarray. Creates an iterator of 1x1xt xarray dataset `pixels`'''
+
     lat_size = len(ds.latitude)
     lon_size = len(ds.longitude)
     cartesian = it.product(range(lat_size), range(lon_size))
@@ -232,6 +261,8 @@ def _pixel_iterator_from_xarray(ds):
 
 
 def _ccd_product_from_pixel(pixel):
+    '''Creates a ccd-product for a given pixel'''
+
     try:
         ccd_results = _run_ccd_on_pixel(pixel)
         ccd_product = _convert_ccd_results_into_dataset(results=ccd_results, model_dataset=pixel)
@@ -242,10 +273,13 @@ def _ccd_product_from_pixel(pixel):
 
 
 def _ccd_product_iterator_from_pixels(pixels, distributed=False):
+    '''Creates an iterator of ccd-products from a iterator of pixels. This function handles the distributed processing of CCD.'''
+
     if distributed == True:
         pool = generate_thread_pool()
+        ccd_product_pixels = None
         try:
-            ccd_productpixels = pool.imap_unordered(_ccd_product_from_pixel, pixels)
+            ccd_product_pixels = pool.imap_unordered(_ccd_product_from_pixel, pixels)
             destroy_thread_pool(pool)
             return ccd_product_pixels
         except:
@@ -257,6 +291,7 @@ def _ccd_product_iterator_from_pixels(pixels, distributed=False):
 
 
 def _rebuild_xarray_from_pixels(pixels):
+    '''Combines pixel sized ccd-products into a larger xarray object.'''
     return reduce(lambda x, y: x.combine_first(y), pixels)
 
 
@@ -311,9 +346,9 @@ def process_pixel(ds):
 
     duplicate_pixel.attrs['ccd_results'] = ccd_results
 
-    duplicate_pixel.attrs['ccd_start_times'] = [_dt_to_sec(model.start_day) for model in ccd_results['change_models']]
-    duplicate_pixel.attrs['ccd_end_times'] = [_dt_to_sec(model.end_day) for model in ccd_results['change_models']]
-    duplicate_pixel.attrs['ccd_break_times'] = [_dt_to_sec(model.break_day) for model in ccd_results['change_models']]
+    duplicate_pixel.attrs['ccd_start_times'] = [_to_datetime(model.start_day) for model in ccd_results['change_models']]
+    duplicate_pixel.attrs['ccd_end_times'] = [_to_datetime(model.end_day) for model in ccd_results['change_models']]
+    duplicate_pixel.attrs['ccd_break_times'] = [_to_datetime(model.break_day) for model in ccd_results['change_models']]
     duplicate_pixel.attrs['ccd'] = True
 
     return duplicate_pixel
