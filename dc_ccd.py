@@ -267,6 +267,19 @@ def _rebuild_xarray_from_pixels(pixels):
 
 @disable_logger
 def process_xarray(ds, distributed=False):
+    """Runs CCD on an xarray datastructure
+
+    Computes CCD calculations on every pixel within an xarray dataset.
+
+    Args:
+        ds: (xarray) An xarray dataset containing landsat bands.
+            The following bands are used in computing CCD [red, green, blue, nir,swir1,swir2,thermal, qa]
+            Missing bands are masked with an array of ones.
+        distributed: (Boolean) toggles full utilization of all processing cores for distributed computation of CCD
+
+    Returns:
+        An Xarray detailing per-pixel 'change_volume'. Change volume is the number changes detected given the extents provided.
+    """
 
     pixels = _pixel_iterator_from_xarray(ds)
     ccd_products = _ccd_product_iterator_from_pixels(pixels, distributed=distributed)
@@ -278,6 +291,18 @@ def process_xarray(ds, distributed=False):
 
 @enable_logger
 def process_pixel(ds):
+    """Runs CCD on a 1x1 xarray
+
+    Computes CCD calculations on a 1x1 xarray.
+
+    Args:
+        ds: (xarray) An xarray dataset containing landsat bands.
+            The following bands are used in computing CCD [red, green, blue, nir,swir1,swir2,thermal, qa]
+            Missing bands are masked with an array of ones.
+
+    Returns:
+        A duplicate xarray with CCD results in attrs.
+    """
     if _is_pixel(ds) is not True:
         raise Exception("Incorrect dimensions for pixel operation.")
 
@@ -295,6 +320,15 @@ def process_pixel(ds):
 
 
 def plot_pixel(ds, bands=None):
+    """Plot time-series for processed pixels
+
+    Computes CCD calculations on a 1x1 xarray.
+
+    Args:
+    ds: (xarray) An xarray dataset that has been processed using the `process_pixel()` function.
+    bands: (list)(string) Bands that should be plotted/displayed. Passing a 'None' value plots time-series models for all bands. Default value is "None"
+    """
+
     if 'ccd' not in list(ds.attrs.keys()):
         raise Exception("This pixel hasn't been processed by CCD. Use the `ccd.process_pixel()` function.")
 
