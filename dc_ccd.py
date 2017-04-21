@@ -75,11 +75,11 @@ def _convert_ccd_results_into_dataset(results=None, model_dataset=None):
     return new_dataset.rename("continuous_change")
 
 
-def is_pixel(value):
+def _is_pixel(value):
     return (len(value.latitude.dims) == 0) and (len(value.longitude.dims) == 0)
 
 
-def clean_pixel(_ds, saturation_threshold=10000):
+def _clean_pixel(_ds, saturation_threshold=10000):
     # Filter out over saturated values
     ds = _ds
     mask = (ds < saturation_threshold) & (ds >= 0)
@@ -109,7 +109,7 @@ def _lasso_eval(date=None, weights=None, bias=None):
     return np.dot(weights, curves) + bias
 
 
-def intersect(a, b):
+def _intersect(a, b):
     return list(set(a) & set(b))
 
 
@@ -152,7 +152,7 @@ def _plot_band(results=None, original_pixel=None, band=None, file_name=None):
         lastdt = dt
 
     if original_pixel is not None:
-        xy = [(_n64_to_datetime(x.time.values) + timedelta(0), x.values) for x in clean_pixel(original_pixel)[band]
+        xy = [(_n64_to_datetime(x.time.values) + timedelta(0), x.values) for x in _clean_pixel(original_pixel)[band]
               if x < 5000]
         x, y = zip(*xy)
         ax2 = fig.add_subplot(211)
@@ -224,14 +224,14 @@ def destroy_thread_pool(_pool):
 ###### ITERATOR FUNCTIONS ##########################################
 
 
-def pixel_iterator_from_xarray(ds):
+def _pixel_iterator_from_xarray(ds):
     lat_size = len(ds.latitude)
     lon_size = len(ds.longitude)
     cartesian = it.product(range(lat_size), range(lon_size))
     return map(lambda x: ds.isel(latitude=x[0], longitude=x[1]), cartesian)
 
 
-def ccd_product_from_pixel(pixel):
+def _ccd_product_from_pixel(pixel):
     try:
         ccd_results = _run_ccd_on_pixel(pixel)
         ccd_product = _convert_ccd_results_into_dataset(results=ccd_results, model_dataset=pixel)
@@ -241,23 +241,23 @@ def ccd_product_from_pixel(pixel):
         return None
 
 
-def ccd_product_iterator_from_pixels(_pixels, distributed=False):
+def _ccd_product_iterator_from_pixels(pixels, distributed=False):
     if distributed == True:
         pool = generate_thread_pool()
         try:
-            ccd_product_pixels = pool.imap_unordered(ccd_product_from_pixel, _pixels)
+            ccd_productpixels = pool.imap_unordered(_ccd_product_from_pixel, pixels)
             destroy_thread_pool(pool)
             return ccd_product_pixels
         except:
             destroy_thread_pool(pool)
             raise
     else:
-        ccd_product_pixels = map(ccd_product_from_pixel, _pixels)
+        ccd_product_pixels = map(_ccd_product_from_pixel, _pixels)
         return ccd_product_pixels
 
 
-def rebuild_xarray_from_pixels(_pixels):
-    return reduce(lambda x, y: x.combine_first(y), _pixels)
+def _rebuild_xarray_from_pixels(pixels):
+    return reduce(lambda x, y: x.combine_first(y), pixels)
 
 
 ###################################################################
@@ -268,17 +268,17 @@ def rebuild_xarray_from_pixels(_pixels):
 @disable_logger
 def process_xarray(ds, distributed=False):
 
-    pixels = pixel_iterator_from_xarray(ds)
-    ccd_products = ccd_product_iterator_from_pixels(pixels, distributed=distributed)
+    pixels = _pixel_iterator_from_xarray(ds)
+    ccd_products = _ccd_product_iterator_from_pixels(pixels, distributed=distributed)
     ccd_products = filter(partial(is_not, None), ccd_products)
-    ccd_change_count_xarray = rebuild_xarray_from_pixels(ccd_products)
+    ccd_change_count_xarray = _rebuild_xarray_from_pixels(ccd_products)
 
     return (ccd_change_count_xarray.sum(dim='time') - 1).rename('change_volume')
 
 
 @enable_logger
 def process_pixel(ds):
-    if is_pixel(ds) is not True:
+    if _is_pixel(ds) is not True:
         raise Exception("Incorrect dimensions for pixel operation.")
 
     duplicate_pixel = ds.copy(deep=True)
@@ -301,7 +301,7 @@ def plot_pixel(ds, bands=None):
     if bands is None or bands is []:
         possible_bands = ['red', 'green', 'blue', 'nir', 'swir1', 'swir2', 'thermal']
         avaliable_bands = ds.data_vars
-        bands = intersect(possible_bands, avaliable_bands)
+        bands = _intersect(possible_bands, avaliable_bands)
 
     for band in bands:
         _plot_band(results=ds.attrs['ccd_results'], original_pixel=ds, band=band)
