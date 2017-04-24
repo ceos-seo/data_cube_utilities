@@ -17,23 +17,9 @@ import xarray
 ###### Time FUNCTIONS #################################
 
 
-def _n64_to_int(n64):
-    """Convert Numpy 64 -bit timestamps to integer timestamps. Units in seconds."""
-
-    b = n64.astype(object)
-    return int(b / 1000000000)
-
-
 def _n64_to_datetime(n64):
     """Convert Numpy 64 bit timestamps to datetime objects. Units in seconds"""
-
-    b = n64.astype(object)
-    return datetime.fromtimestamp(int(b / 1000000000))
-
-
-def _to_datetime(t):
-    """Unit conversion from days to datetime"""
-    return datetime.fromtimestamp(t * 60 * 60 * 24)
+    return datetime.utcfromtimestamp(n64.tolist() / 1e9)
 
 
 ###### Per Pixel FUNCTIONS ############################
@@ -57,7 +43,7 @@ def _run_ccd_on_pixel(ds):
     available_bands = ds.data_vars
     scene_count = ds.dims['time']
 
-    date = [_n64_to_int(t) / 60 / 60 / 24 for t in ds.time.values]
+    date = [_n64_to_datetime(t).date().toordinal() for t in ds.time.values]
 
     red = np.ones(scene_count) if 'red' not in available_bands else ds.red.values
     green = np.ones(scene_count) if 'green' not in available_bands else ds.green.values
@@ -86,7 +72,7 @@ def _convert_ccd_results_into_dataset(results=None, model_dataset=None):
     Returns:
         An xarray dataset with a 1 in all indices where change was detected by ccd.
     """
-    start_times = [_to_datetime(model.start_day) for model in results['change_models']]
+    start_times = [datetime.fromordinal(model.start_day) for model in results['change_models']]
 
     intermediate_product = model_dataset.sel(time=start_times, method='nearest')
 
@@ -199,16 +185,16 @@ def _plot_band(results=None, original_pixel=None, band=None, file_name=None):
 
         xy = [(t, _lasso_eval(date=t, weights=target.coefficients, bias=target.intercept)) for t in time]
         x, y = zip(*xy)
-        x = [datetime.fromtimestamp(t * 60 * 60 * 24) for t in x]
+        x = [datetime.fromordinal(t) for t in x]
         ax1.plot(x, y, label=target.coefficients)
 
-        dt = datetime.fromtimestamp(change_model.start_day * 60 * 60 * 24)
+        dt = datetime.fromordinal(change_model.start_day)
         dateLabels.append(dt)
 
         if lastdt is not None:
             ax1.axvspan(lastdt, dt, color=(0, 0, 0, 0.1))
 
-        dt = datetime.fromtimestamp(change_model.end_day * 60 * 60 * 24)
+        dt = datetime.fromordinal(change_model.end_day)
         dateLabels.append(dt)
 
         lastdt = dt
@@ -440,9 +426,15 @@ def process_pixel(ds):
 
     duplicate_pixel.attrs['ccd_results'] = ccd_results
 
-    duplicate_pixel.attrs['ccd_start_times'] = [_to_datetime(model.start_day) for model in ccd_results['change_models']]
-    duplicate_pixel.attrs['ccd_end_times'] = [_to_datetime(model.end_day) for model in ccd_results['change_models']]
-    duplicate_pixel.attrs['ccd_break_times'] = [_to_datetime(model.break_day) for model in ccd_results['change_models']]
+    duplicate_pixel.attrs['ccd_start_times'] = [
+        datetime.fromordinal(model.start_day) for model in ccd_results['change_models']
+    ]
+    duplicate_pixel.attrs['ccd_end_times'] = [
+        datetime.fromordinal(model.end_day) for model in ccd_results['change_models']
+    ]
+    duplicate_pixel.attrs['ccd_break_times'] = [
+        datetime.fromordinal(model.break_day) for model in ccd_results['change_models']
+    ]
     duplicate_pixel.attrs['ccd'] = True
 
     return duplicate_pixel
