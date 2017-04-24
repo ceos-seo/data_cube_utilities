@@ -18,21 +18,21 @@ import xarray
 
 
 def _n64_to_int(n64):
-    '''Convert Numpy 64 -bit timestamps to integer timestamps. Units in seconds.'''
+    """Convert Numpy 64 -bit timestamps to integer timestamps. Units in seconds."""
 
     b = n64.astype(object)
     return int(b / 1000000000)
 
 
 def _n64_to_datetime(n64):
-    '''Convert Numpy 64 bit timestamps to datetime objects. Units in seconds'''
+    """Convert Numpy 64 bit timestamps to datetime objects. Units in seconds"""
 
     b = n64.astype(object)
     return datetime.fromtimestamp(int(b / 1000000000))
 
 
 def _to_datetime(t):
-    '''Unit conversion from days to datetime'''
+    """Unit conversion from days to datetime"""
     return datetime.fromtimestamp(t * 60 * 60 * 24)
 
 
@@ -40,10 +40,17 @@ def _to_datetime(t):
 
 
 def _run_ccd_on_pixel(ds):
-    '''
-        Performs CCD on a 1x1 dataset. Returns CCD results.
-        Inputs allows for missing bands. cf_mask is required.
-    '''
+    """Performs CCD on a 1x1xn dataset. Returns CCD results.
+
+    Creates a CCD result from a 1x1xn dimensioned dataset. Flattens all bands to perform analysis. Inputs allows for missing bands. cf_mask is required.
+
+    Args:
+        ds: xArray dataset with dimensions 1x1xn with any number of SR bands, cf_mask required.
+
+    Returns:
+        The result of ccd.detect
+
+    """
     if 'time' not in ds.dims:
         raise Exception("You're missing time dims!")
 
@@ -68,10 +75,17 @@ def _run_ccd_on_pixel(ds):
 
 
 def _convert_ccd_results_into_dataset(results=None, model_dataset=None):
-    '''
-        Creates and returns an intermediate product that stores a 1 in lat,lon,time index if change has occured there.
-        Lat Lon values indices are extracted from a 1x1xt model_dataset.
-    '''
+    """Converts the result returned by ccd into a usable xArray dataset
+
+    Creates and returns an intermediate product that stores a 1 in lat,lon,time index if change has occured there. Lat Lon values indices are extracted from a 1x1xt model_dataset.
+
+    Args:
+        results: The results of the CCD operation
+        model_dataset: A dataset with the dimensions that were used to create the ccd result
+
+    Returns:
+        An xarray dataset with a 1 in all indices where change was detected by ccd.
+    """
     start_times = [_to_datetime(model.start_day) for model in results['change_models']]
 
     intermediate_product = model_dataset.sel(time=start_times, method='nearest')
@@ -87,13 +101,32 @@ def _convert_ccd_results_into_dataset(results=None, model_dataset=None):
     return new_dataset.rename("continuous_change")
 
 
-def _is_pixel(value):
-    '''checks if dataset has the size of a pixel'''
-    return (len(value.latitude.dims) == 0) and (len(value.longitude.dims) == 0)
+def _is_pixel(ds):
+    """checks if dataset has the size of a pixel
+
+    Checks to make sure latitude and longitude are dimensionless
+
+    Args:
+        value: xArray dataset
+
+    Returns:
+        Boolean value - true if the ds is a single pixel
+    """
+    return (len(ds.latitude.dims) == 0) and (len(ds.longitude.dims) == 0)
 
 
 def _clean_pixel(_ds, saturation_threshold=10000):
-    '''Filters out over-saturated values'''
+    """Filters out over-saturated values
+
+    Creates a mask from the saturation threshold and > 0 and applies it to _ds.
+
+    Args:
+        _ds: dataset to mask
+        saturation_threshold: threshold that a pixel must be below to be considered 'clean'
+
+    Returns:
+        an xArray dataset that has been masked for saturation and valid (>0) pixels
+    """
     ds = _ds
     mask = (ds < saturation_threshold) & (ds >= 0)
     indices = [x for x, y in enumerate(mask.red.values) if y == True]
@@ -110,7 +143,7 @@ except:
 
 
 def _lasso_eval(date=None, weights=None, bias=None):
-    '''Evaluates time-series model for time t using ccd coefficients'''
+    """Evaluates time-series model for time t using ccd coefficients"""
     curves = [
         date,
         np.cos(2 * np.pi * (date / 365.25)),
@@ -124,15 +157,23 @@ def _lasso_eval(date=None, weights=None, bias=None):
 
 
 def _intersect(a, b):
-    '''Returns the Intersection of two sets.
-    I.E
+    """Returns the Intersection of two sets.
+
+    Returns common elements of two iterables
         ._intersect("apples", "oranges")  returns "aes"
-    '''
+
+    Args:
+        a, b: iterables that can be compared
+
+    Returns:
+        list of common elements between the two input iterables
+    """
+
     return list(set(a) & set(b))
 
 
 def _save_plot_to_file(plot=None, file=None, band_name=None):
-    '''Saves a plot to a file and labels it using bland_name'''
+    """Saves a plot to a file and labels it using bland_name"""
     if isinstance(file_name, str):
         file_name = [file_name]
     for fn in file_name:
@@ -140,7 +181,7 @@ def _save_plot_to_file(plot=None, file=None, band_name=None):
 
 
 def _plot_band(results=None, original_pixel=None, band=None, file_name=None):
-    '''Plots CCD results for a given band. Accepts a 1x1xt xarray if a scatter-plot overlay of original acquisitions over the ccd results is needed.'''
+    """Plots CCD results for a given band. Accepts a 1x1xt xarray if a scatter-plot overlay of original acquisitions over the ccd results is needed."""
 
     fig = plt.figure(1)
     fig.suptitle(band.title(), fontsize=18, verticalalignment='bottom')
@@ -205,7 +246,7 @@ def _plot_band(results=None, original_pixel=None, band=None, file_name=None):
 
 
 def disable_logger(function):
-    '''Turn off lcmap-pyccd's verbose logging'''
+    """Turn off lcmap-pyccd's verbose logging"""
 
     def _func(*params, **kwargs):
         logging.getLogger("ccd").setLevel(logging.WARNING)
@@ -217,7 +258,7 @@ def disable_logger(function):
 
 
 def enable_logger(function):
-    '''Turn on lcmap-pyccd's verbose logging'''
+    """Turn on lcmap-pyccd's verbose logging"""
 
     def _func(*params, **kwargs):
         logging.getLogger("ccd").setLevel(logging.DEBUG)
@@ -232,7 +273,14 @@ def enable_logger(function):
 
 
 def generate_thread_pool():
-    '''Returns a thread pool utilizing all possible cores'''
+    """Returns a thread pool utilizing all possible cores
+
+    Creates a thread pool using cpu_count to count possible cores
+
+    Returns:
+        A multiprocessing Pool with n processes
+
+    """
 
     try:
         cpus = multiprocessing.cpu_count()
@@ -241,18 +289,35 @@ def generate_thread_pool():
     return multiprocessing.Pool(processes=(cpus))
 
 
-def destroy_thread_pool(_pool):
-    '''Destroys a thread pool'''
+def destroy_thread_pool(pool):
+    """Destroys a thread pool
 
-    _pool.close()
-    _pool.join()
+    Destroys a thread pool created with generate_thread_pool
+
+    Args:
+        pool: a multiprocessing pool
+
+    """
+
+    pool.close()
+    pool.join()
 
 
 ###### ITERATOR FUNCTIONS ##########################################
 
 
 def _pixel_iterator_from_xarray(ds):
-    '''Accepts an xarray. Creates an iterator of 1x1xt xarray dataset `pixels`'''
+    """Accepts an xarray. Creates an iterator of 1x1xt xarray dataset `pixels`
+
+    Creates an iterable from dataset pixels usable with multiprocessing pool distribution
+
+    Args:
+        ds: An xArray with the dimensions of latitude, longitude, and time
+
+    Returns:
+        An iterable consisting of xArray datasets with a single latitude/longitude dim with n time dimensions
+
+    """
 
     lat_size = len(ds.latitude)
     lon_size = len(ds.longitude)
@@ -261,7 +326,16 @@ def _pixel_iterator_from_xarray(ds):
 
 
 def _ccd_product_from_pixel(pixel):
-    '''Creates a ccd-product for a given pixel'''
+    """Creates a ccd-product for a given pixel
+
+    Runs the ccd operation on a pixel and converts the results into a dataset
+
+    Args:
+        pixel: An xArray dataset with dimensions latitude, longitude, and time with dims of 1x1xt
+
+    Returns:
+        An xArray dataset with the same dimensions as pixel - the output of the _convert_ccd_results_into_dataset func
+    """
 
     try:
         ccd_results = _run_ccd_on_pixel(pixel)
@@ -273,7 +347,17 @@ def _ccd_product_from_pixel(pixel):
 
 
 def _ccd_product_iterator_from_pixels(pixels, distributed=False):
-    '''Creates an iterator of ccd-products from a iterator of pixels. This function handles the distributed processing of CCD.'''
+    """Creates an iterator of ccd-products from a iterator of pixels. This function handles the distributed processing of CCD.
+
+    Creates an iterator of ccd products from a pixel iterator generated with _pixel_iterator_from_xarray. Distributes with multiprocessing if distributed.
+
+    Args:
+        pixels: iterator of pixel datasets each with dimensions latitude, longitude, and time with dims of 1x1xt
+        distributed: Boolean value signifying whether or not the multiprocessing module should be used to distribute accross all cores
+
+    Returns:
+        An iterator of xArray dataset ccd product pixels with the same dimensions as pixels
+    """
 
     if distributed == True:
         pool = generate_thread_pool()
@@ -286,12 +370,22 @@ def _ccd_product_iterator_from_pixels(pixels, distributed=False):
             destroy_thread_pool(pool)
             raise
     else:
-        ccd_product_pixels = map(_ccd_product_from_pixel, _pixels)
+        ccd_product_pixels = map(_ccd_product_from_pixel, pixels)
         return ccd_product_pixels
 
 
 def _rebuild_xarray_from_pixels(pixels):
-    '''Combines pixel sized ccd-products into a larger xarray object.'''
+    """Combines pixel sized ccd-products into a larger xarray object.
+
+    Used to combine single pixels with latitude, longitude, time back into a single xArray dataset instance
+
+    Args:
+        pixels: iterable of xArray datasets that can be combined using combine_first
+
+    Returns:
+        An xArray dataset with the dimensions of pixels
+
+    """
     return reduce(lambda x, y: x.combine_first(y), pixels)
 
 
