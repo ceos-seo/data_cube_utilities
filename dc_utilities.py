@@ -64,6 +64,9 @@ def create_cfmask_clean_mask(cfmask, no_data=-9999):
     return clean_mask
 
 
+def create_bit_mask(dataset, no_data=-9999, valid_bits=[0, 1]):
+    pass
+
 # split a task (sq area, time) into geographical and time chunks based on params.
 # latitude and longitude are a tuple containing (lower, upper)
 # acquisitions are the list of all acquisitions

@@ -43,6 +43,9 @@ class DataAccessApi:
     def __init__(self, config=None):
         self.dc = datacube.Datacube(config=config)
 
+    def close(self):
+        self.dc.close()
+
     """
     query params are defined in datacube.api.query
     """
@@ -285,7 +288,7 @@ class DataAccessApi:
             dataset.geobox.shape[0] * dataset.geobox.shape[1],
         }
 
-    def list_acquisition_dates(self, platform, product, longitude=None, latitude=None, crs=None, time=None):
+    def list_acquisition_dates(self, product=None, platform=None, longitude=None, latitude=None, crs=None, time=None):
         """
         Get a list of all acquisition dates for a query.
 
@@ -302,8 +305,8 @@ class DataAccessApi:
                           sliced data.
         """
         dataset = self.get_dataset_by_extent(
-            platform=platform,
             product=product,
+            platform=platform,
             longitude=longitude,
             latitude=latitude,
             crs=crs,
@@ -312,8 +315,35 @@ class DataAccessApi:
 
         if not dataset:
             return []
-
         return dataset.time.values.astype('M8[ms]').tolist()
+
+    def get_full_dataset_extent(self, product=None, platform=None, longitude=None, latitude=None, crs=None, time=None):
+        """
+        Get a list of all dimensions query.
+
+        Args:
+            platform (string): Platform for which data is requested
+            product (string): The name of the product associated with the desired dataset.
+            longitude (tuple): Tuple of min,max floats for longitude
+            latitude (tuple): Tuple of min,max floats for latitutde
+            crs (string): Describes the coordinate system of params lat and long
+            time (tuple): Tuple of start and end datetimes for requested data
+
+        Returns:
+            dict containing time, latitude, and longitude, each containing the respective xarray dataarray
+        """
+        dataset = self.get_dataset_by_extent(
+            product=product,
+            platform=platform,
+            longitude=longitude,
+            latitude=latitude,
+            crs=crs,
+            time=time,
+            dask_chunks={})
+
+        if not dataset:
+            return []
+        return {'time': dataset.time, 'latitude': dataset.latitude, 'longitude': dataset.longitude}
 
     def get_datacube_metadata(self, platform, product):
         """
