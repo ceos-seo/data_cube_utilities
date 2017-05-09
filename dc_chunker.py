@@ -82,7 +82,8 @@ def create_time_chunks(datetime_list, _reversed=False, time_chunk_size=10):
     """
 
     datetimes_sorted = sorted(datetime_list, reverse=_reversed)
-
+    if time_chunk_size is None:
+        return [datetimes_sorted]
     return _chunk_iterable(datetimes_sorted, time_chunk_size)
 
 

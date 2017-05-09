@@ -27,6 +27,8 @@ import os
 import math
 import datetime
 import shutil
+import uuid
+import rasterio
 
 import datacube
 
@@ -63,9 +65,6 @@ def create_cfmask_clean_mask(cfmask, no_data=-9999):
         np.in1d(cfmask.values.reshape(-1), [2, 3, 4, 255, no_data], invert=True), cfmask.values.shape)
     return clean_mask
 
-
-def create_bit_mask(dataset, no_data=-9999, valid_bits=[0, 1]):
-    pass
 
 # split a task (sq area, time) into geographical and time chunks based on params.
 # latitude and longitude are a tuple containing (lower, upper)
@@ -230,6 +229,133 @@ def perform_timeseries_analysis_iterative(dataset_in, intermediate_product=None,
         dataset_out['normalized_data'] = processed_data_normalized
 
     return dataset_out
+
+
+"""
+
+AHDS: class view refactor
+
+"""
+
+
+def create_bit_mask(data_array, valid_bits, no_data=-9999):
+    """
+    """
+    assert isinstance(valid_bits, list) and isinstance(valid_bits[0], int), "Valid bits must be a list of integer bits"
+    #do bitwise and on valid mask - all zeros means no intersection e.g. invalid else return a truthy value?
+    valid_mask = sum([1 >> valid_bit for bit in valid_bits])
+    clean_mask = (data_array.values & valid_mask).astype('bool')
+    return clean_mask
+
+
+def add_timestamp_data_to_xr(dataset):
+    """
+    """
+    dims_data_var = list(dataset.data_vars)[0]
+
+    timestamp_data = np.full(dataset[dims_data_var].values.shape, 0, dtype="int32")
+    date_data = np.full(dataset[dims_data_var].values.shape, 0, dtype="int32")
+
+    for index, acq_date in enumerate(dataset.time.values.astype('M8[ms]').tolist()):
+        timestamp_data[index::] = acq_date.timestamp()
+        date_data[index::] = int(acq_date.strftime("%Y%m%d"))
+    dataset['timestamp'] = xr.DataArray(
+        timestamp_data,
+        dims=('time', 'latitude', 'longitude'),
+        coords={'latitude': dataset.latitude,
+                'longitude': dataset.longitude,
+                'time': dataset.time})
+    dataset['date'] = xr.DataArray(
+        date_data,
+        dims=('time', 'latitude', 'longitude'),
+        coords={'latitude': dataset.latitude,
+                'longitude': dataset.longitude,
+                'time': dataset.time})
+
+
+def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326"):
+    """
+    """
+    assert isinstance(bands, list), "Bands must a list of strings"
+    assert len(bands) > 0 and isinstance(bands[0], str), "You must supply at least one band."
+    with rasterio.open(
+            tif_path,
+            'w',
+            driver='GTiff',
+            height=dataset.dims['latitude'],
+            width=dataset.dims['longitude'],
+            count=len(bands),
+            dtype=str(dataset[bands[0]].dtype),
+            crs=crs,
+            transform=_get_transform_from_xr(dataset),
+            nodata=nodata) as dst:
+        for index, band in enumerate(bands):
+            dst.write(dataset[band].values, index + 1)
+        dst.close()
+
+
+def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None):
+    """
+    """
+    assert isinstance(bands, list), "Bands must a list of strings"
+    assert len(bands) == 3 and isinstance(bands[0], str), "You must supply three string bands for a PNG."
+
+    tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
+    write_geotiff_from_xr(tif_path, dataset, bands)
+
+    scale_string = "-scale " + str(scale[0]) + " " + str(scale[1]) + " 0 255" if scale is not None else ""
+    cmd = "gdal_translate -ot Byte -outsize 25% 25% " + scale_string + " -of PNG -b 1 -b 2 -b 3 " + tif_path + ' ' + png_path
+
+    os.system(cmd)
+
+    if png_filled_path is not None and fill_color is not None:
+        cmd = "convert -transparent \"#000000\" " + png_path + " " + png_path
+        os.system(cmd)
+        cmd = "convert " + png_path + " -background " + \
+            fill_color + " -alpha remove " + png_filled_path
+        os.system(cmd)
+
+    os.remove(tif_path)
+
+
+def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None):
+    """
+    """
+    assert os.path.exists(color_scale), "Color scale must be a path to a text file containing a gdal compatible scale."
+    assert isinstance(bands, str), "Band must be a string."
+
+    tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
+    write_geotiff_from_xr(tif_path, dataset, [band])
+
+    cmd = "gdaldem color-relief -of PNG -b 1 " + tif_path + " " + \
+        color_scale + " " + png_path
+    os.system(cmd)
+    cmd = "convert -transparent \"#FFFFFF\" " + \
+        png_path + " " + png_path
+    os.system(cmd)
+    if fill_color is not None and fill_color != "transparent":
+        cmd = "convert " + png_path + " -background " + \
+            fill_color + " -alpha remove " + png_path
+        os.system(cmd)
+
+    os.remove(tif_path)
+
+
+def _get_transform_from_xr(dataset):
+    """
+    """
+
+    from rasterio.transform import from_bounds
+    geotransform = from_bounds(dataset.longitude[0], dataset.latitude[-1], dataset.longitude[-1], dataset.latitude[0],
+                               len(dataset.longitude), len(dataset.latitude))
+    return geotransform
+
+
+"""
+
+END
+
+"""
 
 
 def save_to_geotiff(out_file,

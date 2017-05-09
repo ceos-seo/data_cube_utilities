@@ -144,7 +144,7 @@ class DataAccessApi:
             product_data = self.get_dataset_by_extent(
                 product,
                 product_type=product_type,
-                platform=platforms[index],
+                platform=platforms[index] if platforms is not None else None,
                 time=time,
                 longitude=longitude,
                 latitude=latitude,
@@ -287,6 +287,45 @@ class DataAccessApi:
             'pixel_count':
             dataset.geobox.shape[0] * dataset.geobox.shape[1],
         }
+
+    def list_combined_acquisition_dates(self,
+                                        products=None,
+                                        platforms=None,
+                                        longitude=None,
+                                        latitude=None,
+                                        crs=None,
+                                        time=None):
+        """
+        Get a list of all acquisition dates for a query.
+
+        Args:
+            platform (string): Platform for which data is requested
+            product (string): The name of the product associated with the desired dataset.
+            longitude (tuple): Tuple of min,max floats for longitude
+            latitude (tuple): Tuple of min,max floats for latitutde
+            crs (string): Describes the coordinate system of params lat and long
+            time (tuple): Tuple of start and end datetimes for requested data
+
+        Returns:
+            times (list): Python list of dates that can be used to query the dc for single time
+                          sliced data.
+        """
+        dates = []
+        for index, product in enumerate(products):
+            dataset = self.get_dataset_by_extent(
+                product,
+                platform=platforms[index] if platforms is not None else None,
+                time=time,
+                longitude=longitude,
+                latitude=latitude,
+                dask_chunks={})
+
+            if not dataset:
+                continue
+
+            dates += dataset.time.values.astype('M8[ms]').tolist()
+
+        return dates
 
     def list_acquisition_dates(self, product=None, platform=None, longitude=None, latitude=None, crs=None, time=None):
         """
