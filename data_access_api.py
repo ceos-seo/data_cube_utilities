@@ -36,10 +36,6 @@ class DataAccessApi:
     Class that provides wrapper functionality for the DataCube.
     """
 
-    # defaults for all the required fields.
-    product_default = 'ls7_ledaps'
-    platform_default = 'LANDSAT_7'
-
     def __init__(self, config=None):
         self.dc = datacube.Datacube(config=config)
 
@@ -218,19 +214,7 @@ class DataAccessApi:
         # dict of tiles.
         request_tiles = gw.list_cells(
             product=product, measurements=measurements, output_crs=output_crs, resolution=resolution, **query)
-        """
-        tile_def = defaultdict(dict)
-        for cell, tiles in request_tiles.items():
-            for time, tile in tiles.items():
-                tile_def[cell, time]['request'] = tile
 
-        keys = list(tile_def)
-
-        data_tiles = {}
-        for key in keys:
-            tile = tile_def[key]['request']
-            data_tiles[key[0]] = gw.load(key[0], tile)
-        """
         # cells now return stacked xarrays of data.
         data_tiles = {}
         for tile_key in request_tiles:
@@ -239,7 +223,7 @@ class DataAccessApi:
 
         return data_tiles
 
-    def get_scene_metadata(self, platform, product, longitude=None, latitude=None, crs=None, time=None):
+    def get_query_metadata(self, product, platform=None, longitude=None, latitude=None, crs=None, time=None):
         """
         Gets a descriptor based on a request.
 
@@ -288,13 +272,7 @@ class DataAccessApi:
             dataset.geobox.shape[0] * dataset.geobox.shape[1],
         }
 
-    def list_combined_acquisition_dates(self,
-                                        products=None,
-                                        platforms=None,
-                                        longitude=None,
-                                        latitude=None,
-                                        crs=None,
-                                        time=None):
+    def list_acquisition_dates(self, product, platform=None, longitude=None, latitude=None, time=None, **kwargs):
         """
         Get a list of all acquisition dates for a query.
 
@@ -303,7 +281,40 @@ class DataAccessApi:
             product (string): The name of the product associated with the desired dataset.
             longitude (tuple): Tuple of min,max floats for longitude
             latitude (tuple): Tuple of min,max floats for latitutde
-            crs (string): Describes the coordinate system of params lat and long
+            time (tuple): Tuple of start and end datetimes for requested data
+
+        Returns:
+            times (list): Python list of dates that can be used to query the dc for single time
+                          sliced data.
+        """
+        dataset = self.get_dataset_by_extent(
+            product=product,
+            platform=platform,
+            longitude=longitude,
+            latitude=latitude,
+            crs=crs,
+            time=time,
+            dask_chunks={})
+
+        if not dataset:
+            return []
+        return dataset.time.values.astype('M8[ms]').tolist()
+
+    def list_combined_acquisition_dates(self,
+                                        products,
+                                        platforms=None,
+                                        longitude=None,
+                                        latitude=None,
+                                        time=None,
+                                        **kwargs):
+        """
+        Get a list of all acquisition dates for a query.
+
+        Args:
+            platforms (list): Platforms for which data is requested
+            products (list): The name of the products associated with the desired dataset.
+            longitude (tuple): Tuple of min,max floats for longitude
+            latitude (tuple): Tuple of min,max floats for latitutde
             time (tuple): Tuple of start and end datetimes for requested data
 
         Returns:
@@ -327,58 +338,22 @@ class DataAccessApi:
 
         return dates
 
-    def list_acquisition_dates(self, product=None, platform=None, longitude=None, latitude=None, crs=None, time=None):
+    def get_full_dataset_extent(self, product=None, platform=None, longitude=None, latitude=None, time=None):
         """
-        Get a list of all acquisition dates for a query.
+        Get a list of all dimensions for a query.
 
         Args:
             platform (string): Platform for which data is requested
             product (string): The name of the product associated with the desired dataset.
             longitude (tuple): Tuple of min,max floats for longitude
             latitude (tuple): Tuple of min,max floats for latitutde
-            crs (string): Describes the coordinate system of params lat and long
-            time (tuple): Tuple of start and end datetimes for requested data
-
-        Returns:
-            times (list): Python list of dates that can be used to query the dc for single time
-                          sliced data.
-        """
-        dataset = self.get_dataset_by_extent(
-            product=product,
-            platform=platform,
-            longitude=longitude,
-            latitude=latitude,
-            crs=crs,
-            time=time,
-            dask_chunks={})
-
-        if not dataset:
-            return []
-        return dataset.time.values.astype('M8[ms]').tolist()
-
-    def get_full_dataset_extent(self, product=None, platform=None, longitude=None, latitude=None, crs=None, time=None):
-        """
-        Get a list of all dimensions query.
-
-        Args:
-            platform (string): Platform for which data is requested
-            product (string): The name of the product associated with the desired dataset.
-            longitude (tuple): Tuple of min,max floats for longitude
-            latitude (tuple): Tuple of min,max floats for latitutde
-            crs (string): Describes the coordinate system of params lat and long
             time (tuple): Tuple of start and end datetimes for requested data
 
         Returns:
             dict containing time, latitude, and longitude, each containing the respective xarray dataarray
         """
         dataset = self.get_dataset_by_extent(
-            product=product,
-            platform=platform,
-            longitude=longitude,
-            latitude=latitude,
-            crs=crs,
-            time=time,
-            dask_chunks={})
+            product=product, platform=platform, longitude=longitude, latitude=latitude, time=time, dask_chunks={})
 
         if not dataset:
             return []
@@ -396,4 +371,4 @@ class DataAccessApi:
             datacube_metadata (dict): a dict with multiple keys containing relevant metadata.
         """
 
-        return self.get_scene_metadata(platform, product)
+        return self.get_query_metadata(platform, product)

@@ -238,8 +238,24 @@ AHDS: class view refactor
 """
 
 
+def clear_attrs(dataset):
+    """Clear out all attributes on an xarray dataset to write to disk."""
+    dataset.attrs = collections.OrderedDict()
+    for band in dataset:
+        dataset[band].attrs = collections.OrderedDict()
+
+
 def create_bit_mask(data_array, valid_bits, no_data=-9999):
-    """
+    """Create a boolean bit mask from a list of valid bits
+
+    Args:
+        data_array: xarray data array to extract bit information for.
+        valid_bits: array of ints representing what bits should be considered valid.
+        nodata: nodata value for the data array.
+
+    Returns:
+        Boolean mask signifying valid data.
+
     """
     assert isinstance(valid_bits, list) and isinstance(valid_bits[0], int), "Valid bits must be a list of integer bits"
     #do bitwise and on valid mask - all zeros means no intersection e.g. invalid else return a truthy value?
@@ -249,7 +265,10 @@ def create_bit_mask(data_array, valid_bits, no_data=-9999):
 
 
 def add_timestamp_data_to_xr(dataset):
-    """
+    """Add timestamp data to an xarray dataset using the time dimension.
+
+    Adds both a timestamp and a human readable date int to a dataset - int32 format required.
+    modifies the dataset in place.
     """
     dims_data_var = list(dataset.data_vars)[0]
 
@@ -274,7 +293,15 @@ def add_timestamp_data_to_xr(dataset):
 
 
 def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326"):
-    """
+    """Write a geotiff from an xarray dataset.
+
+    Args:
+        tif_path: path for the tif to be written to.
+        dataset: xarray dataset
+        bands: list of strings representing the bands in the order they should be written
+        nodata: nodata value for the dataset
+        crs: requested crs.
+
     """
     assert isinstance(bands, list), "Bands must a list of strings"
     assert len(bands) > 0 and isinstance(bands[0], str), "You must supply at least one band."
@@ -295,7 +322,16 @@ def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326
 
 
 def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None):
-    """
+    """Write a rgb png from an xarray dataset.
+
+    Args:
+        png_path: path for the png to be written to.
+        dataset: dataset to use for the png creation.
+        bands: a list of three strings representing the bands and their order
+        png_filled_path: optional png with nodata values filled
+        fill_color: color to use as the nodata fill
+        scale: desired scale - tuple like (0, 4000) for the upper and lower bounds
+
     """
     assert isinstance(bands, list), "Bands must a list of strings"
     assert len(bands) == 3 and isinstance(bands[0], str), "You must supply three string bands for a PNG."
@@ -319,7 +355,16 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
 
 
 def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None):
-    """
+    """Write a pseudocolor png from an xarray dataset.
+
+    Args:
+        png_path: path for the png to be written to.
+        dataset: dataset to use for the png creation.
+        band: The band to write to a png
+        png_filled_path: optional png with nodata values filled
+        fill_color: color to use as the nodata fill
+        color_scale: path to a color scale compatible with gdal.
+
     """
     assert os.path.exists(color_scale), "Color scale must be a path to a text file containing a gdal compatible scale."
     assert isinstance(bands, str), "Band must be a string."
@@ -342,7 +387,7 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
 
 
 def _get_transform_from_xr(dataset):
-    """
+    """Create a geotransform from an xarray dataset.
     """
 
     from rasterio.transform import from_bounds
