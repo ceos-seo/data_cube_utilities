@@ -367,7 +367,7 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
 
     """
     assert os.path.exists(color_scale), "Color scale must be a path to a text file containing a gdal compatible scale."
-    assert isinstance(bands, str), "Band must be a string."
+    assert isinstance(band, str), "Band must be a string."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
     write_geotiff_from_xr(tif_path, dataset, [band])

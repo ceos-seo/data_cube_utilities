@@ -288,13 +288,7 @@ class DataAccessApi:
                           sliced data.
         """
         dataset = self.get_dataset_by_extent(
-            product=product,
-            platform=platform,
-            longitude=longitude,
-            latitude=latitude,
-            crs=crs,
-            time=time,
-            dask_chunks={})
+            product=product, platform=platform, longitude=longitude, latitude=latitude, time=time, dask_chunks={})
 
         if not dataset:
             return []
