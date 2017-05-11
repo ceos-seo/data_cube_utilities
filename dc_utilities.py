@@ -354,7 +354,7 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     os.remove(tif_path)
 
 
-def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None):
+def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None):
     """Write a pseudocolor png from an xarray dataset.
 
     Args:
@@ -375,13 +375,6 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
     cmd = "gdaldem color-relief -of PNG -b 1 " + tif_path + " " + \
         color_scale + " " + png_path
     os.system(cmd)
-    cmd = "convert -transparent \"#FFFFFF\" " + \
-        png_path + " " + png_path
-    os.system(cmd)
-    if fill_color is not None and fill_color != "transparent":
-        cmd = "convert " + png_path + " -background " + \
-            fill_color + " -alpha remove " + png_path
-        os.system(cmd)
 
     os.remove(tif_path)
 
