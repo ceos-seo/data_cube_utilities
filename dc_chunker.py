@@ -63,7 +63,7 @@ def combine_geographic_chunks(chunks):
     if 'time' in combined_chunks:
         indices['time'] = sorted(combined_chunks.time.values),
 
-    return combined_chunks.reindex(indices)
+    return combined_chunks.reindex(indices, copy=False)
 
 
 def create_time_chunks(datetime_list, _reversed=False, time_chunk_size=10):
