@@ -90,8 +90,6 @@ class DataAccessApi:
         if longitude is not None and latitude is not None:
             query['longitude'] = longitude
             query['latitude'] = latitude
-        if crs is not None:
-            query['crs'] = crs
 
         data = self.dc.load(
             product=product,
@@ -359,3 +357,12 @@ class DataAccessApi:
         """
 
         return self.get_query_metadata(product, platform=platform)
+
+    def validate_measurements(self, product, measurements):
+        """Ensure that your measurements exist for the product before loading.
+        """
+        measurement_list = self.dc.list_measurements(with_pandas=False)
+        measurements_for_product = filter(lambda x: x['product'] == product, measurement_list)
+        valid_measurements_name_array = map(lambda x: x['name'], measurements_for_product)
+
+        return set(measurements).issubset(set(valid_measurements_name_array))
