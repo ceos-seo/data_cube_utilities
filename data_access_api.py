@@ -56,7 +56,6 @@ class DataAccessApi:
                               measurements=None,
                               output_crs=None,
                               resolution=None,
-                              crs=None,
                               dask_chunks=None):
         """
         Gets and returns data based on lat/long bounding box inputs.
@@ -223,7 +222,7 @@ class DataAccessApi:
 
         return data_tiles
 
-    def get_query_metadata(self, product, platform=None, longitude=None, latitude=None, crs=None, time=None):
+    def get_query_metadata(self, product, platform=None, longitude=None, latitude=None, time=None):
         """
         Gets a descriptor based on a request.
 
@@ -241,13 +240,7 @@ class DataAccessApi:
         """
 
         dataset = self.get_dataset_by_extent(
-            platform=platform,
-            product=product,
-            longitude=longitude,
-            latitude=latitude,
-            crs=crs,
-            time=time,
-            dask_chunks={})
+            platform=platform, product=product, longitude=longitude, latitude=latitude, time=time, dask_chunks={})
 
         if not dataset:
             return {
@@ -365,4 +358,4 @@ class DataAccessApi:
             datacube_metadata (dict): a dict with multiple keys containing relevant metadata.
         """
 
-        return self.get_query_metadata(platform, product)
+        return self.get_query_metadata(product, platform=platform)
