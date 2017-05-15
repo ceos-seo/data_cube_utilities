@@ -56,7 +56,8 @@ class DataAccessApi:
                               measurements=None,
                               output_crs=None,
                               resolution=None,
-                              dask_chunks=None):
+                              dask_chunks=None,
+                              **kwargs):
         """
         Gets and returns data based on lat/long bounding box inputs.
         All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -110,7 +111,8 @@ class DataAccessApi:
                                        measurements=None,
                                        output_crs=None,
                                        resolution=None,
-                                       dask_chunks=None):
+                                       dask_chunks=None,
+                                       **kwargs):
         """
           Gets and returns data based on lat/long bounding box inputs.
           All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -172,7 +174,8 @@ class DataAccessApi:
                           latitude=None,
                           measurements=None,
                           output_crs=None,
-                          resolution=None):
+                          resolution=None,
+                          **kwargs):
         """
         Gets and returns data based on lat/long bounding box inputs.
         All params are optional. Leaving one out will just query the dc without it, (eg leaving out
@@ -220,7 +223,7 @@ class DataAccessApi:
 
         return data_tiles
 
-    def get_query_metadata(self, product, platform=None, longitude=None, latitude=None, time=None):
+    def get_query_metadata(self, product, platform=None, longitude=None, latitude=None, time=None, **kwargs):
         """
         Gets a descriptor based on a request.
 
@@ -323,7 +326,7 @@ class DataAccessApi:
 
         return dates
 
-    def get_full_dataset_extent(self, product=None, platform=None, longitude=None, latitude=None, time=None):
+    def get_full_dataset_extent(self, product, platform=None, longitude=None, latitude=None, time=None, **kwargs):
         """
         Get a list of all dimensions for a query.
 
@@ -358,7 +361,7 @@ class DataAccessApi:
 
         return self.get_query_metadata(product, platform=platform)
 
-    def validate_measurements(self, product, measurements):
+    def validate_measurements(self, product, measurements, **kwargs):
         """Ensure that your measurements exist for the product before loading.
         """
         measurement_list = self.dc.list_measurements(with_pandas=False)

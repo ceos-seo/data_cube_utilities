@@ -49,20 +49,15 @@ def combine_geographic_chunks(chunks):
     Returns:
         Xarray representing the combined product.
     """
-
     combined_chunks = None
     for chunk in chunks:
-        if combined_chunks is None:
-            combined_chunks = chunk
-            continue
-        combined_chunks = combined_chunks.combine_first(chunk)
+        combined_chunks = chunk if combined_chunks is None else combined_chunks.combine_first(chunk.load())
     indices = {
         'latitude': sorted(combined_chunks.latitude.values, reverse=True),
         'longitude': sorted(combined_chunks.longitude.values)
     }
     if 'time' in combined_chunks:
         indices['time'] = sorted(combined_chunks.time.values),
-
     return combined_chunks.reindex(indices, copy=False)
 
 
@@ -90,13 +85,19 @@ def create_time_chunks(datetime_list, _reversed=False, time_chunk_size=10):
 
 def group_datetimes_by_year(datetime_list):
     """Group a list of datetimes by year"""
-    return dict(groupby(datetime_list, lambda x: x.year))
+    data = {}
+    for key, val in groupby(datetime_list, lambda x: x.year):
+        data[key] = list(val)
+    return data
 
 
 def group_datetimes_by_month(datetime_list, months=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]):
     """Group an iterable of datetimes by month with an inclusion list"""
     month_filtered = filter(lambda x: x.month in months, datetime_list)
-    return dict(groupby(datetime_list, lambda x: x.month))
+    data = {}
+    for key, val in groupby(datetime_list, lambda x: x.month):
+        data[key] = list(val)
+    return data
 
 
 def _chunk_iterable(_iterable, chunk_size):
