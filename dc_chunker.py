@@ -86,7 +86,7 @@ def create_time_chunks(datetime_list, _reversed=False, time_chunk_size=10):
 def group_datetimes_by_year(datetime_list):
     """Group a list of datetimes by year"""
     data = {}
-    for key, val in groupby(datetime_list, lambda x: x.year):
+    for key, val in groupby(sorted(datetime_list, key=lambda x: x.year), lambda y: y.year):
         data[key] = list(val)
     return data
 
@@ -95,7 +95,8 @@ def group_datetimes_by_month(datetime_list, months=[1, 2, 3, 4, 5, 6, 7, 8, 9, 1
     """Group an iterable of datetimes by month with an inclusion list"""
     month_filtered = filter(lambda x: x.month in months, datetime_list)
     data = {}
-    for key, val in groupby(datetime_list, lambda x: x.month):
+    #groupby requires a sorted list
+    for key, val in groupby(sorted(month_filtered, key=lambda x: x.month), lambda y: y.month):
         data[key] = list(val)
     return data
 

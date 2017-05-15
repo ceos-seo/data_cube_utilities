@@ -16,7 +16,7 @@ from datetime import datetime
 # Creation date: 2016-10-24
 
 
-def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
+def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
     """
     Description:
       Performs fractional coverage algorithm on given dataset. If no clean mask is given, the 'cf_mask'
