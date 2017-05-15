@@ -321,7 +321,7 @@ def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326
         dst.close()
 
 
-def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None):
+def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False):
     """Write a rgb png from an xarray dataset.
 
     Args:
@@ -340,7 +340,8 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     write_geotiff_from_xr(tif_path, dataset, bands)
 
     scale_string = "-scale " + str(scale[0]) + " " + str(scale[1]) + " 0 255" if scale is not None else ""
-    cmd = "gdal_translate -ot Byte -outsize 25% 25% " + scale_string + " -of PNG -b 1 -b 2 -b 3 " + tif_path + ' ' + png_path
+    outsize_string = "-outsize 25% 25%" if low_res else ""
+    cmd = "gdal_translate -ot Byte " + outsize_string + " " + scale_string + " -of PNG -b 1 -b 2 -b 3 " + tif_path + ' ' + png_path
 
     os.system(cmd)
 

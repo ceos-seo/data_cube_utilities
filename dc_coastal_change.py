@@ -64,6 +64,11 @@ def compute_coastal_change(old_mosaic, new_mosaic):
 
 def mask_mosaic_with_coastlines(dataset):
     """Mask a mosaic using old/new coastline"""
+
+    required_measurements = ['red', 'green', 'blue', 'coastline_old', 'coastline_new']
+    assert set(required_measurements).issubset(
+        set(dataset.data_vars)), "Please include all required bands: Red, green, blue, and coastline masks."
+
     green = _darken_color([89, 255, 61], .8)
     pink = [[255, 8, 74], [252, 8, 74], [230, 98, 137], [255, 147, 172], [255, 192, 205]][0]
     blue = [[13, 222, 255], [139, 237, 236], [0, 20, 225], [30, 144, 255]][-1]
@@ -82,6 +87,11 @@ def mask_mosaic_with_coastlines(dataset):
 
 def mask_mosaic_with_coastal_change(dataset):
     """Mask a mosaic with coastal change"""
+
+    required_measurements = ['red', 'green', 'blue', 'coastal_change']
+    assert set(required_measurements).issubset(
+        set(dataset.data_vars)), "Please include all required bands: Red, green, blue, and coastal change."
+
     green = _darken_color([89, 255, 61], .8)
     pink = [[255, 8, 74], [252, 8, 74], [230, 98, 137], [255, 147, 172], [255, 192, 205]][0]
     blue = [[13, 222, 255], [139, 237, 236], [0, 20, 225], [30, 144, 255]][-1]
