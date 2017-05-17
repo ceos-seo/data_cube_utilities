@@ -107,7 +107,7 @@ def _chunk_iterable(_iterable, chunk_size):
     return chunks
 
 
-def _generate_baseline(_iterable, window_length):
+def generate_baseline(_iterable, window_length):
     """Generate a sliding baseline of an iterable
 
     Creates a list of sliding baselines for the iterable. e.g. if you pass in
@@ -129,6 +129,6 @@ def _generate_baseline(_iterable, window_length):
         list like [[window_1], [window_2], [window_3] ...]
     """
     if len(_iterable) <= window_length:
-        return _iterable
-    num_windows = len(_iterable) - window_length - 1
-    return [[_iterable[window:window + window_length] for window in range(num_windows)]]
+        return [_iterable]
+    num_windows = len(_iterable) - window_length
+    return [_iterable[window:window + window_length + 1] for window in range(num_windows)]

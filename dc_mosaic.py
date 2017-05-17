@@ -90,6 +90,28 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
     return dataset_out
 
 
+def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+    """
+	Description:
+		Method for calculating the mean pixel value for a given dataset.
+	-----
+	Input:
+		dataset_in (xarray dataset) - the set of data with clouds and no data removed.
+	Optional Inputs:
+		no_data (int/float) - no data value.
+	"""
+    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+
+    dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
+    dataset_out = dataset_in_filtered.mean(dim='time', skipna=True, keep_attrs=False)
+    utilities.nan_to_num(dataset_out, no_data)
+    #manually clear out dates/timestamps/sats.. median won't produce meaningful reslts for these.
+    for key in ['timestamp', 'date', 'satellite']:
+        if key in dataset_out:
+            dataset_out[key].values[::] = no_data
+    return dataset_out.astype(kwargs.get('dtype', 'int32'))
+
+
 def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
     """
 	Description:
@@ -100,25 +122,11 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
-    # Create clean_mask from cfmask if none given
-    if clean_mask is None:
-        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
-            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
+    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
 
-    #required for np.nan
-    dataset_in = dataset_in.copy(deep=True).astype("float64")
-
-    for key in list(dataset_in.data_vars):
-        dataset_in[key].values[np.invert(clean_mask)] = no_data
-
-    dataset_out = dataset_in.isel(time=0).drop('time').copy(deep=True).astype('float64')
-    dataset_out.attrs = OrderedDict()
-    # Loop over every key.
-    for key in list(dataset_in.data_vars):
-        dataset_in[key].values[dataset_in[key].values == no_data] = np.nan
-        dataset_out[key].values = np.nanmedian(dataset_in[key].values, axis=0)
-        dataset_out[key].values[np.isnan(dataset_out[key].values)] = no_data
-
+    dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
+    dataset_out = dataset_in_filtered.median(dim='time', skipna=True, keep_attrs=False)
+    utilities.nan_to_num(dataset_out, no_data)
     #manually clear out dates/timestamps/sats.. median won't produce meaningful reslts for these.
     for key in ['timestamp', 'date', 'satellite']:
         if key in dataset_out:

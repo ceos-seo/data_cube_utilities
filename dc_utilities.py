@@ -237,6 +237,11 @@ AHDS: class view refactor
 """
 
 
+def nan_to_num(dataset, number):
+    for key in list(dataset.data_vars):
+        dataset[key].values[np.isnan(dataset[key].values)] = number
+
+
 def clear_attrs(dataset):
     """Clear out all attributes on an xarray dataset to write to disk."""
     dataset.attrs = collections.OrderedDict()
