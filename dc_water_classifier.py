@@ -37,7 +37,7 @@ from datetime import datetime
 # Creation date: 2016-06-13
 
 
-def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enforce_float64=False):
+def wofs_classify(dataset_in, clean_mask, no_data=-9999, mosaic=False, enforce_float64=False):
     """
     Description:
       Performs WOfS algorithm on given dataset. If no clean mask is given, the 'cf_mask'
@@ -209,11 +209,6 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
     nir = dataset_in.nir
     swir1 = dataset_in.swir1
     swir2 = dataset_in.swir2
-
-    # Create a clean mask from cfmask if the user does not provide one
-    if clean_mask is None:
-        cfmask = dataset_in.cf_mask
-        clean_mask = utilities.create_cfmask_clean_mask(cfmask)
 
     # Enforce float calculations - float64 if user specified, otherwise float32 will do
     dtype = blue.values.dtype  # This assumes all dataset bands will have

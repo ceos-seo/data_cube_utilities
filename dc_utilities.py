@@ -144,73 +144,37 @@ def get_spatial_ref(crs):
     return str(ref)
 
 
-def perform_timeseries_analysis(dataset_in, no_data=-9999):
+"""
+
+AHDS: class view refactor
+
+"""
+
+
+def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None, no_data=-9999):
     """
     Description:
 
     -----
     Input:
       dataset_in (xarray.DataSet) - dataset with one variable to perform timeseries on
+      band_name: name of the band to create stats for.
+      intermediate_product: result of this function for previous data, to be combined here
     Output:
       dataset_out (xarray.DataSet) - dataset containing
         variables: normalized_data, total_data, total_clean
     """
 
-    data_vars = list(dataset_in.data_vars)
-    key = data_vars[0]
-    data = dataset_in[key].astype('float')
+    data = dataset_in[band_name]
 
-    processed_data = data.copy(deep=True)
-    processed_data.values[data.values == no_data] = 0
-    processed_data_sum = processed_data.sum('time')
+    processed_data_sum = data.where(data != no_data).sum('time')
 
-    clean_data = data.copy(deep=True)
-    clean_data.values[data.values != no_data] = 1
-    clean_data.values[data.values == no_data] = 0
-    clean_data_sum = clean_data.sum('time')
+    clean_data = data.where(data != no_data).notnull()
+    clean_data_sum = clean_data.astype('bool').sum('time')
 
-    processed_data_normalized = processed_data_sum / clean_data_sum
-
-    dataset_out = xr.Dataset(
-        {
-            'normalized_data': processed_data_normalized,
-            'total_data': processed_data_sum,
-            'total_clean': clean_data_sum
-        },
-        coords={'latitude': dataset_in.latitude,
-                'longitude': dataset_in.longitude})
-
-    return dataset_out
-
-
-def perform_timeseries_analysis_iterative(dataset_in, intermediate_product=None, no_data=-9999):
-    """
-    Description:
-
-    -----
-    Input:
-      dataset_in (xarray.DataSet) - dataset with one variable to perform timeseries on
-    Output:
-      dataset_out (xarray.DataSet) - dataset containing
-        variables: normalized_data, total_data, total_clean
-    """
-
-    data_vars = list(dataset_in.data_vars)
-    key = data_vars[0]
-    data = dataset_in[key].astype('float')
-
-    processed_data = data.copy(deep=True)
-    processed_data.values[data.values == no_data] = 0
-    processed_data_sum = processed_data.sum('time')
-
-    clean_data = data.copy(deep=True)
-    clean_data.values[data.values != no_data] = 1
-    clean_data.values[data.values == no_data] = 0
-    clean_data_sum = clean_data.sum('time')
-
+    dataset_out = None
     if intermediate_product is None:
         processed_data_normalized = processed_data_sum / clean_data_sum
-        processed_data_normalized.values[np.isnan(processed_data_normalized.values)] = 0
         dataset_out = xr.Dataset(
             {
                 'normalized_data': processed_data_normalized,
@@ -219,22 +183,16 @@ def perform_timeseries_analysis_iterative(dataset_in, intermediate_product=None,
             },
             coords={'latitude': dataset_in.latitude,
                     'longitude': dataset_in.longitude})
+
     else:
-        dataset_out = intermediate_product.copy(deep=True)
+        dataset_out = intermediate_product
         dataset_out['total_data'] += processed_data_sum
         dataset_out['total_clean'] += clean_data_sum
-        processed_data_normalized = dataset_out['total_data'] / dataset_out['total_clean']
-        processed_data_normalized.values[np.isnan(processed_data_normalized.values)] = 0
-        dataset_out['normalized_data'] = processed_data_normalized
+        dataset_out['normalized_data'] = dataset_out['total_data'] / dataset_out['total_clean']
+
+    nan_to_num(dataset_out, 0)
 
     return dataset_out
-
-
-"""
-
-AHDS: class view refactor
-
-"""
 
 
 def nan_to_num(dataset, number):
@@ -359,7 +317,7 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     os.remove(tif_path)
 
 
-def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None):
+def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None):
     """Write a pseudocolor png from an xarray dataset.
 
     Args:
@@ -380,6 +338,15 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None):
     cmd = "gdaldem color-relief -of PNG -b 1 " + tif_path + " " + \
         color_scale + " " + png_path
     os.system(cmd)
+
+    if fill_color is not None:
+        cmd = "convert -transparent \"#FFFFFF\" " + \
+            png_path + " " + png_path
+        os.system(cmd)
+        if fill_color is not None and fill_color != "transparent":
+            cmd = "convert " + png_path + " -background " + \
+                fill_color + " -alpha remove " + png_path
+            os.system(cmd)
 
     os.remove(tif_path)
 
