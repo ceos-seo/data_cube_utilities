@@ -233,7 +233,12 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
     write_geotiff_from_xr(tif_path, dataset, bands)
 
-    scale_string = "-scale " + str(scale[0]) + " " + str(scale[1]) + " 0 255" if scale is not None else ""
+    scale_string = ""
+    if scale is not None and len(scale) == 2:
+        scale_string = "-scale {} {} 0 255".format(scale[0], scale[1])
+    elif scale is not None and len(scale) == 3:
+        for index, scale_member in enumerate(scale):
+            scale_string += " -scale_{} {} {} 0 255".format(index + 1, scale_member[0], scale_member[1])
     outsize_string = "-outsize 25% 25%" if low_res else ""
     cmd = "gdal_translate -ot Byte " + outsize_string + " " + scale_string + " -of PNG -b 1 -b 2 -b 3 " + tif_path + ' ' + png_path
 
