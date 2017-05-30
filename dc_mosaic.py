@@ -31,11 +31,6 @@ from collections import OrderedDict
 import datacube
 from . import dc_utilities as utilities
 
-# Author: KMF
-# Creation date: 2016-06-14
-# Modified by: AHDS
-# Last modified date:
-
 
 def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
     """
@@ -62,12 +57,9 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
 
     dataset_in = dataset_in.copy(deep=True).astype(kwargs.get('dtype', 'int32'))
 
-    # Create clean_mask from cfmask if none given
-    if clean_mask is None:
-        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
-            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
+    assert clean_mask is not None, "Please provide a boolean clean mask."
 
-        #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
+    #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
     if intermediate_product is not None:
@@ -146,10 +138,8 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 	"""
 
     dataset_in = dataset_in.copy(deep=True).astype("float64")
-    # Create clean_mask from cfmask if none given
-    if clean_mask is None:
-        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
-            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
+
+    assert clean_mask is not None, "Please provide a boolean clean mask."
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -188,10 +178,8 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 	"""
 
     dataset_in = dataset_in.copy(deep=True).astype("float64")
-    # Create clean_mask from cfmask if none given
-    if clean_mask is None:
-        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
-            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
+
+    assert clean_mask is not None, "Please provide a boolean clean mask."
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
