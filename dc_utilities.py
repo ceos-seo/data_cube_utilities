@@ -127,7 +127,7 @@ def create_bit_mask(data_array, valid_bits, no_data=-9999):
     """
     assert isinstance(valid_bits, list) and isinstance(valid_bits[0], int), "Valid bits must be a list of integer bits"
     #do bitwise and on valid mask - all zeros means no intersection e.g. invalid else return a truthy value?
-    valid_mask = sum([1 >> valid_bit for bit in valid_bits])
+    valid_mask = sum([1 << valid_bit for valid_bit in valid_bits])
     clean_mask = (data_array & valid_mask).astype('bool')
     return clean_mask.values
 
