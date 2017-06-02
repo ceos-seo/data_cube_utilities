@@ -16,5 +16,9 @@ This repository is set up as a submodule in our data_cube_ui and data_cube_noteb
 
 Requirements
 =================
-* [Data Cube](https://github.com/ceos-seo/agdc-v2)
+* Full Data Cube installation with ingested data
+* jupyter
+* matplotlib
 * scipy
+* sklearn
+* lcmap-pyccd
