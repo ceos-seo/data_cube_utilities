@@ -347,7 +347,7 @@ class DataAccessApi:
             return []
         return {'time': dataset.time, 'latitude': dataset.latitude, 'longitude': dataset.longitude}
 
-    def get_datacube_metadata(self, platform, product):
+    def get_datacube_metadata(self, product, platform=None):
         """
         Gets some details on the cube and its contents.
 

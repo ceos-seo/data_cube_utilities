@@ -49,16 +49,25 @@ def combine_geographic_chunks(chunks):
     Returns:
         Xarray representing the combined product.
     """
-    combined_chunks = None
-    for chunk in chunks:
-        combined_chunks = chunk if combined_chunks is None else combined_chunks.combine_first(chunk.load())
+
+    # we're doing nested for loops here as there's no good way to do a reduce-like op in Py3
+    # we aren't doing the xr.Dataset combine_first as it causes mem to spike to 10+Gb for small areas
+    data_types = {data_var: chunks[0][data_var].dtype for data_var in list(chunks[0].data_vars)}
+    combined_data = []
+
+    # Done by data var both for memory usage and to preserve the dtype after merge.
+    for data_var in data_types:
+        combined_data.append(xr.merge([chunk[data_var] for chunk in chunks]).astype(data_types[data_var]))
+
+    combined_data = xr.merge(combined_data)
     indices = {
-        'latitude': sorted(combined_chunks.latitude.values, reverse=True),
-        'longitude': sorted(combined_chunks.longitude.values)
+        'latitude': sorted(combined_data.latitude.values, reverse=True),
+        'longitude': sorted(combined_data.longitude.values)
     }
-    if 'time' in combined_chunks:
-        indices['time'] = sorted(combined_chunks.time.values),
-    return combined_chunks.reindex(indices, copy=False)
+    if 'time' in combined_data:
+        indices['time'] = sorted(combined_data.time.values)
+
+    return combined_data.reindex(indices, copy=False)
 
 
 def create_time_chunks(datetime_list, _reversed=False, time_chunk_size=10):

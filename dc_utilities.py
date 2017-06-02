@@ -30,14 +30,6 @@ import shutil
 import uuid
 import rasterio
 
-import datacube
-
-# Author: KMF
-# Creation date: 2016-06-13
-"""
-General-use functions
-"""
-
 
 def create_cfmask_clean_mask(cfmask, no_data=-9999):
     """
@@ -63,24 +55,6 @@ def create_cfmask_clean_mask(cfmask, no_data=-9999):
 
     clean_mask = (cfmask == 0) | (cfmask == 1)
     return clean_mask.values
-
-
-def get_spatial_ref(crs):
-    """
-    Description:
-      Get the spatial reference of a given crs
-    -----
-    Input:
-      crs (datacube.model.CRS) - Example: CRS('EPSG:4326')
-    Output:
-      ref (str) - spatial reference of given crs
-    """
-
-    crs_str = str(crs)
-    epsg_code = int(crs_str.split(':')[1])
-    ref = osr.SpatialReference()
-    ref.ImportFromEPSG(epsg_code)
-    return str(ref)
 
 
 def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None, no_data=-9999):
