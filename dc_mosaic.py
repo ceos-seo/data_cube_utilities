@@ -55,7 +55,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         variables: same as dataset_in
     """
 
-    dataset_in = dataset_in.copy(deep=True).astype(kwargs.get('dtype', 'int32'))
+    dataset_in = dataset_in.copy(deep=True)
 
     assert clean_mask is not None, "Please provide a boolean clean mask."
 
@@ -72,8 +72,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         dataset_slice = dataset_in.isel(time=index).drop('time')
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
-            #clear out the params as they can't be written to nc.
-            dataset_out.attrs = OrderedDict()
+            utilities.clear_attrs(dataset_out)
         else:
             for key in list(dataset_in.data_vars):
                 dataset_out[key].values[dataset_out[key].values == -9999] = dataset_slice[key].values[dataset_out[key]
@@ -137,7 +136,7 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 		no_data (int/float) - no data value.
 	"""
 
-    dataset_in = dataset_in.copy(deep=True).astype("float64")
+    dataset_in = dataset_in.copy(deep=True)
 
     assert clean_mask is not None, "Please provide a boolean clean mask."
 
@@ -156,8 +155,7 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
         dataset_slice['ndvi'] = ndvi
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
-            #clear out the params as they can't be written to nc.
-            dataset_out.attrs = OrderedDict()
+            utilities.clear_attrs(dataset_out)
         else:
             for key in list(dataset_slice.data_vars):
                 dataset_out[key].values[dataset_slice.ndvi.values >
@@ -177,7 +175,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 		no_data (int/float) - no data value.
 	"""
 
-    dataset_in = dataset_in.copy(deep=True).astype("float64")
+    dataset_in = dataset_in.copy(deep=True)
 
     assert clean_mask is not None, "Please provide a boolean clean mask."
 
@@ -196,8 +194,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
         dataset_slice['ndvi'] = ndvi
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
-            #clear out the params as they can't be written to nc.
-            dataset_out.attrs = OrderedDict()
+            utilities.clear_attrs(dataset_out)
         else:
             for key in list(dataset_slice.data_vars):
                 dataset_out[key].values[dataset_slice.ndvi.values <
