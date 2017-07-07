@@ -260,7 +260,7 @@ class DataAccessApi:
             'lon_extents': (lon_min, lon_max),
             'time_extents': (dataset.time[0].values.astype('M8[ms]').tolist(),
                              dataset.time[-1].values.astype('M8[ms]').tolist()),
-            'scene_count':
+            'tile_count':
             dataset.time.size,
             'pixel_count':
             dataset.geobox.shape[0] * dataset.geobox.shape[1],
