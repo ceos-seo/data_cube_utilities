@@ -4,25 +4,35 @@ import math
 import numpy as np  
 
 def _degree_to_zoom_level(l1, l2, margin = 0.0):
+    
     degree = abs(l1 - l2) * (1 + margin)
     zoom_level_float = math.log(360/degree)/math.log(2)
     zoom_level_int = int(zoom_level_float)
     return zoom_level_int
 
 def display_map(latitude = None, longitude = None, resolution = None):
-    """ Returns a centered folium map that outlines lat-lon bounds. This function also adjusts for zoom level based on latitude bounds
+    """ Generates a folium map with a lat-lon bounded rectangle drawn on it. Folium maps can be 
     
-        Inputs:
-            latitude:  a tuple of latitudes bounds in (min,max) format
-            longitude: a tuple of longitude bounds in (min,max) format
-            resolution: an (optional) tuple in (lat,lon) format used to draw a grid on your map. Gridding starts at top left corner.
-        Output:
-            follium.Map object 
+    Args:
+        latitude   (float,float): a tuple of latitude bounds in (min,max) format
+        longitude  ((float, float)): a tuple of longitude bounds in (min,max) format
+        resolution ((float, float)): tuple in (lat,lon) format used to draw a grid on your map. Values denote   
+                                     spacing of latitude and longitude lines.  Gridding starts at top left 
+                                     corner. Default displays no grid at all.  
+
+    Returns:
+        folium.Map: A map centered on the lat lon bounds. A rectangle is drawn on this map detailing the
+        perimeter of the lat,lon bounds.  A zoom level is calculated such that the resulting viewport is the
+        closest it can possibly get to the centered bounding rectangle without clipping it. An 
+        optional grid can be overlaid with primitive interpolation.  
+
+    .. _Folium
+        https://github.com/python-visualization/folium
+
     """
-   
+    
     assert latitude is not None
     assert longitude is not None
-   
 
     ###### ###### ######   CALC ZOOM LEVEL     ###### ###### ######
 
