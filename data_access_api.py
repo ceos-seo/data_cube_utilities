@@ -25,11 +25,6 @@ from datacube.api import GridWorkflow
 import xarray as xr
 import numpy as np
 
-# Author: AHDS
-# Creation date: 2016-06-23
-# Modified by:
-# Last modified date: 2016-08-05
-
 
 class DataAccessApi:
     """
@@ -164,64 +159,6 @@ class DataAccessApi:
             data = combined_data.reindex({'time': sorted(combined_data.time.values)})
 
         return data
-
-    def get_dataset_tiles(self,
-                          product,
-                          product_type=None,
-                          platform=None,
-                          time=None,
-                          longitude=None,
-                          latitude=None,
-                          measurements=None,
-                          output_crs=None,
-                          resolution=None,
-                          **kwargs):
-        """
-        Gets and returns data based on lat/long bounding box inputs.
-        All params are optional. Leaving one out will just query the dc without it, (eg leaving out
-        lat/lng but giving product returns dataset containing entire product.)
-
-        Args:
-            product (string): The name of the product associated with the desired dataset.
-            product_type (string): The type of product associated with the desired dataset.
-            platform (string): The platform associated with the desired dataset.
-            time (tuple): A tuple consisting of the start time and end time for the dataset.
-            longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
-            latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
-            measurements (list): A list of strings that represents all measurements.
-            output_crs (string): Determines reprojection of the data before its returned
-            resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
-
-        Returns:
-            data (xarray): dataset with the desired data in tiled sections.
-        """
-
-        # there is probably a better way to do this but I'm not aware of it.
-        query = {}
-        if product_type is not None:
-            query['product_type'] = product_type
-        if platform is not None:
-            query['platform'] = platform
-        if time is not None:
-            query['time'] = time
-        if longitude is not None and latitude is not None:
-            query['longitude'] = longitude
-            query['latitude'] = latitude
-
-        # set up the grid workflow
-        gw = GridWorkflow(self.dc.index, product=product)
-
-        # dict of tiles.
-        request_tiles = gw.list_cells(
-            product=product, measurements=measurements, output_crs=output_crs, resolution=resolution, **query)
-
-        # cells now return stacked xarrays of data.
-        data_tiles = {}
-        for tile_key in request_tiles:
-            tile = request_tiles[tile_key]
-            data_tiles[tile_key] = gw.load(tile, measurements=measurements)
-
-        return data_tiles
 
     def get_query_metadata(self, product, platform=None, longitude=None, latitude=None, time=None, **kwargs):
         """
