@@ -1,5 +1,7 @@
 import unittest
 
+from data_cube_utilities import dc_coastal_change
+
 
 class TestCoastalChange(unittest.TestCase):
 

@@ -1,5 +1,7 @@
 import unittest
 
+from data_cube_utilities import dc_fractional_coverage_classifier
+
 
 class TestFractionalCover(unittest.TestCase):
 
