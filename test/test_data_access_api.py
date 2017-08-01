@@ -1,5 +1,5 @@
 import unittest
-from data_access_api import DataAccessApi
+from data_cube_utilities.data_access_api import DataAccessApi
 
 from datetime import datetime
 import xarray as xr

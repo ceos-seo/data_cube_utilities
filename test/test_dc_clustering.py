@@ -9,5 +9,5 @@ class TestClustering(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_(self):
+    def test_kmeans_cluster_dataset(self):
         pass

@@ -9,5 +9,11 @@ class TestCoastalChange(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_(self):
+    def test_compute_coastal_change(self):
+        pass
+
+    def test_mask_mosaic_with_coastlines(self):
+        pass
+
+    def test_mask_mosaic_with_coastal_change(self):
         pass
