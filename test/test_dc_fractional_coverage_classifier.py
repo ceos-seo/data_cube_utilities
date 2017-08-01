@@ -9,5 +9,5 @@ class TestFractionalCover(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_(self):
+    def test_frac_coverage_classify(self):
         pass
