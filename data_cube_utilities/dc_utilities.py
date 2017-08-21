@@ -228,7 +228,7 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     os.remove(tif_path)
 
 
-def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None):
+def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None, interpolate=True):
     """Write a pseudocolor png from an xarray dataset.
 
     Args:
@@ -246,7 +246,9 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
     write_geotiff_from_xr(tif_path, dataset, [band])
 
-    cmd = "gdaldem color-relief -of PNG -b 1 " + tif_path + " " + \
+    interpolation_settings = "-nearest_color_entry" if not interpolate else ""
+
+    cmd = "gdaldem color-relief -of PNG " + interpolation_settings + " -b 1 " + tif_path + " " + \
         color_scale + " " + png_path
     os.system(cmd)
 
