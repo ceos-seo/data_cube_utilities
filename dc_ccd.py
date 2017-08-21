@@ -53,7 +53,8 @@ def _run_ccd_on_pixel(ds):
     swir2 = np.ones(scene_count) if 'swir2' not in available_bands else ds.swir2.values
 
     thermals = np.ones(scene_count) * (273.15) * 10 if 'thermal' not in available_bands else ds.object.values
-    qa = np.array(ds.cf_mask.values)
+    qa = np.array(ds.pixel_qa.values)
+
 
     params = (date, blue, green, red, nir, swir1, swir2, thermals, qa)
 
