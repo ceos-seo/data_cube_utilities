@@ -24,6 +24,7 @@ import datacube
 from datacube.api import GridWorkflow
 import xarray as xr
 import numpy as np
+from datetime import date
 
 
 class DataAccessApi:
@@ -184,7 +185,7 @@ class DataAccessApi:
             return {
                 'lat_extents': (0, 0),
                 'lon_extents': (0, 0),
-                'time_extents': (0, 0),
+                'time_extents': (date(2000, 1, 1), date(2000, 1, 1)),
                 'scene_count': 0,
                 'pixel_count': 0,
                 'tile_count': 0,
