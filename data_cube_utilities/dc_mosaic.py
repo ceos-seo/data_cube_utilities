@@ -240,71 +240,16 @@ def create_geo_median_single_band_mosaic(dataset_in,
         output_dict,
         coords={'latitude': dataset_in_filtered['latitude'],
                 'longitude': dataset_in_filtered['longitude']})
-
+    utilities.nan_to_num(dataset_out, no_data)
     return dataset_out
 
 
-def create_geo_median_multiple_band_mosaic(dataset_in,
-                                           clean_mask=None,
-                                           no_data=-9999,
-                                           intermediate_product=None,
-                                           **kwargs):
-    """
-    Description:
-    Calculates the geometric median using a multi-band processing method.
-    -----
-    Input:
-    dataset_in (xarray dataset) - the set of data with clouds and no data removed.
-    Optional Inputs:
-    no_data (int/float) - no data value.
-    """
-    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
-
-    dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
-
-    assert 'blue' in dataset_in_filtered.data_vars, 'No blue band found for the given data.'
-    assert 'green' in dataset_in_filtered.data_vars, 'No green band found for the given data.'
-    assert 'red' in dataset_in_filtered.data_vars, 'No red band found for the given data.'
-    assert 'nir' in dataset_in_filtered.data_vars, 'No nir band found for the given data.'
-    assert 'swir1' in dataset_in_filtered.data_vars, 'No swir1 band found for the given data.'
-    assert 'swir2' in dataset_in_filtered.data_vars, 'No swir2 band found for the given data.'
-
-    arrays = []
-    band_to_index_map = {}
-    band_index = 0
-    for band in dataset_in_filtered.data_vars:
-        if band == 'blue' or band == 'green' or band == 'red' or band == 'nir' or band == 'swir1' or band == 'swir2':
-            arrays.append(dataset_in_filtered[band])
-            band_to_index_map[band_index] = band
-            band_index += 1
-
-    stacked_data = np.stack(arrays)
-    bands_shape, time_slices_shape, lat_shape, lon_shape = stacked_data.shape[0], stacked_data.shape[
-        1], stacked_data.shape[2], stacked_data.shape[3]
-
-    reshaped_stack = stacked_data.reshape(bands_shape, time_slices_shape,
-                                          lat_shape * lon_shape)  # Reshape to remove lat/lon
-
-    vals = np.zeros((bands_shape, lat_shape * lon_shape))  # Build zeroes array across time slices.
-
-    for x in range(reshaped_stack.shape[2]):
-        vals[:, x] = hd.nangeomedian(reshaped_stack[:, :, x], axis=1)  # Perform geometric median analysis.
-
-    output_dict = {}
-
-    for key in sorted(band_to_index_map.keys()):
-        temp_vals = vals[key, :]
-        shaped_sample_output = temp_vals.reshape(lat_shape, lon_shape)
-        output_dict[band_to_index_map[key]] = (('latitude', 'longitude'), shaped_sample_output)
-
-    dataset_out = xr.Dataset(
-        output_dict, coords={'latitude': dataset_in['latitude'],
-                             'longitude': dataset_in['longitude']})
-
-    return dataset_out.astype(kwargs.get('dtype', 'int32'))
-
-
-def create_medoid_multiple_band_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+def create_hdmedians_multiple_band_mosaic(dataset_in,
+                                          clean_mask=None,
+                                          no_data=-9999,
+                                          intermediate_product=None,
+                                          operation="median",
+                                          **kwargs):
     """
     Description:
     Calculates the medoid using a multi-band processing method.
@@ -314,25 +259,14 @@ def create_medoid_multiple_band_mosaic(dataset_in, clean_mask=None, no_data=-999
     Optional Inputs:
     no_data (int/float) - no data value.
     """
+
     assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+    assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
 
-    assert 'blue' in dataset_in_filtered.data_vars, 'No blue band found for the given data.'
-    assert 'green' in dataset_in_filtered.data_vars, 'No green band found for the given data.'
-    assert 'red' in dataset_in_filtered.data_vars, 'No red band found for the given data.'
-    assert 'nir' in dataset_in_filtered.data_vars, 'No nir band found for the given data.'
-    assert 'swir1' in dataset_in_filtered.data_vars, 'No swir1 band found for the given data.'
-    assert 'swir2' in dataset_in_filtered.data_vars, 'No swir2 band found for the given data.'
-
-    arrays = []
-    band_to_index_map = {}
-    band_index = 0
-    for band in dataset_in_filtered.data_vars:
-        if band == 'blue' or band == 'green' or band == 'red' or band == 'nir' or band == 'swir1' or band == 'swir2':
-            arrays.append(dataset_in_filtered[band])
-            band_to_index_map[band_index] = band
-            band_index += 1
+    band_list = list(dataset_in_filtered.data_vars)
+    arrays = [dataset_in_filtered[band] for band in band_list]
 
     stacked_data = np.stack(arrays)
     bands_shape, time_slices_shape, lat_shape, lon_shape = stacked_data.shape[0], stacked_data.shape[
@@ -340,18 +274,26 @@ def create_medoid_multiple_band_mosaic(dataset_in, clean_mask=None, no_data=-999
 
     reshaped_stack = stacked_data.reshape(bands_shape, time_slices_shape,
                                           lat_shape * lon_shape)  # Reshape to remove lat/lon
-    vals = np.zeros((bands_shape, lat_shape * lon_shape))  # Build zeroes array across time slices.
+    hdmedians_result = np.zeros((bands_shape, lat_shape * lon_shape))  # Build zeroes array across time slices.
 
     for x in range(reshaped_stack.shape[2]):
-        vals[:, x] = hd.nanmedoid(reshaped_stack[:, :, x], axis=1)
+        try:
+            hdmedians_result[:, x] = hd.nangeomedian(
+                reshaped_stack[:, :, x], axis=1) if operation == "median" else hd.nanmedoid(
+                    reshaped_stack[:, :, x], axis=1)
+        except ValueError:
+            no_data_pixel_stack = reshaped_stack[:, :, x]
+            no_data_pixel_stack[np.isnan(no_data_pixel_stack)] = no_data
+            hdmedians_result[:, x] = np.full((bands_shape), no_data) if operation == "median" else hd.nanmedoid(
+                no_data_pixel_stack, axis=1)
 
-    output_dict = {}
+    output_dict = {
+        value: (('latitude', 'longitude'), hdmedians_result[index, :].reshape(lat_shape, lon_shape))
+        for index, value in enumerate(band_list)
+    }
 
-    for key in sorted(band_to_index_map.keys()):
-        temp_vals = vals[key, :]
-        shaped_sample_output = temp_vals.reshape(lat_shape, lon_shape)
-        output_dict[band_to_index_map[key]] = (('latitude', 'longitude'), shaped_sample_output)
-
-    dataset = xr.Dataset(output_dict, coords={'latitude': dataset_in['latitude'], 'longitude': dataset_in['longitude']})
-
-    return dataset.astype(kwargs.get('dtype', 'int32'))
+    dataset_out = xr.Dataset(
+        output_dict, coords={'latitude': dataset_in['latitude'],
+                             'longitude': dataset_in['longitude']})
+    utilities.nan_to_num(dataset_out, no_data)
+    return dataset_out
