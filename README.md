@@ -22,4 +22,5 @@ Requirements
 * scipy
 * sklearn
 * lcmap-pyccd
-* folium 
+* folium
+* hdmedians
