@@ -301,7 +301,7 @@ def create_geo_median_multiple_band_mosaic(dataset_in,
         output_dict, coords={'latitude': dataset_in['latitude'],
                              'longitude': dataset_in['longitude']})
 
-    return dataset_out
+    return dataset_out.astype(kwargs.get('dtype', 'int32'))
 
 
 def create_medoid_multiple_band_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
@@ -354,4 +354,4 @@ def create_medoid_multiple_band_mosaic(dataset_in, clean_mask=None, no_data=-999
 
     dataset = xr.Dataset(output_dict, coords={'latitude': dataset_in['latitude'], 'longitude': dataset_in['longitude']})
 
-    return dataset
+    return dataset.astype(kwargs.get('dtype', 'int32'))
