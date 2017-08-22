@@ -6,7 +6,7 @@ import xarray as xr
 
 from data_cube_utilities.dc_mosaic import (create_mosaic, create_mean_mosaic, create_median_mosaic,
                                            create_max_ndvi_mosaic, create_min_ndvi_mosaic,
-                                           create_geo_median_single_band_mosaic, create_hdmedians_multiple_band_mosaic)
+                                           create_hdmedians_multiple_band_mosaic)
 
 
 class TestMosaic(unittest.TestCase):
@@ -194,35 +194,6 @@ class TestMosaic(unittest.TestCase):
             no_data=-9999)
         print(mosaic_dataset_iterated, mosaic_dataset)
         self.assertTrue((mosaic_dataset_iterated.test_data.values == np.array([[3, 3], [3, 3]])).all())
-
-    def test_create_geo_median_single_band_mosaic(self):
-        dataset = xr.Dataset(
-            {
-                'red': (('time', 'latitude', 'longitude'), self.red),
-                'blue': (('time', 'latitude', 'longitude'), self.blue),
-                'green': (('time', 'latitude', 'longitude'), self.green),
-                'nir': (('time', 'latitude', 'longitude'), self.nir),
-                'swir1': (('time', 'latitude', 'longitude'), self.swir1),
-                'swir2': (('time', 'latitude', 'longitude'), self.swir2),
-            },
-            coords={'time': self.times,
-                    'latitude': self.latitudes,
-                    'longitude': self.longitudes})
-
-        test_mosaic = create_geo_median_single_band_mosaic(dataset, self.sample_clean_mask)
-        dataset_swir1 = np.array([[53., 68.], [47., -9999]])
-        dataset_swir2 = np.array([[55., 56.], [8., -9999]])
-        dataset_nir = np.array([[1., 1.], [1., -9999]])
-        dataset_red = np.array([[1., 1.], [1., -9999]])
-        dataset_green = np.array([[58., 6.], [30., -9999]])
-        dataset_blue = np.array([[42., 53.], [45., -9999]])
-
-        self.assertTrue(np.isclose(test_mosaic.swir1, dataset_swir1, equal_nan=True).all())
-        self.assertTrue(np.isclose(test_mosaic.swir2, dataset_swir2, equal_nan=True).all())
-        self.assertTrue(np.isclose(test_mosaic.nir, dataset_nir, equal_nan=True).all())
-        self.assertTrue(np.isclose(test_mosaic.blue, dataset_blue, equal_nan=True).all())
-        self.assertTrue(np.isclose(test_mosaic.red, dataset_red, equal_nan=True).all())
-        self.assertTrue(np.isclose(test_mosaic.green, dataset_green, equal_nan=True).all())
 
     def test_create_geo_median_multiple_band_mosaic(self):
         dataset = xr.Dataset(

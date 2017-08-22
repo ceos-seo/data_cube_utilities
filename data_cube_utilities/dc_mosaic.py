@@ -206,44 +206,6 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     return dataset_out
 
 
-def create_geo_median_single_band_mosaic(dataset_in,
-                                         clean_mask=None,
-                                         no_data=-9999,
-                                         intermediate_product=None,
-                                         **kwargs):
-    """
-    Description:
-    Calculates the geometric median using single band processing.
-    -----
-    Input:
-    dataset_in (xarray dataset) - the set of data with clouds and no data removed.
-    Optional Inputs:
-    no_data (int/float) - no data value.
-    """
-    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
-
-    dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
-
-    output_dict = {}  # Dictionary that will be built out and converted into dataset.
-    for band in dataset_in_filtered.keys():
-        if band != 'time' and band != 'latitude' and band != 'longitude':
-            shape_0, shape_1, shape_2 = dataset_in_filtered[band].values.shape[0], dataset_in_filtered[
-                band].values.shape[1], dataset_in_filtered[band].values.shape[2]
-            band_data = dataset_in_filtered[band].values.astype(
-                'float64')  # Convert to float for purposes of doing algorithm.
-            reshaped_data = band_data.reshape((shape_0, shape_1 * shape_2))
-            mean_data = np.array(hd.nangeomedian(reshaped_data, axis=0))  # Run the geometric median.
-            output_data = mean_data.reshape(shape_1, shape_2)
-            output_dict[band] = (('latitude', 'longitude'), output_data)
-
-    dataset_out = xr.Dataset(
-        output_dict,
-        coords={'latitude': dataset_in_filtered['latitude'],
-                'longitude': dataset_in_filtered['longitude']})
-    utilities.nan_to_num(dataset_out, no_data)
-    return dataset_out
-
-
 def create_hdmedians_multiple_band_mosaic(dataset_in,
                                           clean_mask=None,
                                           no_data=-9999,
