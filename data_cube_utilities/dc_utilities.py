@@ -57,7 +57,7 @@ def create_cfmask_clean_mask(cfmask, no_data=-9999):
     return clean_mask.values
 
 
-def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None, no_data=-9999):
+def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None, no_data=-9999, operation="mean"):
     """
     Description:
 
@@ -71,11 +71,14 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
         variables: normalized_data, total_data, total_clean
     """
 
+    assert operation in ['mean', 'max', 'min'], "Please enter a valid operation."
+
     data = dataset_in[band_name]
+    data = data.where(data != no_data)
 
-    processed_data_sum = data.where(data != no_data).sum('time')
+    processed_data_sum = data.sum('time')
 
-    clean_data = data.where(data != no_data).notnull()
+    clean_data = data.notnull()
     clean_data_sum = clean_data.astype('bool').sum('time')
 
     dataset_out = None
@@ -84,17 +87,20 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
         dataset_out = xr.Dataset(
             {
                 'normalized_data': processed_data_normalized,
+                'min': data.min(dim='time'),
+                'max': data.max(dim='time'),
                 'total_data': processed_data_sum,
                 'total_clean': clean_data_sum
             },
             coords={'latitude': dataset_in.latitude,
                     'longitude': dataset_in.longitude})
-
     else:
         dataset_out = intermediate_product
         dataset_out['total_data'] += processed_data_sum
         dataset_out['total_clean'] += clean_data_sum
         dataset_out['normalized_data'] = dataset_out['total_data'] / dataset_out['total_clean']
+        dataset_out['min'] = xr.concat([dataset_out['min'], data.min(dim='time')], dim='time').min(dim='time')
+        dataset_out['max'] = xr.concat([dataset_out['max'], data.max(dim='time')], dim='time').max(dim='time')
 
     nan_to_num(dataset_out, 0)
 
