@@ -189,7 +189,7 @@ def write_geotiff_from_xr(tif_path, dataset, bands, no_data=-9999, crs="EPSG:432
             dtype=str(dataset[bands[0]].dtype),
             crs=crs,
             transform=_get_transform_from_xr(dataset),
-            no_data=no_data) as dst:
+            nodata=no_data) as dst:
         for index, band in enumerate(bands):
             dst.write(dataset[band].values, index + 1)
         dst.close()
