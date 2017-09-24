@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 
 
-def compute_slip(baseline_data, target_data, dem_data, nodata=-9999):
+def compute_slip(baseline_data, target_data, dem_data, no_data=-9999):
     """Compute the SLIP product for a baseline and target dataset
 
     Args:
@@ -27,7 +27,7 @@ def compute_slip(baseline_data, target_data, dem_data, nodata=-9999):
         coords={'latitude': target_data.latitude,
                 'longitude': target_data.longitude})
 
-    filtered_baseline_data = baseline_data.where(baseline_data != nodata)
+    filtered_baseline_data = baseline_data.where(baseline_data != no_data)
 
     ndwi_target = (target_data.nir - target_data.swir1) / (target_data.nir + target_data.swir1)
     ndwi_baseline = (filtered_baseline_data.nir - filtered_baseline_data.swir1) / (

@@ -125,7 +125,7 @@ def create_bit_mask(data_array, valid_bits, no_data=-9999):
     Args:
         data_array: xarray data array to extract bit information for.
         valid_bits: array of ints representing what bits should be considered valid.
-        nodata: nodata value for the data array.
+        no_data: no_data value for the data array.
 
     Returns:
         Boolean mask signifying valid data.
@@ -166,14 +166,14 @@ def add_timestamp_data_to_xr(dataset):
                 'time': dataset.time})
 
 
-def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326"):
+def write_geotiff_from_xr(tif_path, dataset, bands, no_data=-9999, crs="EPSG:4326"):
     """Write a geotiff from an xarray dataset.
 
     Args:
         tif_path: path for the tif to be written to.
         dataset: xarray dataset
         bands: list of strings representing the bands in the order they should be written
-        nodata: nodata value for the dataset
+        no_data: no_data value for the dataset
         crs: requested crs.
 
     """
@@ -189,7 +189,7 @@ def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326
             dtype=str(dataset[bands[0]].dtype),
             crs=crs,
             transform=_get_transform_from_xr(dataset),
-            nodata=nodata) as dst:
+            no_data=no_data) as dst:
         for index, band in enumerate(bands):
             dst.write(dataset[band].values, index + 1)
         dst.close()
@@ -202,7 +202,7 @@ def write_png_from_xr(png_path,
                       fill_color='red',
                       scale=None,
                       low_res=False,
-                      nodata=-9999,
+                      no_data=-9999,
                       crs="EPSG:4326"):
     """Write a rgb png from an xarray dataset.
 
@@ -210,8 +210,8 @@ def write_png_from_xr(png_path,
         png_path: path for the png to be written to.
         dataset: dataset to use for the png creation.
         bands: a list of three strings representing the bands and their order
-        png_filled_path: optional png with nodata values filled
-        fill_color: color to use as the nodata fill
+        png_filled_path: optional png with no_data values filled
+        fill_color: color to use as the no_data fill
         scale: desired scale - tuple like (0, 4000) for the upper and lower bounds
 
     """
@@ -219,7 +219,7 @@ def write_png_from_xr(png_path,
     assert len(bands) == 3 and isinstance(bands[0], str), "You must supply three string bands for a PNG."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
-    write_geotiff_from_xr(tif_path, dataset, bands, nodata=nodata, crs=crs)
+    write_geotiff_from_xr(tif_path, dataset, bands, no_data=no_data, crs=crs)
 
     scale_string = ""
     if scale is not None and len(scale) == 2:
@@ -248,7 +248,7 @@ def write_single_band_png_from_xr(png_path,
                                   color_scale=None,
                                   fill_color=None,
                                   interpolate=True,
-                                  nodata=-9999,
+                                  no_data=-9999,
                                   crs="EPSG:4326"):
     """Write a pseudocolor png from an xarray dataset.
 
@@ -256,8 +256,8 @@ def write_single_band_png_from_xr(png_path,
         png_path: path for the png to be written to.
         dataset: dataset to use for the png creation.
         band: The band to write to a png
-        png_filled_path: optional png with nodata values filled
-        fill_color: color to use as the nodata fill
+        png_filled_path: optional png with no_data values filled
+        fill_color: color to use as the no_data fill
         color_scale: path to a color scale compatible with gdal.
 
     """
@@ -265,7 +265,7 @@ def write_single_band_png_from_xr(png_path,
     assert isinstance(band, str), "Band must be a string."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
-    write_geotiff_from_xr(tif_path, dataset, [band], nodata=nodata, crs=crs)
+    write_geotiff_from_xr(tif_path, dataset, [band], no_data=no_data, crs=crs)
 
     interpolation_settings = "-nearest_color_entry" if not interpolate else ""
 
