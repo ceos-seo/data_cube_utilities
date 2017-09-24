@@ -195,7 +195,15 @@ def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326
         dst.close()
 
 
-def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False):
+def write_png_from_xr(png_path,
+                      dataset,
+                      bands,
+                      png_filled_path=None,
+                      fill_color='red',
+                      scale=None,
+                      low_res=False,
+                      nodata=-9999,
+                      crs="EPSG:4326"):
     """Write a rgb png from an xarray dataset.
 
     Args:
@@ -211,7 +219,7 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     assert len(bands) == 3 and isinstance(bands[0], str), "You must supply three string bands for a PNG."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
-    write_geotiff_from_xr(tif_path, dataset, bands)
+    write_geotiff_from_xr(tif_path, dataset, bands, nodata=nodata, crs=crs)
 
     scale_string = ""
     if scale is not None and len(scale) == 2:
@@ -234,7 +242,14 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     os.remove(tif_path)
 
 
-def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None, interpolate=True):
+def write_single_band_png_from_xr(png_path,
+                                  dataset,
+                                  band,
+                                  color_scale=None,
+                                  fill_color=None,
+                                  interpolate=True,
+                                  nodata=-9999,
+                                  crs="EPSG:4326"):
     """Write a pseudocolor png from an xarray dataset.
 
     Args:
@@ -250,7 +265,7 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
     assert isinstance(band, str), "Band must be a string."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
-    write_geotiff_from_xr(tif_path, dataset, [band])
+    write_geotiff_from_xr(tif_path, dataset, [band], nodata=nodata, crs=crs)
 
     interpolation_settings = "-nearest_color_entry" if not interpolate else ""
 
