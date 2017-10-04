@@ -17,6 +17,7 @@ This repository is set up as a submodule in our data_cube_ui and data_cube_noteb
 Requirements
 =================
 * Full Data Cube installation with ingested data
+* imagemagick (sudo apt-get install imagemagick)
 * jupyter
 * matplotlib
 * scipy
