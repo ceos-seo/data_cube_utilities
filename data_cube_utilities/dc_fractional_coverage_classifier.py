@@ -15,6 +15,7 @@ from datetime import datetime
 # Author: KMF
 # Creation date: 2016-10-24
 
+csv_file_path = os.path.join(os.path.dirname(__file__), 'endmembers_landsat.csv')
 
 def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
     """
@@ -90,9 +91,7 @@ def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
     ones = ones.reshape(ones.shape[0], 1)
     band_stack = np.concatenate((band_stack, ones), axis=1)  # Now a n x 64 matrix (assuming one acquisition)
 
-    end_members = np.loadtxt(
-        '/home/localuser/Datacube/data_cube_ui/utils/data_cube_utilities/endmembers_landsat.csv',
-        delimiter=',')  # Creates a 64 x 3 matrix
+    end_members = np.loadtxt(csv_file_path, delimiter=',')  # Creates a 64 x 3 matrix
 
     SumToOneWeight = 0.02
     ones = np.ones(end_members.shape[1]) * SumToOneWeight

@@ -5,9 +5,9 @@ import numpy as np
 import xarray as xr
 
 from data_cube_utilities.dc_mosaic import (create_mosaic, create_mean_mosaic, create_median_mosaic,
+
                                            create_max_ndvi_mosaic, create_min_ndvi_mosaic,
                                            create_hdmedians_multiple_band_mosaic)
-
 
 class TestMosaic(unittest.TestCase):
 
@@ -71,8 +71,7 @@ class TestMosaic(unittest.TestCase):
                                [[77, 17], [ 8, 30]],
                                [[19, 42], [ 0, 27]],
                                [[ 6, 56], [ 5, 99]]])
-
-        # yapf: enable
+ # yapf: enable
 
     def tearDown(self):
         pass

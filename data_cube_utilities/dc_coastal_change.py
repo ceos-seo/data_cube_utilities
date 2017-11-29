@@ -27,7 +27,7 @@ import scipy.ndimage.filters as conv
 import numpy as np
 
 
-def compute_coastal_change(old_mosaic, new_mosaic):
+def compute_coastal_change(old_mosaic, new_mosaic, no_data=-9999):
     """Compute the coastal change and coastlines for two mosaics
 
     Computes the output products and appends them onto the old mosaic as
@@ -45,8 +45,8 @@ def compute_coastal_change(old_mosaic, new_mosaic):
         new_mosaic.cf_mask) if 'cf_mask' in old_mosaic else create_bit_mask(
             old_mosaic.pixel_qa, [1, 2]) & create_bit_mask(new_mosaic.pixel_qa, [1, 2])
 
-    old_water = wofs_classify(old_mosaic, mosaic=True, clean_mask=combined_mask)
-    new_water = wofs_classify(new_mosaic, mosaic=True, clean_mask=combined_mask)
+    old_water = wofs_classify(old_mosaic, mosaic=True, clean_mask=combined_mask, no_data=no_data)
+    new_water = wofs_classify(new_mosaic, mosaic=True, clean_mask=combined_mask, no_data=no_data)
 
     coastal_change = new_water - old_water
 

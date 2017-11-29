@@ -60,15 +60,16 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
 
     assert clean_mask is not None, "Please provide a boolean clean mask."
 
-    #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
+    #masks data with clean_mask. all values that are clean_mask==False are set to no_data.
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
     if intermediate_product is not None:
         dataset_out = intermediate_product.copy(deep=True)
     else:
         dataset_out = None
-    time_slices = reversed(range(len(dataset_in.time))) if kwargs and kwargs['reverse_time'] else range(
-        len(dataset_in.time))
+    time_slices = reversed(
+        range(len(dataset_in.time))) if 'reverse_time' in kwargs and kwargs['reverse_time'] else range(
+            len(dataset_in.time))
     for index in time_slices:
         dataset_slice = dataset_in.isel(time=index).drop('time')
         if dataset_out is None:

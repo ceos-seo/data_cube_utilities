@@ -57,7 +57,7 @@ def create_cfmask_clean_mask(cfmask, no_data=-9999):
     return clean_mask.values
 
 
-def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None, no_data=-9999):
+def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None, no_data=-9999, operation="mean"):
     """
     Description:
 
@@ -71,11 +71,15 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
         variables: normalized_data, total_data, total_clean
     """
 
+    assert operation in ['mean', 'max', 'min'], "Please enter a valid operation."
+
     data = dataset_in[band_name]
+    data = data.where(data != no_data)
 
-    processed_data_sum = data.where(data != no_data).sum('time')
+    processed_data_sum = data.sum('time')
 
-    clean_data = data.where(data != no_data).notnull()
+    clean_data = data.notnull()
+
     clean_data_sum = clean_data.astype('bool').sum('time')
 
     dataset_out = None
@@ -84,17 +88,20 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
         dataset_out = xr.Dataset(
             {
                 'normalized_data': processed_data_normalized,
+                'min': data.min(dim='time'),
+                'max': data.max(dim='time'),
                 'total_data': processed_data_sum,
                 'total_clean': clean_data_sum
             },
             coords={'latitude': dataset_in.latitude,
                     'longitude': dataset_in.longitude})
-
     else:
         dataset_out = intermediate_product
         dataset_out['total_data'] += processed_data_sum
         dataset_out['total_clean'] += clean_data_sum
         dataset_out['normalized_data'] = dataset_out['total_data'] / dataset_out['total_clean']
+        dataset_out['min'] = xr.concat([dataset_out['min'], data.min(dim='time')], dim='time').min(dim='time')
+        dataset_out['max'] = xr.concat([dataset_out['max'], data.max(dim='time')], dim='time').max(dim='time')
 
     nan_to_num(dataset_out, 0)
 
@@ -119,7 +126,7 @@ def create_bit_mask(data_array, valid_bits, no_data=-9999):
     Args:
         data_array: xarray data array to extract bit information for.
         valid_bits: array of ints representing what bits should be considered valid.
-        nodata: nodata value for the data array.
+        no_data: no_data value for the data array.
 
     Returns:
         Boolean mask signifying valid data.
@@ -160,14 +167,14 @@ def add_timestamp_data_to_xr(dataset):
                 'time': dataset.time})
 
 
-def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326"):
+def write_geotiff_from_xr(tif_path, dataset, bands, no_data=-9999, crs="EPSG:4326"):
     """Write a geotiff from an xarray dataset.
 
     Args:
         tif_path: path for the tif to be written to.
         dataset: xarray dataset
         bands: list of strings representing the bands in the order they should be written
-        nodata: nodata value for the dataset
+        no_data: no_data value for the dataset
         crs: requested crs.
 
     """
@@ -183,21 +190,29 @@ def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326
             dtype=str(dataset[bands[0]].dtype),
             crs=crs,
             transform=_get_transform_from_xr(dataset),
-            nodata=nodata) as dst:
+            nodata=no_data) as dst:
         for index, band in enumerate(bands):
             dst.write(dataset[band].values, index + 1)
         dst.close()
 
 
-def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False):
+def write_png_from_xr(png_path,
+                      dataset,
+                      bands,
+                      png_filled_path=None,
+                      fill_color='red',
+                      scale=None,
+                      low_res=False,
+                      no_data=-9999,
+                      crs="EPSG:4326"):
     """Write a rgb png from an xarray dataset.
 
     Args:
         png_path: path for the png to be written to.
         dataset: dataset to use for the png creation.
         bands: a list of three strings representing the bands and their order
-        png_filled_path: optional png with nodata values filled
-        fill_color: color to use as the nodata fill
+        png_filled_path: optional png with no_data values filled
+        fill_color: color to use as the no_data fill
         scale: desired scale - tuple like (0, 4000) for the upper and lower bounds
 
     """
@@ -205,7 +220,7 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     assert len(bands) == 3 and isinstance(bands[0], str), "You must supply three string bands for a PNG."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
-    write_geotiff_from_xr(tif_path, dataset, bands)
+    write_geotiff_from_xr(tif_path, dataset, bands, no_data=no_data, crs=crs)
 
     scale_string = ""
     if scale is not None and len(scale) == 2:
@@ -228,15 +243,22 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     os.remove(tif_path)
 
 
-def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None, interpolate=True):
-    """Write a pseudocolor png from an xarray dataset.
+def write_single_band_png_from_xr(png_path,
+                                  dataset,
+                                  band,
+                                  color_scale=None,
+                                  fill_color=None,
+                                  interpolate=True,
+                                  no_data=-9999,
+                                  crs="EPSG:4326"):
+ """Write a pseudocolor png from an xarray dataset.
 
     Args:
         png_path: path for the png to be written to.
         dataset: dataset to use for the png creation.
         band: The band to write to a png
-        png_filled_path: optional png with nodata values filled
-        fill_color: color to use as the nodata fill
+        png_filled_path: optional png with no_data values filled
+        fill_color: color to use as the no_data fill
         color_scale: path to a color scale compatible with gdal.
 
     """
@@ -244,7 +266,7 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
     assert isinstance(band, str), "Band must be a string."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
-    write_geotiff_from_xr(tif_path, dataset, [band])
+    write_geotiff_from_xr(tif_path, dataset, [band], no_data=no_data, crs=crs)
 
     interpolation_settings = "-nearest_color_entry" if not interpolate else ""
 
