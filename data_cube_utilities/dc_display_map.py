@@ -39,8 +39,8 @@ def display_map(latitude = None, longitude = None, resolution = None):
     margin = -0.5
     zoom_bias = 0
     
-    lat_zoom_level = _degree_to_zoom_level(*latitude, margin = margin) + zoom_bias
-    lon_zoom_level = _degree_to_zoom_level(*longitude, margin = margin) + zoom_bias
+    lat_zoom_level = _degree_to_zoom_level(margin = margin, *latitude ) + zoom_bias
+    lon_zoom_level = _degree_to_zoom_level(margin = margin, *longitude) + zoom_bias
     zoom_level = min(lat_zoom_level, lon_zoom_level) 
 
     ###### ###### ######   CENTER POINT        ###### ###### ######
@@ -61,8 +61,8 @@ def display_map(latitude = None, longitude = None, resolution = None):
     if resolution is not None:
         res_lat, res_lon = resolution
 
-        lats = np.arange(*latitude, abs(res_lat))
-        lons = np.arange(*longitude, abs(res_lon))
+        lats = np.arange(abs(res_lat), *latitude)
+        lons = np.arange(abs(res_lon), *longitude)
 
         vertical_grid   = map(lambda x :([x[0][0],x[1]],[x[0][1],x[1]]),itertools.product([latitude],lons))
         horizontal_grid = map(lambda x :([x[1],x[0][0]],[x[1],x[0][1]]),itertools.product([longitude],lats))
