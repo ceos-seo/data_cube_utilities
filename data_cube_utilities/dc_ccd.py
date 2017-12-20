@@ -21,6 +21,41 @@ def _n64_to_datetime(n64):
     """Convert Numpy 64 bit timestamps to datetime objects. Units in seconds"""
     return datetime.utcfromtimestamp(n64.tolist() / 1e9)
 
+def _n64_datetime_to_scalar(dt64):
+        return (dt64 - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's')
+
+def _scalar_to_n64_datetime(scalar):
+        return (scalar * np.timedelta64(1, 's')) + np.datetime64('1970-01-01T00:00:00Z')
+
+
+
+###### POST PROCESSING FUNCTIONS ######################
+
+def _identity_transform(x):
+    return x
+
+def _extract_time_coordinate_and_treat_as_value(da, f = _identity_transform):    
+    value = [[f(da.time.values)]] #dummy value for time scalar 
+    coords = [[da.latitude.values],[da.longitude.values]]
+    dims=['latitude', 'longitude']
+    
+    return xarray.DataArray(value, coords, dims)
+
+
+def _nth_occurence_in_ccd_matrix(ds, n, f = _identity_transform):
+    xr_pixel_drop_nan         = lambda da: da.where(~np.isnan(da), drop = True)
+    xr_pixel_has_n_values     = lambda da: len(da.values) >= n + 1
+    xr_get_nth_time           = lambda da: da.isel(time = n)  
+    
+    time_per_coord_stream = map(
+        partial(_extract_time_coordinate_and_treat_as_value, f = f), map(
+            xr_get_nth_time, filter(
+                xr_pixel_has_n_values, map(
+                    xr_pixel_drop_nan ,_pixel_iterator_from_xarray(ds)))))
+    
+    return reduce(lambda x, y: x.combine_first(y), time_per_coord_stream)
+
+
 
 ###### Per Pixel FUNCTIONS ############################
 
@@ -54,7 +89,6 @@ def _run_ccd_on_pixel(ds):
 
     thermals = np.ones(scene_count) * (273.15) * 10 if 'thermal' not in available_bands else ds.object.values
     qa = np.array(ds.pixel_qa.values)
-
 
     params = (date, blue, green, red, nir, swir1, swir2, thermals, qa)
 
@@ -382,7 +416,7 @@ def _rebuild_xarray_from_pixels(pixels):
 
 
 @disable_logger
-def process_xarray(ds, distributed=False):
+def _generate_change_matrix(ds, distributed= False):
     """Runs CCD on an xarray datastructure
 
     Computes CCD calculations on every pixel within an xarray dataset.
@@ -400,9 +434,31 @@ def process_xarray(ds, distributed=False):
     pixels = _pixel_iterator_from_xarray(ds)
     ccd_products = _ccd_product_iterator_from_pixels(pixels, distributed=distributed)
     ccd_products = filter(partial(is_not, None), ccd_products)
-    ccd_change_count_xarray = _rebuild_xarray_from_pixels(ccd_products)
+    ccd_change_count_xarray = _rebuild_xarray_from_pixels(ccd_products) # Change matrix
+    return ccd_change_count_xarray
 
-    return (ccd_change_count_xarray.sum(dim='time') - 1).rename('change_volume')
+def process_xarray(ds, distributed=False, process = "change_count"):
+    
+    ### Instead of using an `if process = "moving_avg"` if ladder to add and remove
+    ### processing options, we use a dictionary to look up our processing options. 
+    
+    ### Declare several processing outputs. 
+    def generate_matrix():
+        return _generate_change_matrix(ds, distributed = distributed)
+    def change_count():
+        return (generate_matrix().sum(dim='time') - 1).rename('change_volume')
+    def first_change():
+        return _nth_occurence_in_ccd_matrix(generate_matrix(),
+                                            1,
+                                            f = _n64_datetime_to_scalar)
+    
+    processing_options = {
+        "change_count": change_count,
+        "first":  first_change,
+        "matrix": generate_matrix
+    }
+    
+    return processing_options[process]()
 
 
 @enable_logger
