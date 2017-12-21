@@ -27,14 +27,10 @@ import xarray as xr
 from datetime import datetime
 import collections
 from collections import OrderedDict
+import hdmedians as hd
 
 import datacube
 from . import dc_utilities as utilities
-
-# Author: KMF
-# Creation date: 2016-06-14
-# Modified by: AHDS
-# Last modified date:
 
 
 def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
@@ -60,33 +56,53 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
         variables: same as dataset_in
     """
 
-    dataset_in = dataset_in.copy(deep=True).astype(kwargs.get('dtype', 'int32'))
+    dataset_in = dataset_in.copy(deep=True)
 
-    # Create clean_mask from cfmask if none given
-    if clean_mask is None:
-        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
-            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
+    assert clean_mask is not None, "Please provide a boolean clean mask."
 
-        #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
+    #masks data with clean_mask. all values that are clean_mask==False are set to no_data.
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
     if intermediate_product is not None:
         dataset_out = intermediate_product.copy(deep=True)
     else:
         dataset_out = None
-    time_slices = reversed(range(len(clean_mask))) if kwargs and kwargs['reverse_time'] else range(len(clean_mask))
+    time_slices = reversed(
+        range(len(dataset_in.time))) if 'reverse_time' in kwargs and kwargs['reverse_time'] else range(
+            len(dataset_in.time))
     for index in time_slices:
         dataset_slice = dataset_in.isel(time=index).drop('time')
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
-            #clear out the params as they can't be written to nc.
-            dataset_out.attrs = OrderedDict()
+            utilities.clear_attrs(dataset_out)
         else:
             for key in list(dataset_in.data_vars):
                 dataset_out[key].values[dataset_out[key].values == -9999] = dataset_slice[key].values[dataset_out[key]
                                                                                                       .values == -9999]
                 dataset_out[key].attrs = OrderedDict()
     return dataset_out
+
+
+def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+    """
+	Description:
+		Method for calculating the mean pixel value for a given dataset.
+	-----
+	Input:
+		dataset_in (xarray dataset) - the set of data with clouds and no data removed.
+	Optional Inputs:
+		no_data (int/float) - no data value.
+	"""
+    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+
+    dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
+    dataset_out = dataset_in_filtered.mean(dim='time', skipna=True, keep_attrs=False)
+    utilities.nan_to_num(dataset_out, no_data)
+    #manually clear out dates/timestamps/sats.. median won't produce meaningful reslts for these.
+    for key in ['timestamp', 'date', 'satellite']:
+        if key in dataset_out:
+            dataset_out[key].values[::] = no_data
+    return dataset_out.astype(kwargs.get('dtype', 'int32'))
 
 
 def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
@@ -99,25 +115,11 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
-    # Create clean_mask from cfmask if none given
-    if clean_mask is None:
-        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
-            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
+    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
 
-    #required for np.nan
-    dataset_in = dataset_in.copy(deep=True).astype("float64")
-
-    for key in list(dataset_in.data_vars):
-        dataset_in[key].values[np.invert(clean_mask)] = no_data
-
-    dataset_out = dataset_in.isel(time=0).drop('time').copy(deep=True).astype('float64')
-    dataset_out.attrs = OrderedDict()
-    # Loop over every key.
-    for key in list(dataset_in.data_vars):
-        dataset_in[key].values[dataset_in[key].values == no_data] = np.nan
-        dataset_out[key].values = np.nanmedian(dataset_in[key].values, axis=0)
-        dataset_out[key].values[np.isnan(dataset_out[key].values)] = no_data
-
+    dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
+    dataset_out = dataset_in_filtered.median(dim='time', skipna=True, keep_attrs=False)
+    utilities.nan_to_num(dataset_out, no_data)
     #manually clear out dates/timestamps/sats.. median won't produce meaningful reslts for these.
     for key in ['timestamp', 'date', 'satellite']:
         if key in dataset_out:
@@ -136,11 +138,9 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 		no_data (int/float) - no data value.
 	"""
 
-    dataset_in = dataset_in.copy(deep=True).astype("float64")
-    # Create clean_mask from cfmask if none given
-    if clean_mask is None:
-        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
-            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
+    dataset_in = dataset_in.copy(deep=True)
+
+    assert clean_mask is not None, "Please provide a boolean clean mask."
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -150,15 +150,15 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     else:
         dataset_out = None
 
-    for timeslice in range(clean_mask.shape[0]):
+    time_slices = range(len(dataset_in.time))
+    for timeslice in time_slices:
         dataset_slice = dataset_in.isel(time=timeslice).drop('time')
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
         ndvi.values[np.invert(clean_mask)[timeslice, ::]] = -1000000000
         dataset_slice['ndvi'] = ndvi
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
-            #clear out the params as they can't be written to nc.
-            dataset_out.attrs = OrderedDict()
+            utilities.clear_attrs(dataset_out)
         else:
             for key in list(dataset_slice.data_vars):
                 dataset_out[key].values[dataset_slice.ndvi.values >
@@ -178,11 +178,9 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 		no_data (int/float) - no data value.
 	"""
 
-    dataset_in = dataset_in.copy(deep=True).astype("float64")
-    # Create clean_mask from cfmask if none given
-    if clean_mask is None:
-        clean_mask = utilities.create_cfmask_clean_mask(dataset_in.cf_mask) if 'cf_mask' in dataset_in else np.full(
-            (dataset_in[list(dataset_in.data_vars)[0]].shape), True)
+    dataset_in = dataset_in.copy(deep=True)
+
+    assert clean_mask is not None, "Please provide a boolean clean mask."
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -192,18 +190,73 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
     else:
         dataset_out = None
 
-    for timeslice in range(clean_mask.shape[0]):
+    time_slices = range(len(dataset_in.time))
+    for timeslice in time_slices:
         dataset_slice = dataset_in.isel(time=timeslice).drop('time')
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
         ndvi.values[np.invert(clean_mask)[timeslice, ::]] = 1000000000
         dataset_slice['ndvi'] = ndvi
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
-            #clear out the params as they can't be written to nc.
-            dataset_out.attrs = OrderedDict()
+            utilities.clear_attrs(dataset_out)
         else:
             for key in list(dataset_slice.data_vars):
                 dataset_out[key].values[dataset_slice.ndvi.values <
                                         dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values <
                                                                                              dataset_out.ndvi.values]
+    return dataset_out
+
+
+def create_hdmedians_multiple_band_mosaic(dataset_in,
+                                          clean_mask=None,
+                                          no_data=-9999,
+                                          intermediate_product=None,
+                                          operation="median",
+                                          **kwargs):
+    """
+    Description:
+    Calculates the medoid using a multi-band processing method.
+    -----
+    Input:
+    dataset_in (xarray dataset) - the set of data with clouds and no data removed.
+    Optional Inputs:
+    no_data (int/float) - no data value.
+    """
+
+    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+    assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
+
+    dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
+
+    band_list = list(dataset_in_filtered.data_vars)
+    arrays = [dataset_in_filtered[band] for band in band_list]
+
+    stacked_data = np.stack(arrays)
+    bands_shape, time_slices_shape, lat_shape, lon_shape = stacked_data.shape[0], stacked_data.shape[
+        1], stacked_data.shape[2], stacked_data.shape[3]
+
+    reshaped_stack = stacked_data.reshape(bands_shape, time_slices_shape,
+                                          lat_shape * lon_shape)  # Reshape to remove lat/lon
+    hdmedians_result = np.zeros((bands_shape, lat_shape * lon_shape))  # Build zeroes array across time slices.
+
+    for x in range(reshaped_stack.shape[2]):
+        try:
+            hdmedians_result[:, x] = hd.nangeomedian(
+                reshaped_stack[:, :, x], axis=1) if operation == "median" else hd.nanmedoid(
+                    reshaped_stack[:, :, x], axis=1)
+        except ValueError:
+            no_data_pixel_stack = reshaped_stack[:, :, x]
+            no_data_pixel_stack[np.isnan(no_data_pixel_stack)] = no_data
+            hdmedians_result[:, x] = np.full((bands_shape), no_data) if operation == "median" else hd.nanmedoid(
+                no_data_pixel_stack, axis=1)
+
+    output_dict = {
+        value: (('latitude', 'longitude'), hdmedians_result[index, :].reshape(lat_shape, lon_shape))
+        for index, value in enumerate(band_list)
+    }
+
+    dataset_out = xr.Dataset(
+        output_dict, coords={'latitude': dataset_in['latitude'],
+                             'longitude': dataset_in['longitude']})
+    utilities.nan_to_num(dataset_out, no_data)
     return dataset_out
