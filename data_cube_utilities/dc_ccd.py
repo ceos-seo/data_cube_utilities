@@ -461,7 +461,7 @@ def process_xarray(ds, distributed=False, process = "change_count"):
     return processing_options[process]()
 
 
-@enable_logger
+@disable_logger
 def process_pixel(ds):
     """Runs CCD on a 1x1 xarray
 
