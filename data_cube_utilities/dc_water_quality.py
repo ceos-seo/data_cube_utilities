@@ -19,10 +19,8 @@ def tsm(dataset_in, clean_mask=None, no_data=0):
     tsm.values[np.invert(clean_mask)] = no_data  # Contains data for clear pixels
 
     # Create xarray of data
-    time = dataset_in.time
-    latitude = dataset_in.latitude
-    longitude = dataset_in.longitude
-    dataset_out = xr.Dataset({'tsm': tsm}, coords={'time': time, 'latitude': latitude, 'longitude': longitude})
+    _coords = { key:dataset_in[key] for key in dataset_in.dims.keys()}
+    dataset_out = xr.Dataset({'tsm': tsm}, coords=_coords)
     return dataset_out
 
 

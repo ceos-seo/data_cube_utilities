@@ -37,7 +37,7 @@ from datetime import datetime
 # Creation date: 2016-06-13
 
 
-def wofs_classify(dataset_in, clean_mask, no_data=-9999, mosaic=False, enforce_float64=False):
+def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enforce_float64=False):
     """
     Description:
       Performs WOfS algorithm on given dataset. If no clean mask is given, the 'cf_mask'
@@ -58,7 +58,7 @@ def wofs_classify(dataset_in, clean_mask, no_data=-9999, mosaic=False, enforce_f
         variable
     Optional Inputs:
       clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
-        if user does not provide a clean mask, one will be created using cfmask
+        if user does not provide a clean mask, all values will be considered clean
       no_data (int/float) - no data pixel value; default: -9999
       mosaic (boolean) - flag to indicate if dataset_in is a mosaic. If mosaic = False, dataset_in
         should have a time coordinate and wofs will run over each time slice; otherwise, dataset_in
@@ -202,6 +202,12 @@ def wofs_classify(dataset_in, clean_mask, no_data=-9999, mosaic=False, enforce_f
 
         return classified
 
+    # Default to masking nothing.
+    data_vars = dataset_in.data_vars
+    if len(data_vars) != 0:
+        first_data_var = next(iter(data_vars))
+        clean_mask = np.ones(dataset_in[first_data_var].shape).astype(np.bool)
+    
     # Extract dataset bands needed for calculations
     blue = dataset_in.blue
     green = dataset_in.green
