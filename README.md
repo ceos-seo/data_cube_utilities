@@ -1,6 +1,6 @@
 Data Cube Utilities
 =================
------
+
 This repository serves as a common module for our Jupyter examples and our UI.
 
 This includes:
