@@ -40,9 +40,7 @@ from datetime import datetime
 def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enforce_float64=False):
     """
     Description:
-      Performs WOfS algorithm on given dataset. If no clean mask is given, the 'cf_mask'
-      variable must be included in the input dataset, as it will be used to create a
-      clean mask
+      Performs WOfS algorithm on given dataset.
     Assumption:
       - The WOfS algorithm is defined for Landsat 5/Landsat 7
     References:
@@ -54,8 +52,6 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
       dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube; should contain
         coordinates: time, latitude, longitude
         variables: blue, green, red, nir, swir1, swir2
-        If user does not provide a clean_mask, dataset_in must also include the cf_mask
-        variable
     Optional Inputs:
       clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
         if user does not provide a clean mask, all values will be considered clean
