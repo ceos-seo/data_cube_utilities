@@ -56,6 +56,41 @@ def create_cfmask_clean_mask(cfmask, no_data=-9999):
     clean_mask = (cfmask == 0) | (cfmask == 1)
     return clean_mask.values
 
+def create_default_clean_mask(dataset_in):
+    """
+    Description:
+        Creates a data mask that masks nothing.
+    -----
+    Inputs:
+        dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube.
+    Throws:
+        ValueError - if dataset_in is an empty xarray.Dataset.
+    """
+    data_vars = dataset_in.data_vars
+    if len(data_vars) != 0:
+        first_data_var = next(iter(data_vars))
+        clean_mask = np.ones(dataset_in[first_data_var].shape).astype(np.bool)
+        return clean_mask
+    else:
+        raise ValueError('`dataset_in` has no data!')
+
+def get_spatial_ref(crs):
+    """
+    Description:
+      Get the spatial reference of a given crs
+    -----
+    Input:
+      crs (datacube.model.CRS) - Example: CRS('EPSG:4326')
+    Output:
+      ref (str) - spatial reference of given crs
+    """
+
+    crs_str = str(crs)
+    epsg_code = int(crs_str.split(':')[1])
+    ref = osr.SpatialReference()
+    ref.ImportFromEPSG(epsg_code)
+    return str(ref)
+
 
 def get_spatial_ref(crs):
     """

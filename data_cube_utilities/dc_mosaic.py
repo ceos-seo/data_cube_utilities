@@ -27,6 +27,7 @@ import xarray as xr
 from datetime import datetime
 import collections
 from collections import OrderedDict
+import hdmedians as hd
 
 import datacube
 from . import dc_utilities as utilities
@@ -35,29 +36,30 @@ from . import dc_utilities as utilities
 def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
     """
     Description:
-      Creates a most recent - oldest mosaic of the input dataset. If no clean mask is given,
-      the 'cf_mask' variable must be included in the input dataset, as it will be used
-      to create a clean mask
+        Creates a most recent - oldest mosaic of the input dataset. If no clean mask is given,
+        the 'cf_mask' variable must be included in the input dataset, as it will be used
+        to create a clean mask
     -----
     Inputs:
-      dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube; should contain
-        coordinates: time, latitude, longitude
-        variables: variables to be mosaicked
-        If user does not provide a clean_mask, dataset_in must also include the cf_mask
-        variable
+        dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube; should contain
+            coordinates: time, latitude, longitude
+            variables: variables to be mosaicked
     Optional Inputs:
-      clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
-        if user does not provide a clean mask, one will be created using cfmask
-      no_data (int/float) - no data pixel value; default: -9999
+        clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
+            if user does not provide a clean mask, all values will be considered clean
+        no_data (int/float) - no data pixel value; default: -9999
     Output:
-      dataset_out (xarray.Dataset) - mosaicked data with
-        coordinates: latitude, longitude
-        variables: same as dataset_in
+        dataset_out (xarray.Dataset) - mosaicked data with
+            coordinates: latitude, longitude
+            variables: same as dataset_in
+    Throws:
+        ValueError - if dataset_in is an empty xarray.Dataset.
     """
-
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
+        
     dataset_in = dataset_in.copy(deep=True)
-
-    assert clean_mask is not None, "Please provide a boolean clean mask."
 
     #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
     for key in list(dataset_in.data_vars):
@@ -91,7 +93,9 @@ def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
-    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
     dataset_out = dataset_in_filtered.mean(dim='time', skipna=True, keep_attrs=False)
@@ -113,7 +117,9 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
-    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
     dataset_out = dataset_in_filtered.median(dim='time', skipna=True, keep_attrs=False)
@@ -135,10 +141,11 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
-
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
+        
     dataset_in = dataset_in.copy(deep=True)
-
-    assert clean_mask is not None, "Please provide a boolean clean mask."
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -175,10 +182,11 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
-
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
+    
     dataset_in = dataset_in.copy(deep=True)
-
-    assert clean_mask is not None, "Please provide a boolean clean mask."
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -278,8 +286,14 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
                                           intermediate_product=None,
                                           operation="median",
                                           **kwargs):
+<<<<<<< HEAD
         
     assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+=======
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
+>>>>>>> 31e603310bbe47804eb953977c110067351ef623
     assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
@@ -315,5 +329,8 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
                              coords={'latitude': dataset_in['latitude'], 'longitude': dataset_in['longitude']},
                              attrs = dataset_in.attrs)
     nan_to_num(dataset_out, no_data)
+<<<<<<< HEAD
     #return dataset_out
+=======
+>>>>>>> 31e603310bbe47804eb953977c110067351ef623
     return dataset_out.astype(kwargs.get('dtype', 'int32'))

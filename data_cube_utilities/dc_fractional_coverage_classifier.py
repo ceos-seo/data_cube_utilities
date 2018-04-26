@@ -4,6 +4,7 @@ import scipy.optimize as opt  #nnls
 
 import datacube
 from . import dc_utilities as utilities
+from .dc_utilities import create_default_clean_mask
 
 # Command line tool imports
 import argparse
@@ -16,12 +17,10 @@ from datetime import datetime
 # Creation date: 2016-10-24
 
 
-def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
+def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     """
     Description:
-      Performs fractional coverage algorithm on given dataset. If no clean mask is given, the 'cf_mask'
-      variable must be included in the input dataset, as it will be used to create a
-      clean mask
+      Performs fractional coverage algorithm on given dataset.
     Assumption:
       - The implemented algorithm is defined for Landsat 5/Landsat 7; in order for it to
         be used for Landsat 8, the bands will need to be adjusted
@@ -36,11 +35,9 @@ def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
         product, such as a cloudfree mosaic; should contain
           coordinates: latitude, longitude
           variables: blue, green, red, nir, swir1, swir2
-        If user does not provide a clean_mask, dataset_in must also include the cf_mask
-        variable
     Optional Inputs:
       clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
-        if user does not provide a clean mask, one will be created using cfmask
+        if user does not provide a clean mask, all values will be considered clean
       no_data (int/float) - no data pixel value; default: -9999
     Output:
       dataset_out (xarray.Dataset) - fractional coverage results with no data = -9999; containing
@@ -48,7 +45,10 @@ def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
           variables: bs, pv, npv
         where bs -> bare soil, pv -> photosynthetic vegetation, npv -> non-photosynthetic vegetation
     """
-
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
+    
     band_stack = []
 
     mosaic_clean_mask = clean_mask.flatten()
