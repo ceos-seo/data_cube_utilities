@@ -4,6 +4,7 @@ import xarray as xr
 import scipy.ndimage.filters as conv
 
 from . import dc_utilities as utilities
+from .dc_utilities import create_default_clean_mask
 from datetime import datetime
 
 
@@ -12,8 +13,20 @@ def _tsmi(dataset):
 
 
 def tsm(dataset_in, clean_mask=None, no_data=0):
-    assert clean_mask is not None, "Please supply a boolean clean mask with the same dimensions as dataset_in"
+    """
+    Inputs:
+        dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube.
+    Optional Inputs:
+        clean_mask (numpy.ndarray with dtype boolean) - true for values user considers clean;
+            if user does not provide a clean mask, all values will be considered clean
+        no_data (int/float) - no data pixel value; default: -9999
+    Throws:
+        ValueError - if dataset_in is an empty xarray.Dataset.
+    """
     assert 'red' in dataset_in and 'green' in dataset_in, "Red and Green bands are required for the TSM analysis."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     tsm = 3983 * _tsmi(dataset_in)**1.6246
     tsm.values[np.invert(clean_mask)] = no_data  # Contains data for clear pixels
@@ -41,8 +54,10 @@ def mask_water_quality(dataset_in, wofs):
 
 
 def watanabe_chlorophyll(dataset_in, clean_mask=None, no_data=0):
-    assert clean_mask is not None, "Please supply a boolean clean mask with the same dimensions as dataset_in"
     assert 'red' in dataset_in and 'nir' in dataset_in, "Red and NIR bands are required for the Watanabe Chlorophyll analysis."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     chl_a = 925.001 * (dataset_in.nir.astype('float64') / dataset_in.red.astype('float64')) - 77.16
     chl_a.values[np.invert(clean_mask)] = no_data  # Contains data for clear pixels
@@ -61,7 +76,9 @@ def watanabe_chlorophyll(dataset_in, clean_mask=None, no_data=0):
 
 
 def nazeer_chlorophyll(dataset_in, clean_mask=None, no_data=0):
-    assert clean_mask is not None, "Please supply a boolean clean mask with the same dimensions as dataset_in"
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     chl_a = (0.57 * (dataset_in.red.astype('float64') * 0.0001) /
              (dataset_in.blue.astype('float64') * 0.0001)**2) - 2.61
