@@ -27,6 +27,7 @@ import xarray as xr
 from datetime import datetime
 import collections
 from collections import OrderedDict
+import hdmedians as hd
 
 import datacube
 from . import dc_utilities as utilities
@@ -285,8 +286,9 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
                                           intermediate_product=None,
                                           operation="median",
                                           **kwargs):
-        
-    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
     assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
@@ -322,5 +324,4 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
                              coords={'latitude': dataset_in['latitude'], 'longitude': dataset_in['longitude']},
                              attrs = dataset_in.attrs)
     nan_to_num(dataset_out, no_data)
-    #return dataset_out
     return dataset_out.astype(kwargs.get('dtype', 'int32'))
