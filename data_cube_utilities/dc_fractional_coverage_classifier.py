@@ -37,7 +37,7 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
           variables: blue, green, red, nir, swir1, swir2
     Optional Inputs:
       clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
-        if user does not provide a clean mask, one will be created using cfmask
+        if user does not provide a clean mask, all values will be considered clean
       no_data (int/float) - no data pixel value; default: -9999
     Output:
       dataset_out (xarray.Dataset) - fractional coverage results with no data = -9999; containing
