@@ -201,15 +201,8 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
         return classified
 
     # Default to masking nothing.
-<<<<<<< HEAD
-    data_vars = dataset_in.data_vars
-    if len(data_vars) != 0:
-        first_data_var = next(iter(data_vars))
-        clean_mask = np.ones(dataset_in[first_data_var].shape).astype(np.bool)
-=======
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
->>>>>>> 31e603310bbe47804eb953977c110067351ef623
     
     # Extract dataset bands needed for calculations
     blue = dataset_in.blue
