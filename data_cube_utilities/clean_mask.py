@@ -4,7 +4,16 @@ import numpy as np
 
 
 def landsat_qa_clean_mask(dataset, platform):
+    """
+    Returns a clean_mask for `dataset` that masks out clouds.
     
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        An xarray (usually produced by `datacube.load()`) that contains a `pixel_qa` data variable.
+    platform: str
+        A string denoting the platform to be used. Can be "LANDSAT_5", "LANDSAT_7", or "LANDSAT_8".
+    """
     processing_options = {
         "LANDSAT_5": ls5_unpack_qa,
         "LANDSAT_7": ls7_unpack_qa,
