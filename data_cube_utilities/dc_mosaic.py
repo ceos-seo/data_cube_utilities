@@ -30,7 +30,7 @@ from collections import OrderedDict
 
 import datacube
 from . import dc_utilities as utilities
-
+from .dc_utilities import create_default_clean_mask
 
 def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
     """
