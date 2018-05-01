@@ -5,7 +5,8 @@ import pandas as pd
 import datacube as dc
 import xarray as xr
 import utils.data_cube_utilities.data_access_api as dc_api 
-from utils.data_cube_utilities.dc_utilities import ls7_unpack_qa, perform_timeseries_analysis
+from utils.data_cube_utilities.dc_utilities import perform_timeseries_analysis
+from utils.data_cube_utilities.dc_mosaic import ls7_unpack_qa
 from rasterstats import zonal_stats
 from scipy import stats
 from scipy.stats import norm
@@ -20,7 +21,6 @@ import matplotlib.ticker as ticker
 from matplotlib.ticker import FuncFormatter
 import calendar, datetime, time
 import pytz
-from utils.data_cube_utilities.dc_utilities import plot_bands
 
 def n64_to_epoch(timestamp):
     ts = pd.to_datetime(str(timestamp)) 
