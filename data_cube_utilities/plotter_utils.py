@@ -134,7 +134,6 @@ def plot_band(landsat_dataset, dataset):
     plt.show
 
 def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", plot_max = False, plot_min = False):
-    
     times = dataset.time.values
     mpl.style.use('seaborn')
     plt.figure(figsize=(20,15))
