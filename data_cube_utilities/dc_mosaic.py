@@ -58,7 +58,9 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
 
     dataset_in = dataset_in.copy(deep=True)
 
-    assert clean_mask is not None, "Please provide a boolean clean mask."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
     for key in list(dataset_in.data_vars):
@@ -92,7 +94,9 @@ def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
-    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
     dataset_out = dataset_in_filtered.mean(dim='time', skipna=True, keep_attrs=False)
@@ -114,7 +118,9 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
 	Optional Inputs:
 		no_data (int/float) - no data value.
 	"""
-    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
     dataset_out = dataset_in_filtered.median(dim='time', skipna=True, keep_attrs=False)
@@ -139,7 +145,9 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 
     dataset_in = dataset_in.copy(deep=True)
 
-    assert clean_mask is not None, "Please provide a boolean clean mask."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -179,7 +187,9 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
 
     dataset_in = dataset_in.copy(deep=True)
 
-    assert clean_mask is not None, "Please provide a boolean clean mask."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
@@ -280,7 +290,9 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
                                           operation="median",
                                           **kwargs):
         
-    assert clean_mask is not None, "A boolean mask for clean_mask must be supplied."
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
     assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
