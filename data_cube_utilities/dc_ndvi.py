@@ -2,6 +2,22 @@ from .dc_water_classifier import wofs_classify
 import xarray as xr
 import numpy as np
 
+def NDVI(dataset):
+    """
+    Computes the Normalized Difference Vegetation Index for an `xarray.Dataset`.
+    
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        An `xarray.Dataset` that must contain 'nir' and 'red' `DataArrays`.
+        
+    Returns
+    -------
+    ndvi: xarray.DataArray
+        An `xarray.DataArray` with the same shape as `dataset` - the same coordinates in 
+        the same order.
+    """
+    return (dataset.nir - dataset.red) / (dataset.nir + dataset.red)
 
 def compute_ndvi_anomaly(baseline_data,
                          scene_data,
