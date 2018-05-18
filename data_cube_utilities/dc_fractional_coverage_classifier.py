@@ -5,6 +5,7 @@ import scipy.optimize as opt  #nnls
 import datacube
 from . import dc_utilities as utilities
 from .dc_utilities import create_default_clean_mask
+from .clean_mask import create_2D_mosaic_clean_mask
 
 # Command line tool imports
 import argparse
@@ -31,12 +32,11 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
         161 (2015): 12-26.
     -----
     Inputs:
-      dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube (can be a derived
-        product, such as a cloudfree mosaic; should contain
+      dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube - should be a mosaic (mean mosaic is a good choice) containing:
           coordinates: latitude, longitude
           variables: blue, green, red, nir, swir1, swir2
     Optional Inputs:
-      clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
+      clean_mask (numpy.ndarray with dtype boolean) - true for values user considers clean;
         if user does not provide a clean mask, all values will be considered clean
       no_data (int/float) - no data pixel value; default: -9999
     Output:
@@ -49,10 +49,11 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
     
+    # Clean and format data so it is analysis-ready.
     band_stack = []
-
-    mosaic_clean_mask = clean_mask.flatten()
-
+    mosaic_clean_mask = create_2D_mosaic_clean_mask(clean_mask)
+    mosaic_clean_mask_flat = mosaic_clean_mask.flatten()
+    
     for band in [
             dataset_in.blue.values, dataset_in.green.values, dataset_in.red.values, dataset_in.nir.values,
             dataset_in.swir1.values, dataset_in.swir2.values
@@ -61,48 +62,53 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
         band = band * 0.0001
         band = band.flatten()
         band_clean = np.full(band.shape, np.nan)
-        band_clean[mosaic_clean_mask] = band[mosaic_clean_mask]
+        band_clean[mosaic_clean_mask_flat] = band[mosaic_clean_mask_flat]
         band_stack.append(band_clean)
 
     band_stack = np.array(band_stack).transpose()
-
-    for b in range(6):
+    num_bands = band_stack.shape[1]
+    
+    # In order to account for the non-linearities in the spectral mixing, the following 
+    # code performs log transformations of the surface reflectance bands and interactive 
+    # terms in the regression equations.
+    for b in range(num_bands):
         band_stack = np.hstack((band_stack, np.expand_dims(np.log(band_stack[:, b]), axis=1)))
-    for b in range(6):
+    for b in range(num_bands):
         band_stack = np.hstack(
-            (band_stack, np.expand_dims(np.multiply(band_stack[:, b], band_stack[:, b + 6]), axis=1)))
-    for b in range(6):
-        for b2 in range(b + 1, 6):
+            (band_stack, np.expand_dims(np.multiply(band_stack[:, b], band_stack[:, b + num_bands]), axis=1)))
+    for b in range(num_bands):
+        for b2 in range(b + 1, num_bands):
             band_stack = np.hstack(
                 (band_stack, np.expand_dims(np.multiply(band_stack[:, b], band_stack[:, b2]), axis=1)))
-    for b in range(6):
-        for b2 in range(b + 1, 6):
+    for b in range(num_bands):
+        for b2 in range(b + 1, num_bands):
             band_stack = np.hstack(
-                (band_stack, np.expand_dims(np.multiply(band_stack[:, b + 6], band_stack[:, b2 + 6]), axis=1)))
-    for b in range(6):
-        for b2 in range(b + 1, 6):
+                (band_stack, np.expand_dims(np.multiply(band_stack[:, b + num_bands], band_stack[:, b2 + num_bands]), axis=1)))
+    for b in range(num_bands):
+        for b2 in range(b + 1, num_bands):
             band_stack = np.hstack((band_stack, np.expand_dims(
                 np.divide(band_stack[:, b2] - band_stack[:, b], band_stack[:, b2] + band_stack[:, b]), axis=1)))
 
     band_stack = np.nan_to_num(band_stack)  # Now a n x 63 matrix (assuming one acquisition)
 
+    # Run fractional coverage algorithm.
     ones = np.ones(band_stack.shape[0])
     ones = ones.reshape(ones.shape[0], 1)
     band_stack = np.concatenate((band_stack, ones), axis=1)  # Now a n x 64 matrix (assuming one acquisition)
 
     end_members = np.loadtxt(
-        '/home/localuser/Datacube/data_cube_ui/utils/data_cube_utilities/endmembers_landsat.csv',
+'/home/localuser/Datacube/data_cube_ui/utils/data_cube_utilities/endmembers_landsat.csv',
         delimiter=',')  # Creates a 64 x 3 matrix
 
     SumToOneWeight = 0.02
     ones = np.ones(end_members.shape[1]) * SumToOneWeight
     ones = ones.reshape(1, end_members.shape[1])
     end_members = np.concatenate((end_members, ones), axis=0).astype(np.float32)
-
+    
     result = np.zeros((band_stack.shape[0], end_members.shape[1]), dtype=np.float32)  # Creates an n x 3 matrix
-
+    
     for i in range(band_stack.shape[0]):
-        if mosaic_clean_mask[i]:
+        if mosaic_clean_mask_flat[i]:
             result[i, :] = (opt.nnls(end_members, band_stack[i, :])[0].clip(0, 2.54) * 100).astype(np.int16)
         else:
             result[i, :] = np.ones((end_members.shape[1]), dtype=np.int16) * (-9999)  # Set as no data
@@ -111,17 +117,20 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     longitude = dataset_in.longitude
 
     result = result.reshape(latitude.size, longitude.size, 3)
-
+    
+    # Photosynthetic Vegetation
     pv_band = result[:, :, 0]
+    # Nonphotosynthetic Vegetation
     npv_band = result[:, :, 1]
+    # Bare Soil
     bs_band = result[:, :, 2]
 
     pv_clean = np.full(pv_band.shape, -9999)
     npv_clean = np.full(npv_band.shape, -9999)
     bs_clean = np.full(bs_band.shape, -9999)
-    pv_clean[clean_mask] = pv_band[clean_mask]
-    npv_clean[clean_mask] = npv_band[clean_mask]
-    bs_clean[clean_mask] = bs_band[clean_mask]
+    pv_clean[mosaic_clean_mask] = pv_band[mosaic_clean_mask]
+    npv_clean[mosaic_clean_mask] = npv_band[mosaic_clean_mask]
+    bs_clean[mosaic_clean_mask] = bs_band[mosaic_clean_mask]
 
     rapp_bands = collections.OrderedDict([('bs', (['latitude', 'longitude'], bs_band)),
                                           ('pv', (['latitude', 'longitude'], pv_band)),
