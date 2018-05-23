@@ -63,7 +63,23 @@ def full_linear_regression(ds):
 def tfmt(x, pos=None):
     return time.strftime("%Y-%m-%d",time.gmtime(x))
 
-def plot_band(landsat_dataset, dataset):
+def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
+    """
+    Plots several statistics over time - including mean, median, linear regression of the 
+    means, Gaussian smoothed curve of means, and the band enclosing the 25th percentiles 
+    and the 75th percentiles.
+    
+    Parameters
+    ----------
+    landsat_dataset: xarray.Dataset
+        An xarray `Dataset` containing longitude, latitude, and time coordinates.
+    dataset: xarray.DataArray
+        An xarray `DataArray` containing time, latitude, and longitude coordinates.
+    figsize: tuple
+        A 2-tuple of the figure size in inches for the entire figure.
+    fontsize: int
+        The font size to use for text.
+    """
     
     #Calculations
     times = dataset.time.values
@@ -72,8 +88,9 @@ def plot_band(landsat_dataset, dataset):
     times = np.sort(times)
     mean  = dataset.mean(dim=['latitude','longitude'],  skipna = True).values
     medians = dataset.median(dim=['latitude','longitude'], skipna = True)
+    
     std_dev = np.nanstd(mean)
-    plt.figure(figsize=(20,15))
+    plt.figure(figsize=figsize)
     ax = plt.gca()
 
     #Shaded Area
@@ -127,11 +144,12 @@ def plot_band(landsat_dataset, dataset):
     #Formatting
     ax.grid(color='k', alpha=0.1, linestyle='-', linewidth=1)
     ax.xaxis.set_major_formatter(FuncFormatter(tfmt))
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.xticks(rotation=45)
-    ax.set_xlabel('Time')
-    ax.set_ylabel('Value')
-    plt.show
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=legend_fontsize)
+    plt.xticks(rotation=45, fontsize=fontsize)
+    plt.yticks(fontsize=fontsize)
+    ax.set_xlabel('Time', fontsize=fontsize)
+    ax.set_ylabel('Value', fontsize=fontsize)
+    plt.show()
 
 def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", plot_max = False, plot_min = False):
     times = dataset.time.values
