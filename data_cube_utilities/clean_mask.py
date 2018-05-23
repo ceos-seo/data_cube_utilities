@@ -32,9 +32,9 @@ def landsat_clean_mask_invalid(dataset):
     Parameters
     ----------
     dataset: xarray.Dataset
-        
+        An xarray `Dataset` containing bands such as 'red', 'green', or 'blue'.
     """
-    data_bands = dataset[['red', 'green', 'blue', 'swir1', 'swir2', 'nir']]
+    data_bands = dataset.drop('pixel_qa')
     return data_bands.where((0 < data_bands) & (data_bands < 10000))
     
 
