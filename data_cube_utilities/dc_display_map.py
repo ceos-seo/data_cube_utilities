@@ -6,8 +6,12 @@ import numpy as np
 def _degree_to_zoom_level(l1, l2, margin = 0.0):
     
     degree = abs(l1 - l2) * (1 + margin)
-    zoom_level_float = math.log(360/degree)/math.log(2)
-    zoom_level_int = int(zoom_level_float)
+    zoom_level_int = 0
+    if degree != 0:
+        zoom_level_float = math.log(360/degree)/math.log(2)
+        zoom_level_int = int(zoom_level_float)
+    else:
+        zoom_level_int = 18
     return zoom_level_int
 
 def display_map(latitude = None, longitude = None, resolution = None):
