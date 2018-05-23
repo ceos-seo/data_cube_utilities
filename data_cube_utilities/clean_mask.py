@@ -24,6 +24,19 @@ def create_2D_mosaic_clean_mask(clean_mask):
         mosaic_clean_mask = np.logical_or(mosaic_clean_mask, clean_mask[i])    
     return mosaic_clean_mask
 
+def landsat_clean_mask_invalid(dataset):
+    """
+    Masks out invalid data according to the LANDSAT 7 and 8 surface reflectance 
+    specifications.
+    
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        
+    """
+    data_bands = dataset[['red', 'green', 'blue', 'swir1', 'swir2', 'nir']]
+    return data_bands.where((0 < data_bands) & (data_bands < 10000))
+    
 
 def landsat_qa_clean_mask(dataset, platform):
     """
