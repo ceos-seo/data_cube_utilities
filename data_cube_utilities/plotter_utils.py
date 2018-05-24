@@ -22,6 +22,26 @@ from matplotlib.ticker import FuncFormatter
 import calendar, datetime, time
 import pytz
 
+def impute_missing_data_1D(data1D):
+    """
+    Many linear plotting functions for 1D data often (and should) only connect contiguous, 
+    non-nan data points. This leaves gaps in the piecewise linear plot, which are 
+    graphically undesirable. This function returns the data in the same format as it was 
+    passed in, but with missing values either masked out or imputed with appropriate values 
+    (using a linear trend).
+    
+    Parameters
+    ----------
+    data: numpy.ndarray
+        Ideally, any type of 1D data for which missing values are to be masked or imputed 
+        suitably for at least matplotlib plotting. If formatting for other libraries such 
+        as seaborn or plotly is necessary, add that formatting requirement as a parameter.
+    """
+    if type(data1D) == np.ndarray:
+        mask = np.isfinite(data1D)
+        data1D = data1D[mask]
+    return data1D
+    
 def n64_to_epoch(timestamp):
     ts = pd.to_datetime(str(timestamp)) 
     ts = ts.strftime('%Y-%m-%d')
@@ -67,7 +87,8 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     """
     Plots several statistics over time - including mean, median, linear regression of the 
     means, Gaussian smoothed curve of means, and the band enclosing the 25th percentiles 
-    and the 75th percentiles.
+    and the 75th percentiles. This is very similar to the output of the Comet Time Series 
+    Toolset (https://github.com/CosmiQ/CometTS). 
     
     Parameters
     ----------
