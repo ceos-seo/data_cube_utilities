@@ -6,6 +6,38 @@ from collections import OrderedDict
 import xarray as xr
 import matplotlib.pyplot as plt
 
+def get_frequency_counts(classification):
+    """
+    Get the raw and fractional class frequency counts for an `xarray.Dataset`.
+    Intended to be used with outputs from the `*_cluster_dataset()` fucntions.
+    
+    Parameters
+    ----------
+    classification: xarray.Dataset
+        An `xarray.Dataset` with a `classification` data variable.
+    
+    Returns
+    -------
+    freqs: list
+        A list containing tuples of the format (class_number, (count, frequency)), ordered 
+        by frequency.
+    """
+    classifications = classification.classification.values.flatten()
+    class_nums, class_counts = np.unique(classifications, return_counts=True)
+    num_classifications = len(classifications)
+    fractional_freqs = [count/num_classifications for count in class_counts]
+    #classes, class_counts = np.unique(classifications, return_counts=True)
+    #np.bincount(classifications)
+#     print(class_nums, class_counts)
+    freqs = {class_num: (count, freq) for class_num, count, freq in zip(class_nums, 
+             class_counts, fractional_freqs)}
+    # Order by the frequency.
+    freqs = sorted(freqs.items(), key=lambda x: x[1])
+#     freqs = {}
+#     for i in range(len(class_counts)):
+#         freqs[i] = (class_counts[i], fractional_freqs[i])
+    return freqs
+
 def clustering_pre_processing(dataset_in, bands):
     array_from = []
     for band in bands:
