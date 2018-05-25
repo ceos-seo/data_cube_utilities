@@ -58,7 +58,7 @@ def convert_to_dtype(data, dtype):
 Compositing Functions
 """
 
-def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, intermediate_product=None, **kwargs):
+def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, intermediate_product=None, **kwargs):
     """
     Creates a most-recent-to-oldest mosaic of the input dataset.
     
@@ -84,7 +84,6 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, 
         coordinates: latitude, longitude
         variables: same as dataset_in
     """
-
     dataset_in = dataset_in.copy(deep=True)
 
     # Default to masking nothing.
@@ -110,9 +109,12 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, 
                 dataset_out[key].values[dataset_out[key].values == -9999] = dataset_slice[key].values[dataset_out[key]
                                                                                                       .values == -9999]
                 dataset_out[key].attrs = OrderedDict()
-    return convert_to_dtype(dataset_out, dtype)
+    utilities.nan_to_num(dataset_out, no_data)
+    if dtype is not None:
+        convert_to_dtype(dataset_out, dtype)
+    return dataset_out
 
-def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, **kwargs):
+def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, **kwargs):
     """
     Method for calculating the mean pixel value for a given dataset.
     
@@ -149,10 +151,13 @@ def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.floa
     for key in ['timestamp', 'date', 'satellite']:
         if key in dataset_out:
             dataset_out[key].values[::] = no_data
-    return convert_to_dtype(dataset_out, dtype)
+    utilities.nan_to_num(dataset_out, no_data)
+    if dtype is not None:
+        convert_to_dtype(dataset_out, dtype)
+    return dataset_out
 
 
-def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, **kwargs):
+def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, **kwargs):
     """
     Method for calculating the median pixel value for a given dataset.
     
@@ -189,10 +194,13 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.fl
     for key in ['timestamp', 'date', 'satellite']:
         if key in dataset_out:
             dataset_out[key].values[::] = no_data
-    return convert_to_dtype(dataset_out, dtype)
+    utilities.nan_to_num(dataset_out, no_data)
+    if dtype is not None:
+        convert_to_dtype(dataset_out, dtype)
+    return dataset_out
 
 
-def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, intermediate_product=None, **kwargs):
+def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, intermediate_product=None, **kwargs):
     """
     Method for calculating the pixel value for the max ndvi value.
     
@@ -246,10 +254,13 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.
                 dataset_out[key].values[dataset_slice.ndvi.values >
                                         dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values >
                                                                                              dataset_out.ndvi.values]
-    return convert_to_dtype(dataset_out, dtype)
+    utilities.nan_to_num(dataset_out, no_data)
+    if dtype is not None:
+        convert_to_dtype(dataset_out, dtype)
+    return dataset_out
 
 
-def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, intermediate_product=None, **kwargs):
+def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, intermediate_product=None, **kwargs):
     """
     Method for calculating the pixel value for the min ndvi value.
 
@@ -303,7 +314,10 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.
                 dataset_out[key].values[dataset_slice.ndvi.values <
                                         dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values <
                                                                                              dataset_out.ndvi.values]
-    return convert_to_dtype(dataset_out, dtype)
+    utilities.nan_to_num(dataset_out, no_data)
+    if dtype is not None:
+        convert_to_dtype(dataset_out, dtype)
+    return dataset_out
 
 def unpack_bits(land_cover_endcoding, data_array, cover_type):
     """
@@ -368,15 +382,12 @@ def ls5_unpack_qa( data_array , cover_type):
                                  high_conf=  [224]
                                ) 
     return unpack_bits(land_cover_endcoding, data_array, cover_type)  
-    
-def nan_to_num(dataset, number):
-    for key in list(dataset.data_vars):
-        dataset[key].values[np.isnan(dataset[key].values)] = number  
+
         
 def create_hdmedians_multiple_band_mosaic(dataset_in,
                                           clean_mask=None,
                                           no_data=-9999,
-                                          dtype=np.float16,
+                                          dtype=None,
                                           intermediate_product=None,
                                           operation="median",
                                           **kwargs):
@@ -410,21 +421,15 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
-#     print("dataset_in_filtered: ", dataset_in_filtered, dataset_in_filtered.dims)
-#     print("dataset_in_filtered sum nodata: ", 
-#         dataset_in_filtered.where(dataset_in_filtered==-9999).sum())
     
     band_list = list(dataset_in_filtered.data_vars)
     arrays = [dataset_in_filtered[band] for band in band_list]
-#     print("arrays:", arrays)
     stacked_data = np.stack(arrays)
-#     print("stacked_data: ", stacked_data[:5,:5,:5,:5], stacked_data.shape)
     bands_shape, time_slices_shape, lat_shape, lon_shape = stacked_data.shape[0], \
     stacked_data.shape[1], stacked_data.shape[2], stacked_data.shape[3]
     # Reshape to remove lat/lon
     reshaped_stack = stacked_data.reshape(bands_shape, time_slices_shape,
                                           lat_shape * lon_shape)
-#     print("reshaped_stack:", reshaped_stack)
     # Build zeroes array across time slices.
     hdmedians_result = np.zeros((bands_shape, lat_shape * lon_shape))
 
@@ -445,9 +450,7 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     dataset_out = xr.Dataset(output_dict,
                              coords={'latitude': dataset_in['latitude'], 'longitude': dataset_in['longitude']},
                              attrs = dataset_in.attrs)
-#     dataset_out = dataset_out.where(dataset_out!=-9999)
-#     print("dataset_out:", dataset_out)
-#     print("dataset_out sum nodata:", dataset_out.where(dataset_out==-9999).sum())
-#     nan_to_num(dataset_out, no_data)
-    #return dataset_out
-    return convert_to_dtype(dataset_out, dtype)
+    utilities.nan_to_num(dataset_out, no_data)
+    if dtype is not None:
+        convert_to_dtype(dataset_out, dtype)
+    return dataset_out
