@@ -33,25 +33,54 @@ from . import dc_utilities as utilities
 from .dc_utilities import create_default_clean_mask
 import hdmedians as hd
 
-def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+"""
+Utility Functions
+"""
+
+def convert_to_dtype(data, dtype):
     """
-    Description:
-      Creates a most recent - oldest mosaic of the input dataset. If no clean mask is given,
-      the 'cf_mask' variable must be included in the input dataset, as it will be used
-      to create a clean mask
-    -----
-    Inputs:
-      dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube; should contain
+    A utility function converting xarray, pandas, or NumPy data to a given dtype.
+    
+    Parameters
+    ----------
+    data: xarray.Dataset, xarray.DataArray, pandas.Series, pandas.DataFrame, 
+             or numpy.ndarray 
+    dtype: str or numpy.dtype
+        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g. 
+        np.int16, np.float32) to convert the data to.
+    """
+    if dtype is None: # Don't convert the data type.
+        return data
+    return data.astype(dtype)    
+
+
+"""
+Compositing Functions
+"""
+
+def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, intermediate_product=None, **kwargs):
+    """
+    Creates a most-recent-to-oldest mosaic of the input dataset.
+    
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A dataset retrieved from the Data Cube; should contain:
         coordinates: time, latitude, longitude
-        variables: variables to be mosaicked
-        If user does not provide a clean_mask, dataset_in must also include the cf_mask
-        variable
-    Optional Inputs:
-      clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
-        if user does not provide a clean mask, one will be created using cfmask
-      no_data (int/float) - no data pixel value; default: -9999
-    Output:
-      dataset_out (xarray.Dataset) - mosaicked data with
+        variables: variables to be mosaicked (e.g. red, green, and blue bands)
+    clean_mask: np.ndarray
+        An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
+        If no clean mask is specified, then all values are kept during compositing.
+    no_data: int or float
+        The no data value.
+    dtype: str or numpy.dtype
+        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g. 
+        np.int16, np.float32) to convert the data to.
+    
+    Returns
+    -------
+    dataset_out: xarray.Dataset
+        Compositited data with the format:
         coordinates: latitude, longitude
         variables: same as dataset_in
     """
@@ -62,7 +91,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    #masks data with clean_mask. all values that are clean_mask==False are set to nodata.
+    # Mask data with clean_mask. All values where clean_mask==False are set to no_data.
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
     if intermediate_product is not None:
@@ -81,19 +110,34 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_produ
                 dataset_out[key].values[dataset_out[key].values == -9999] = dataset_slice[key].values[dataset_out[key]
                                                                                                       .values == -9999]
                 dataset_out[key].attrs = OrderedDict()
-    return dataset_out
+    return convert_to_dtype(dataset_out, dtype)
 
-
-def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, **kwargs):
     """
-	Description:
-		Method for calculating the mean pixel value for a given dataset.
-	-----
-	Input:
-		dataset_in (xarray dataset) - the set of data with clouds and no data removed.
-	Optional Inputs:
-		no_data (int/float) - no data value.
-	"""
+    Method for calculating the mean pixel value for a given dataset.
+    
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A dataset retrieved from the Data Cube; should contain:
+        coordinates: time, latitude, longitude
+        variables: variables to be mosaicked (e.g. red, green, and blue bands)
+    clean_mask: np.ndarray
+        An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
+        If no clean mask is specified, then all values are kept during compositing.
+    no_data: int or float
+        The no data value.
+    dtype: str or numpy.dtype
+        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g. 
+        np.int16, np.float32) to convert the data to.
+    
+    Returns
+    -------
+    dataset_out: xarray.Dataset
+        Compositited data with the format:
+        coordinates: latitude, longitude
+        variables: same as dataset_in
+    """
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
@@ -105,19 +149,35 @@ def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_
     for key in ['timestamp', 'date', 'satellite']:
         if key in dataset_out:
             dataset_out[key].values[::] = no_data
-    return dataset_out.astype(kwargs.get('dtype', 'int32'))
+    return convert_to_dtype(dataset_out, dtype)
 
 
-def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, **kwargs):
     """
-	Description:
-		Method for calculating the median pixel value for a given dataset.
-	-----
-	Input:
-		dataset_in (xarray dataset) - the set of data with clouds and no data removed.
-	Optional Inputs:
-		no_data (int/float) - no data value.
-	"""
+    Method for calculating the median pixel value for a given dataset.
+    
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A dataset retrieved from the Data Cube; should contain:
+        coordinates: time, latitude, longitude
+        variables: variables to be mosaicked (e.g. red, green, and blue bands)
+    clean_mask: np.ndarray
+        An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
+        If no clean mask is specified, then all values are kept during compositing.
+    no_data: int or float
+        The no data value.
+    dtype: str or numpy.dtype
+        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g. 
+        np.int16, np.float32) to convert the data to.
+    
+    Returns
+    -------
+    dataset_out: xarray.Dataset
+        Compositited data with the format:
+        coordinates: latitude, longitude
+        variables: same as dataset_in
+    """
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
@@ -129,20 +189,35 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediat
     for key in ['timestamp', 'date', 'satellite']:
         if key in dataset_out:
             dataset_out[key].values[::] = no_data
-    return dataset_out.astype(kwargs.get('dtype', 'int32'))
+    return convert_to_dtype(dataset_out, dtype)
 
 
-def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, intermediate_product=None, **kwargs):
     """
-	Description:
-		Method for calculating the pixel value for the max ndvi value.
-	-----
-	Input:
-		dataset_in (xarray dataset) - the set of data with clouds and no data removed.
-	Optional Inputs:
-		no_data (int/float) - no data value.
-	"""
-
+    Method for calculating the pixel value for the max ndvi value.
+    
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A dataset retrieved from the Data Cube; should contain:
+        coordinates: time, latitude, longitude
+        variables: variables to be mosaicked (e.g. red, green, and blue bands)
+    clean_mask: np.ndarray
+        An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
+        If no clean mask is specified, then all values are kept during compositing.
+    no_data: int or float
+        The no data value.
+    dtype: str or numpy.dtype
+        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g. 
+        np.int16, np.float32) to convert the data to.
+    
+    Returns
+    -------
+    dataset_out: xarray.Dataset
+        Compositited data with the format:
+        coordinates: latitude, longitude
+        variables: same as dataset_in
+    """
     dataset_in = dataset_in.copy(deep=True)
 
     # Default to masking nothing.
@@ -171,20 +246,35 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
                 dataset_out[key].values[dataset_slice.ndvi.values >
                                         dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values >
                                                                                              dataset_out.ndvi.values]
-    return dataset_out
+    return convert_to_dtype(dataset_out, dtype)
 
 
-def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermediate_product=None, **kwargs):
+def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=np.float16, intermediate_product=None, **kwargs):
     """
-	Description:
-		Method for calculating the pixel value for the min ndvi value.
-	-----
-	Input:
-		dataset_in (xarray dataset) - the set of data with clouds and no data removed.
-	Optional Inputs:
-		no_data (int/float) - no data value.
-	"""
+    Method for calculating the pixel value for the min ndvi value.
 
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A dataset retrieved from the Data Cube; should contain:
+        coordinates: time, latitude, longitude
+        variables: variables to be mosaicked (e.g. red, green, and blue bands)
+    clean_mask: np.ndarray
+        An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
+        If no clean mask is specified, then all values are kept during compositing.
+    no_data: int or float
+        The no data value.
+    dtype: str or numpy.dtype
+        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g. 
+        np.int16, np.float32) to convert the data to.
+    
+    Returns
+    -------
+    dataset_out: xarray.Dataset
+        Compositited data with the format:
+        coordinates: latitude, longitude
+        variables: same as dataset_in
+    """
     dataset_in = dataset_in.copy(deep=True)
 
     # Default to masking nothing.
@@ -213,7 +303,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, intermedi
                 dataset_out[key].values[dataset_slice.ndvi.values <
                                         dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values <
                                                                                              dataset_out.ndvi.values]
-    return dataset_out
+    return convert_to_dtype(dataset_out, dtype)
 
 def unpack_bits(land_cover_endcoding, data_array, cover_type):
     """
@@ -286,27 +376,57 @@ def nan_to_num(dataset, number):
 def create_hdmedians_multiple_band_mosaic(dataset_in,
                                           clean_mask=None,
                                           no_data=-9999,
+                                          dtype=np.float16,
                                           intermediate_product=None,
                                           operation="median",
                                           **kwargs):
-        
+    """
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A dataset retrieved from the Data Cube; should contain:
+        coordinates: time, latitude, longitude
+        variables: variables to be mosaicked (e.g. red, green, and blue bands)
+    clean_mask: np.ndarray
+        An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
+        If no clean mask is specified, then all values are kept during compositing.
+    no_data: int or float
+        The no data value.
+    dtype: str or numpy.dtype
+        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g. 
+        np.int16, np.float32) to convert the data to.
+    operation: str in ['median', 'medoid']
+    
+    Returns
+    -------
+    dataset_out: xarray.Dataset
+        Compositited data with the format:
+        coordinates: latitude, longitude
+        variables: same as dataset_in
+    """
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
     assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
     dataset_in_filtered = dataset_in.where((dataset_in != no_data) & (clean_mask))
-
+#     print("dataset_in_filtered: ", dataset_in_filtered, dataset_in_filtered.dims)
+#     print("dataset_in_filtered sum nodata: ", 
+#         dataset_in_filtered.where(dataset_in_filtered==-9999).sum())
+    
     band_list = list(dataset_in_filtered.data_vars)
     arrays = [dataset_in_filtered[band] for band in band_list]
-
+#     print("arrays:", arrays)
     stacked_data = np.stack(arrays)
-    bands_shape, time_slices_shape, lat_shape, lon_shape = stacked_data.shape[0], stacked_data.shape[1],
-    stacked_data.shape[2], stacked_data.shape[3]
-
+#     print("stacked_data: ", stacked_data[:5,:5,:5,:5], stacked_data.shape)
+    bands_shape, time_slices_shape, lat_shape, lon_shape = stacked_data.shape[0], \
+    stacked_data.shape[1], stacked_data.shape[2], stacked_data.shape[3]
+    # Reshape to remove lat/lon
     reshaped_stack = stacked_data.reshape(bands_shape, time_slices_shape,
-                                          lat_shape * lon_shape)  # Reshape to remove lat/lon
-    hdmedians_result = np.zeros((bands_shape, lat_shape * lon_shape))  # Build zeroes array across time slices.
+                                          lat_shape * lon_shape)
+#     print("reshaped_stack:", reshaped_stack)
+    # Build zeroes array across time slices.
+    hdmedians_result = np.zeros((bands_shape, lat_shape * lon_shape))
 
     for x in range(reshaped_stack.shape[2]):
         try:
@@ -318,15 +438,16 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
             no_data_pixel_stack[np.isnan(no_data_pixel_stack)] = no_data
             hdmedians_result[:, x] = np.full((bands_shape), no_data) if operation == "median" else hd.nanmedoid(
                 no_data_pixel_stack, axis=1)
-
     output_dict = {
         value: (('latitude', 'longitude'), hdmedians_result[index, :].reshape(lat_shape, lon_shape))
         for index, value in enumerate(band_list)
     }
-
     dataset_out = xr.Dataset(output_dict,
                              coords={'latitude': dataset_in['latitude'], 'longitude': dataset_in['longitude']},
                              attrs = dataset_in.attrs)
-    nan_to_num(dataset_out, no_data)
+#     dataset_out = dataset_out.where(dataset_out!=-9999)
+#     print("dataset_out:", dataset_out)
+#     print("dataset_out sum nodata:", dataset_out.where(dataset_out==-9999).sum())
+#     nan_to_num(dataset_out, no_data)
     #return dataset_out
-    return dataset_out.astype(kwargs.get('dtype', 'int32'))
+    return convert_to_dtype(dataset_out, dtype)
