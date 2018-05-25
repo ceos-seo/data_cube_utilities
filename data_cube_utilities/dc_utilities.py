@@ -30,6 +30,20 @@ import shutil
 import uuid
 import rasterio
 
+def check_for_float(array):
+    """
+    Check if a NumPy array-like contains floats.
+
+    Parameters
+    ----------
+    array : numpy.ndarray or convertible
+        The array to check.
+    """
+    try:
+        return array.dtype.kind == 'f'
+    except AttributeError:
+        # in case it's not a numpy array it will probably have no dtype.
+        return np.asarray(array).dtype.kind in numerical_dtype_kinds
 
 def create_cfmask_clean_mask(cfmask, no_data=-9999):
     """
@@ -233,7 +247,7 @@ def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326
             height=dataset.dims['latitude'],
             width=dataset.dims['longitude'],
             count=len(bands),
-            dtype=str(dataset[bands[0]].dtype),
+            dtype=dataset[bands[0]].dtype,#str(dataset[bands[0]].dtype),
             crs=crs,
             transform=_get_transform_from_xr(dataset),
             nodata=nodata) as dst:
