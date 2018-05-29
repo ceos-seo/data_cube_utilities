@@ -26,16 +26,10 @@ def get_frequency_counts(classification):
     class_nums, class_counts = np.unique(classifications, return_counts=True)
     num_classifications = len(classifications)
     fractional_freqs = [count/num_classifications for count in class_counts]
-    #classes, class_counts = np.unique(classifications, return_counts=True)
-    #np.bincount(classifications)
-#     print(class_nums, class_counts)
     freqs = {class_num: (count, freq) for class_num, count, freq in zip(class_nums, 
              class_counts, fractional_freqs)}
     # Order by the frequency.
     freqs = sorted(freqs.items(), key=lambda x: x[1])
-#     freqs = {}
-#     for i in range(len(class_counts)):
-#         freqs[i] = (class_counts[i], fractional_freqs[i])
     return freqs
 
 def clustering_pre_processing(dataset_in, bands):
@@ -51,13 +45,12 @@ def clustering_pre_processing(dataset_in, bands):
 
 def clustering_post_processing(classified, dataset_in, bands):
     classified_data = OrderedDict()
-
-    classification = classified.labels_.reshape((dataset_in[bands[0]].shape[0], dataset_in[bands[0]].shape[1]))
-    classified_data['classification'] = (['latitude', 'longitude'], classification)
-
-    dataset_out = xr.Dataset(
-        classified_data, coords={'latitude': dataset_in.latitude,
-                                 'longitude': dataset_in.longitude})
+    shape = dataset_in[bands[0]].values.shape
+    classification = classified.labels_.reshape(shape)
+    coord_names = list(dataset_in.coords.keys())
+    classified_data['classification'] = (coord_names, classification)
+    dataset_out = xr.Dataset(classified_data,
+                             dataset_in.coords)
     return dataset_out
 
 def kmeans_cluster_dataset(dataset_in, bands=['red', 'green', 'blue', 'swir1', 'swir2', 'nir'], n_clusters=4):
