@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 def get_frequency_counts(classification):
     """
     Get the raw and fractional class frequency counts for an `xarray.Dataset`.
-    Intended to be used with outputs from the `*_cluster_dataset()` fucntions.
+    Intended to be used with outputs from the `*_cluster_dataset()` functions.
     
     Parameters
     ----------
@@ -18,18 +18,16 @@ def get_frequency_counts(classification):
     
     Returns
     -------
-    freqs: list
-        A list containing tuples of the format (class_number, (count, frequency)), ordered 
-        by frequency.
+    freqs: np.ndarray
+        A 2D NumPy array containing entries of the format 
+        [class_number, count, frequency] ordered by class number.
     """
     classifications = classification.classification.values.flatten()
     class_nums, class_counts = np.unique(classifications, return_counts=True)
     num_classifications = len(classifications)
     fractional_freqs = [count/num_classifications for count in class_counts]
-    freqs = {class_num: (count, freq) for class_num, count, freq in zip(class_nums, 
-             class_counts, fractional_freqs)}
-    # Order by the frequency.
-    freqs = sorted(freqs.items(), key=lambda x: x[1])
+    freqs = np.array([(class_num, count, freq) for (class_num, count, freq) in 
+                      zip(class_nums, class_counts, fractional_freqs)])
     return freqs
 
 def clustering_pre_processing(dataset_in, bands):
