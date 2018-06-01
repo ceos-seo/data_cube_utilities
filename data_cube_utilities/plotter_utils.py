@@ -22,6 +22,8 @@ from matplotlib.ticker import FuncFormatter
 import calendar, datetime, time
 import pytz
 
+from scipy.interpolate import interp1d
+
 def impute_missing_data_1D(data1D):
     """
     Many linear plotting functions for 1D data often (and should) only connect contiguous, 
@@ -33,14 +35,29 @@ def impute_missing_data_1D(data1D):
     Parameters
     ----------
     data: numpy.ndarray
-        Ideally, any type of 1D data for which missing values are to be masked or imputed 
+        A 1D NumPy array for which missing values are to be masked or imputed 
         suitably for at least matplotlib plotting. If formatting for other libraries such 
         as seaborn or plotly is necessary, add that formatting requirement as a parameter.
     """
-    if type(data1D) == np.ndarray:
-        mask = np.isfinite(data1D)
-        data1D = data1D[mask]
-    return data1D
+    nan_mask = ~np.isnan(data1D)
+    x = np.arange(len(data1D))
+    x_no_nan = x[nan_mask]
+    data_no_nan = data1D[nan_mask]
+    print("IMPUTE: x, x_no_nan, data_no_nan, data1D:", x, len(x), x_no_nan, len(x_no_nan),
+          data_no_nan, len(data_no_nan), data1D, len(data1D))
+    if len(x_no_nan) >= 2:
+        f = interp1d(x_no_nan, data_no_nan)
+        # Select points for interpolation.
+        interpolation_x_inds = (x_no_nan[0]<=x) & (x<=x_no_nan[-1])
+        interpolation_x = x[interpolation_x_inds]
+        data1D_interp = np.arange(len(data1D), dtype=np.float32)
+        # The ends of data1D may contain NaNs that must be included.
+        end_nan_inds = np.setdiff1d(x[[0,-1]], x_no_nan, assume_unique=True)
+        data1D_interp[end_nan_inds] = np.nan
+        data1D_interp[interpolation_x_inds] = f(interpolation_x)
+        return data1D_interp
+    else: # Cannot interpolate with a single non-nan point.
+        return data1D
     
 def n64_to_epoch(timestamp):
     ts = pd.to_datetime(str(timestamp)) 
