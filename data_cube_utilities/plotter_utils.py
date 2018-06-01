@@ -43,8 +43,6 @@ def impute_missing_data_1D(data1D):
     x = np.arange(len(data1D))
     x_no_nan = x[nan_mask]
     data_no_nan = data1D[nan_mask]
-    print("IMPUTE: x, x_no_nan, data_no_nan, data1D:", x, len(x), x_no_nan, len(x_no_nan),
-          data_no_nan, len(data_no_nan), data1D, len(data1D))
     if len(x_no_nan) >= 2:
         f = interp1d(x_no_nan, data_no_nan)
         # Select points for interpolation.
