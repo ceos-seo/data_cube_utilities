@@ -26,11 +26,11 @@ from scipy.interpolate import interp1d
 
 def impute_missing_data_1D(data1D):
     """
-    Many linear plotting functions for 1D data often (and should) only connect contiguous, 
-    non-nan data points. This leaves gaps in the piecewise linear plot, which are 
-    graphically undesirable. This function returns the data in the same format as it was 
+    This function returns the data in the same format as it was 
     passed in, but with missing values either masked out or imputed with appropriate values 
-    (using a linear trend).
+    (currently only using a linear trend). Many linear plotting functions for 1D data often 
+    (and should) only connect contiguous,  non-nan data points. This leaves gaps in the 
+    piecewise linear plot, which are graphically undesirable.
     
     Parameters
     ----------
@@ -39,20 +39,28 @@ def impute_missing_data_1D(data1D):
         suitably for at least matplotlib plotting. If formatting for other libraries such 
         as seaborn or plotly is necessary, add that formatting requirement as a parameter.
     """
+#     print("data1D:", data1D)
     nan_mask = ~np.isnan(data1D)
     x = np.arange(len(data1D))
     x_no_nan = x[nan_mask]
+#     print("x_no_nan:", x_no_nan)
     data_no_nan = data1D[nan_mask]
+#     print("data_no_nan:", data_no_nan)
     if len(x_no_nan) >= 2:
         f = interp1d(x_no_nan, data_no_nan)
         # Select points for interpolation.
-        interpolation_x_inds = (x_no_nan[0]<=x) & (x<=x_no_nan[-1])
-        interpolation_x = x[interpolation_x_inds]
+        interpolation_x_mask = (x_no_nan[0]<=x) & (x<=x_no_nan[-1])
+#         print("interpolation_x_mask:", interpolation_x_mask)
+        interpolation_x = x[interpolation_x_mask]
+#         print("interpolation_x:", interpolation_x)
         data1D_interp = np.arange(len(data1D), dtype=np.float32)
         # The ends of data1D may contain NaNs that must be included.
-        end_nan_inds = np.setdiff1d(x[[0,-1]], x_no_nan, assume_unique=True)
+        end_nan_inds = x[(x<=x_no_nan[0]) | (x_no_nan[-1]<=x)]
+#         end_nan_inds = np.setdiff1d(x[[0,-1]], x_no_nan, assume_unique=True)
+#         print("end_nan_inds:", end_nan_inds)
         data1D_interp[end_nan_inds] = np.nan
-        data1D_interp[interpolation_x_inds] = f(interpolation_x)
+        data1D_interp[interpolation_x_mask] = f(interpolation_x)
+#         print("data1D_interp:", data1D_interp)
         return data1D_interp
     else: # Cannot interpolate with a single non-nan point.
         return data1D
