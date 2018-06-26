@@ -71,16 +71,4 @@ def landsat_qa_clean_mask(dataset, platform):
     return np.logical_or(clear_xarray.values.astype(bool), water_xarray.values.astype(bool))
 
 
-# def landsat_cf_clean_mask(dataset, platform):
-    
-#     processing_options = {
-#         "LANDSAT_8": l8_clean_mask,
-#         "LANDSAT_7": ls7_unpack_qa
-#     }
-    
-#     #Clean mask creation to filter out pixels that are not suitable for analysis
-#     clear_xarray  = processing_options[platform](dataset.pixel_qa, "clear")  
-#     water_xarray  = processing_options[platform](dataset.pixel_qa, "water")
-    
-#     #use logical or statement to elect viable pixels for analysis
-#     return np.logical_or(clear_xarray.values.astype(bool), water_xarray.values.astype(bool))
+
