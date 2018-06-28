@@ -182,9 +182,9 @@ class DataAccessApi:
 
         if not dataset:
             return {
-                'lat_extents': (0, 0),
-                'lon_extents': (0, 0),
-                'time_extents': (0, 0),
+                'lat_extents': (None, None),
+                'lon_extents': (None, None),
+                'time_extents': (None, None),
                 'scene_count': 0,
                 'pixel_count': 0,
                 'tile_count': 0,
