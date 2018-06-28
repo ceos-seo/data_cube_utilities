@@ -45,7 +45,7 @@ def check_for_float(array):
         # in case it's not a numpy array it will probably have no dtype.
         return np.asarray(array).dtype.kind in numerical_dtype_kinds
 
-def create_cfmask_clean_mask(cfmask, no_data=-9999):
+def create_cfmask_clean_mask(cfmask):
     """
     Description:
       Create a clean mask for clear land/water pixels,
@@ -151,6 +151,8 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
         dataset_out = xr.Dataset(
             {
                 'normalized_data': processed_data_normalized,
+                'min': data.min(dim='time'),
+                'max': data.max(dim='time'),
                 'total_data': processed_data_sum,
                 'total_clean': clean_data_sum
             },
@@ -162,6 +164,8 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
         dataset_out['total_data'] += processed_data_sum
         dataset_out['total_clean'] += clean_data_sum
         dataset_out['normalized_data'] = dataset_out['total_data'] / dataset_out['total_clean']
+        dataset_out['min'] = xr.concat([dataset_out['min'], data.min(dim='time')], dim='time').min(dim='time')
+        dataset_out['max'] = xr.concat([dataset_out['max'], data.max(dim='time')], dim='time').max(dim='time')
 
     nan_to_num(dataset_out, 0)
 
@@ -227,14 +231,14 @@ def add_timestamp_data_to_xr(dataset):
                 'time': dataset.time})
 
 
-def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326"):
+def write_geotiff_from_xr(tif_path, dataset, bands, no_data=-9999, crs="EPSG:4326"):
     """Write a geotiff from an xarray dataset.
 
     Args:
         tif_path: path for the tif to be written to.
         dataset: xarray dataset
         bands: list of strings representing the bands in the order they should be written
-        nodata: nodata value for the dataset
+        no_data: nodata value for the dataset
         crs: requested crs.
 
     """
@@ -250,13 +254,14 @@ def write_geotiff_from_xr(tif_path, dataset, bands, nodata=-9999, crs="EPSG:4326
             dtype=dataset[bands[0]].dtype,#str(dataset[bands[0]].dtype),
             crs=crs,
             transform=_get_transform_from_xr(dataset),
-            nodata=nodata) as dst:
+            nodata=no_data) as dst:
         for index, band in enumerate(bands):
             dst.write(dataset[band].values, index + 1)
         dst.close()
 
 
-def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False):
+def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False,
+                      no_data=-9999, crs="EPSG:4326"):
     """Write a rgb png from an xarray dataset.
 
     Args:
@@ -272,7 +277,7 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     assert len(bands) == 3 and isinstance(bands[0], str), "You must supply three string bands for a PNG."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
-    write_geotiff_from_xr(tif_path, dataset, bands)
+    write_geotiff_from_xr(tif_path, dataset, bands, no_data=no_data, crs=crs)
 
     scale_string = ""
     if scale is not None and len(scale) == 2:
@@ -295,7 +300,8 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     os.remove(tif_path)
 
 
-def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None):
+def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None, interpolate=True,
+                                  no_data=-9999, crs="EPSG:4326"):
     """Write a pseudocolor png from an xarray dataset.
 
     Args:
@@ -311,7 +317,7 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
     assert isinstance(band, str), "Band must be a string."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
-    write_geotiff_from_xr(tif_path, dataset, [band])
+    write_geotiff_from_xr(tif_path, dataset, [band], no_data=no_data, crs=crs)
 
     cmd = "gdaldem color-relief -of PNG -b 1 " + tif_path + " " + \
         color_scale + " " + png_path
