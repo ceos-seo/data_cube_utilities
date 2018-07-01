@@ -502,8 +502,8 @@ def _get_train_data(sar_dataset, landsat_dataset, pct = .09, displaydates = Fals
     if satellite_type == 'alos':
         band1 = sar_dataset_at_time.hv.values.flatten()
         # band2 = sar_dataset_at_time.incidence_angle.values.flatten()
-        
-    dset      = zip(band1, truth_values) if band2 == None else zip(band1, band2, truth_values)
+
+    dset      = zip(band1, truth_values) if band2 is None else zip(band1, band2, truth_values)
     dset      = list(dset)
     
     has_water = lambda datapoint: datapoint[-1] == 1

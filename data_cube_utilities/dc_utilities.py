@@ -30,8 +30,22 @@ import shutil
 import uuid
 import rasterio
 
+def check_for_float(array):
+    """
+    Check if a NumPy array-like contains floats.
 
-def create_cfmask_clean_mask(cfmask, no_data=-9999):
+    Parameters
+    ----------
+    array : numpy.ndarray or convertible
+        The array to check.
+    """
+    try:
+        return array.dtype.kind == 'f'
+    except AttributeError:
+        # in case it's not a numpy array it will probably have no dtype.
+        return np.asarray(array).dtype.kind in numerical_dtype_kinds
+
+def create_cfmask_clean_mask(cfmask):
     """
     Description:
       Create a clean mask for clear land/water pixels,
@@ -55,6 +69,59 @@ def create_cfmask_clean_mask(cfmask, no_data=-9999):
 
     clean_mask = (cfmask == 0) | (cfmask == 1)
     return clean_mask.values
+
+def create_default_clean_mask(dataset_in):
+    """
+    Description:
+        Creates a data mask that masks nothing.
+    -----
+    Inputs:
+        dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube.
+    Throws:
+        ValueError - if dataset_in is an empty xarray.Dataset.
+    """
+    data_vars = dataset_in.data_vars
+    if len(data_vars) != 0:
+        first_data_var = next(iter(data_vars))
+        clean_mask = np.ones(dataset_in[first_data_var].shape).astype(np.bool)
+        return clean_mask
+    else:
+        raise ValueError('`dataset_in` has no data!')
+
+def get_spatial_ref(crs):
+    """
+    Description:
+      Get the spatial reference of a given crs
+    -----
+    Input:
+      crs (datacube.model.CRS) - Example: CRS('EPSG:4326')
+    Output:
+      ref (str) - spatial reference of given crs
+    """
+
+    crs_str = str(crs)
+    epsg_code = int(crs_str.split(':')[1])
+    ref = osr.SpatialReference()
+    ref.ImportFromEPSG(epsg_code)
+    return str(ref)
+
+
+def get_spatial_ref(crs):
+    """
+    Description:
+      Get the spatial reference of a given crs
+    -----
+    Input:
+      crs (datacube.model.CRS) - Example: CRS('EPSG:4326')
+    Output:
+      ref (str) - spatial reference of given crs
+    """
+
+    crs_str = str(crs)
+    epsg_code = int(crs_str.split(':')[1])
+    ref = osr.SpatialReference()
+    ref.ImportFromEPSG(epsg_code)
+    return str(ref)
 
 
 def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None, no_data=-9999, operation="mean"):
@@ -174,7 +241,7 @@ def write_geotiff_from_xr(tif_path, dataset, bands, no_data=-9999, crs="EPSG:432
         tif_path: path for the tif to be written to.
         dataset: xarray dataset
         bands: list of strings representing the bands in the order they should be written
-        no_data: no_data value for the dataset
+        no_data: nodata value for the dataset
         crs: requested crs.
 
     """
@@ -187,7 +254,7 @@ def write_geotiff_from_xr(tif_path, dataset, bands, no_data=-9999, crs="EPSG:432
             height=dataset.dims['latitude'],
             width=dataset.dims['longitude'],
             count=len(bands),
-            dtype=str(dataset[bands[0]].dtype),
+            dtype=dataset[bands[0]].dtype,#str(dataset[bands[0]].dtype),
             crs=crs,
             transform=_get_transform_from_xr(dataset),
             nodata=no_data) as dst:
@@ -196,15 +263,8 @@ def write_geotiff_from_xr(tif_path, dataset, bands, no_data=-9999, crs="EPSG:432
         dst.close()
 
 
-def write_png_from_xr(png_path,
-                      dataset,
-                      bands,
-                      png_filled_path=None,
-                      fill_color='red',
-                      scale=None,
-                      low_res=False,
-                      no_data=-9999,
-                      crs="EPSG:4326"):
+def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False,
+                      no_data=-9999, crs="EPSG:4326"):
     """Write a rgb png from an xarray dataset.
 
     Args:
@@ -221,7 +281,7 @@ def write_png_from_xr(png_path,
     
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
     write_geotiff_from_xr(tif_path, dataset, bands, no_data=no_data, crs=crs)
-    
+
     scale_string = ""
     if scale is not None and len(scale) == 2:
         scale_string = "-scale {} {} 0 255".format(scale[0], scale[1])
@@ -243,15 +303,10 @@ def write_png_from_xr(png_path,
     os.remove(tif_path)
 
 
-def write_single_band_png_from_xr(png_path,
-                                  dataset,
-                                  band,
-                                  color_scale=None,
-                                  fill_color=None,
-                                  interpolate=True,
-                                  no_data=-9999,
-                                  crs="EPSG:4326"):
-    """Write a pseudocolor png from an xarray dataset.  
+def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None, interpolate=True,
+                                  no_data=-9999, crs="EPSG:4326"):
+    """Write a pseudocolor png from an xarray dataset.
+
     Args:
         png_path: path for the png to be written to.
         dataset: dataset to use for the png creation.
@@ -266,10 +321,8 @@ def write_single_band_png_from_xr(png_path,
     
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
     write_geotiff_from_xr(tif_path, dataset, [band], no_data=no_data, crs=crs)
-    
-    interpolation_settings = "-nearest_color_entry" if not interpolate else ""
-    
-    cmd = "gdaldem color-relief -of PNG " + interpolation_settings + " -b 1 " + tif_path + " " + \
+
+    cmd = "gdaldem color-relief -of PNG -b 1 " + tif_path + " " + \
         color_scale + " " + png_path
     os.system(cmd)
     

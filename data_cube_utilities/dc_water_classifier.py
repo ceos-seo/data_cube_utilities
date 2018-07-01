@@ -25,7 +25,7 @@ import xarray as xr
 
 import datacube
 from . import dc_utilities as utilities
-
+from .dc_utilities import create_default_clean_mask
 # Command line tool imports
 import argparse
 import os
@@ -37,12 +37,10 @@ from datetime import datetime
 # Creation date: 2016-06-13
 
 
-def wofs_classify(dataset_in, clean_mask, no_data=-9999, mosaic=False, enforce_float64=False):
+def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enforce_float64=False):
     """
     Description:
-      Performs WOfS algorithm on given dataset. If no clean mask is given, the 'cf_mask'
-      variable must be included in the input dataset, as it will be used to create a
-      clean mask
+      Performs WOfS algorithm on given dataset.
     Assumption:
       - The WOfS algorithm is defined for Landsat 5/Landsat 7
     References:
@@ -54,11 +52,9 @@ def wofs_classify(dataset_in, clean_mask, no_data=-9999, mosaic=False, enforce_f
       dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube; should contain
         coordinates: time, latitude, longitude
         variables: blue, green, red, nir, swir1, swir2
-        If user does not provide a clean_mask, dataset_in must also include the cf_mask
-        variable
     Optional Inputs:
       clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
-        if user does not provide a clean mask, one will be created using cfmask
+        if user does not provide a clean mask, all values will be considered clean
       no_data (int/float) - no data pixel value; default: -9999
       mosaic (boolean) - flag to indicate if dataset_in is a mosaic. If mosaic = False, dataset_in
         should have a time coordinate and wofs will run over each time slice; otherwise, dataset_in
@@ -67,6 +63,8 @@ def wofs_classify(dataset_in, clean_mask, no_data=-9999, mosaic=False, enforce_f
         will use float32 if false
     Output:
       dataset_out (xarray.DataArray) - wofs water classification results: 0 - not water; 1 - water
+    Throws:
+        ValueError - if dataset_in is an empty xarray.Dataset.
     """
 
     def _band_ratio(a, b):
@@ -202,6 +200,10 @@ def wofs_classify(dataset_in, clean_mask, no_data=-9999, mosaic=False, enforce_f
 
         return classified
 
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
+    
     # Extract dataset bands needed for calculations
     blue = dataset_in.blue
     green = dataset_in.green

@@ -517,3 +517,4 @@ def plot_pixel(ds, bands=None):
 
     for band in bands:
         _plot_band(results=ds.attrs['ccd_results'], original_pixel=ds, band=band)
+
