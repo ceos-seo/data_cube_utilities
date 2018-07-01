@@ -17,7 +17,6 @@ from datetime import datetime
 
 csv_file_path = os.path.join(os.path.dirname(__file__), 'endmembers_landsat.csv')
 
-
 def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
     """
     Description:

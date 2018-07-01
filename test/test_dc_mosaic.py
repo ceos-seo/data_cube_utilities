@@ -5,8 +5,9 @@ import numpy as np
 import xarray as xr
 
 from data_cube_utilities.dc_mosaic import (create_mosaic, create_mean_mosaic, create_median_mosaic,
-                                           create_max_ndvi_mosaic, create_min_ndvi_mosaic)
 
+                                           create_max_ndvi_mosaic, create_min_ndvi_mosaic,
+                                           create_hdmedians_multiple_band_mosaic)
 
 class TestMosaic(unittest.TestCase):
 
@@ -46,7 +47,31 @@ class TestMosaic(unittest.TestCase):
                              [[1, 5], [1, 1]],
                              [[1, 1], [1, 1]],
                              [[1, 1], [1, 4]]])
-        # yapf: enable
+
+        self.blue = np.array([[[62, 15], [31,  0]],
+                              [[42, 91], [ 3, 18]],
+                              [[44, 53], [45, 23]],
+                              [[72, 53], [88, 32]],
+                              [[28, 91], [86, 67]]])
+
+        self.green = np.array([[[58, 92], [61, 64]],
+                               [[86, 41], [70, 99]],
+                               [[14, 70], [27, 14]],
+                               [[54,  2], [30, 45]],
+                               [[18,  6], [16, 44]]])
+
+        self.swir1 = np.array([[[53,  0], [48, 12]],
+                               [[58, 53], [45, 70]],
+                               [[ 4, 81], [58, 79]],
+                               [[22, 68], [47, 26]],
+                               [[40, 75], [39, 58]]])
+
+        self.swir2 = np.array([[[55, 88], [88, 40]],
+                               [[70, 38], [84, 98]],
+                               [[77, 17], [ 8, 30]],
+                               [[19, 42], [ 0, 27]],
+                               [[ 6, 56], [ 5, 99]]])
+ # yapf: enable
 
     def tearDown(self):
         pass
@@ -168,3 +193,63 @@ class TestMosaic(unittest.TestCase):
             no_data=-9999)
         print(mosaic_dataset_iterated, mosaic_dataset)
         self.assertTrue((mosaic_dataset_iterated.test_data.values == np.array([[3, 3], [3, 3]])).all())
+
+    def test_create_geo_median_multiple_band_mosaic(self):
+        dataset = xr.Dataset(
+            {
+                'red': (('time', 'latitude', 'longitude'), self.red),
+                'blue': (('time', 'latitude', 'longitude'), self.blue),
+                'green': (('time', 'latitude', 'longitude'), self.green),
+                'nir': (('time', 'latitude', 'longitude'), self.nir),
+                'swir1': (('time', 'latitude', 'longitude'), self.swir1),
+                'swir2': (('time', 'latitude', 'longitude'), self.swir2),
+            },
+            coords={'time': self.times,
+                    'latitude': self.latitudes,
+                    'longitude': self.longitudes})
+
+        test_mosaic = create_hdmedians_multiple_band_mosaic(dataset, self.sample_clean_mask, operation="median")
+        dataset_swir1 = np.array([[52.795282, 64.96945], [57.762149, -9999]])
+        dataset_swir2 = np.array([[53.79578, 48.799493], [8.378129, -9999]])
+        dataset_nir = np.array([[0.230488, 3.703346], [1.97955, -9999]])
+        dataset_red = np.array([[12.599269, 1.], [1., -9999]])
+        dataset_green = np.array([[58.789003, 9.373638], [27.319318, -9999]])
+        dataset_blue = np.array([[57.744289, 59.947858], [45.331181, -9999]])
+
+        print(test_mosaic)
+
+        self.assertTrue(np.isclose(test_mosaic.swir1, dataset_swir1, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.swir2, dataset_swir2, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.nir, dataset_nir, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.blue, dataset_blue, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.red, dataset_red, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.green, dataset_green, equal_nan=True).all())
+
+    def test_create_medoid_multiple_band_mosaic(self):
+        dataset = xr.Dataset(
+            {
+                'red': (('time', 'latitude', 'longitude'), self.red),
+                'blue': (('time', 'latitude', 'longitude'), self.blue),
+                'green': (('time', 'latitude', 'longitude'), self.green),
+                'nir': (('time', 'latitude', 'longitude'), self.nir),
+                'swir1': (('time', 'latitude', 'longitude'), self.swir1),
+                'swir2': (('time', 'latitude', 'longitude'), self.swir2),
+            },
+            coords={'time': self.times,
+                    'latitude': self.latitudes,
+                    'longitude': self.longitudes})
+
+        test_mosaic = create_hdmedians_multiple_band_mosaic(dataset, self.sample_clean_mask, operation="medoid")
+        dataset_swir1 = np.array([[53., 68.], [58., -9999]])
+        dataset_swir2 = np.array([[55., 42.], [8., -9999]])
+        dataset_nir = np.array([[0., 5.], [2., -9999]])
+        dataset_red = np.array([[15., 1.], [1., -9999]])
+        dataset_green = np.array([[58., 2.], [27., -9999]])
+        dataset_blue = np.array([[62., 53.], [45., -9999]])
+
+        self.assertTrue(np.isclose(test_mosaic.swir1, dataset_swir1, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.swir2, dataset_swir2, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.nir, dataset_nir, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.blue, dataset_blue, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.red, dataset_red, equal_nan=True).all())
+        self.assertTrue(np.isclose(test_mosaic.green, dataset_green, equal_nan=True).all())
