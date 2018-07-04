@@ -46,7 +46,7 @@ def _composite_by_average(dataset, custom_label="_composite"):
 ## This should be the the only method called from dc baseline
 def generate_baseline(dataset, composite_size=5, mode="average", custom_label=""):
     ranges = _window(range(len(dataset.time)), n=composite_size + 1)
-    reffs = (dataset.isel(time=frame[:-1]) for frame in ranges)
+    reffs = (dataset.isel(time=list(frame)[:-1]) for frame in ranges)
 
     baselines = None
     if mode == "average":
