@@ -175,9 +175,19 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
     return dataset_out
 
 
-def nan_to_num(dataset, number):
-    for key in list(dataset.data_vars):
-        dataset[key].values[np.isnan(dataset[key].values)] = number
+def nan_to_num(data, number):
+    """
+    Converts all nan values in `data` to `number`.
+
+    Parameters
+    ----------
+    data: xarray.Dataset or xarray.DataArray
+    """
+    if isinstance(data, xr.Dataset):
+        for key in list(data.data_vars):
+            data[key].values[np.isnan(data[key].values)] = number
+    elif isinstance(data, xr.DataArray):
+        data.values[np.isnan(data.values)] = number
 
 
 def clear_attrs(dataset):
@@ -278,7 +288,7 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
     """
     assert isinstance(bands, list), "Bands must a list of strings"
     assert len(bands) == 3 and isinstance(bands[0], str), "You must supply three string bands for a PNG."
-    
+
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
     write_geotiff_from_xr(tif_path, dataset, bands, no_data=no_data, crs=crs)
 
@@ -290,16 +300,16 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
             scale_string += " -scale_{} {} {} 0 255".format(index + 1, scale_member[0], scale_member[1])
     outsize_string = "-outsize 25% 25%" if low_res else ""
     cmd = "gdal_translate -ot Byte " + outsize_string + " " + scale_string + " -of PNG -b 1 -b 2 -b 3 " + tif_path + ' ' + png_path
-    
+
     os.system(cmd)
-    
+
     if png_filled_path is not None and fill_color is not None:
         cmd = "convert -transparent \"#000000\" " + png_path + " " + png_path
         os.system(cmd)
         cmd = "convert " + png_path + " -background " + \
             fill_color + " -alpha remove " + png_filled_path
         os.system(cmd)
-    
+
     os.remove(tif_path)
 
 
@@ -318,14 +328,14 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
     """
     assert os.path.exists(color_scale), "Color scale must be a path to a text file containing a gdal compatible scale."
     assert isinstance(band, str), "Band must be a string."
-    
+
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".png")
     write_geotiff_from_xr(tif_path, dataset, [band], no_data=no_data, crs=crs)
 
     cmd = "gdaldem color-relief -of PNG -b 1 " + tif_path + " " + \
         color_scale + " " + png_path
     os.system(cmd)
-    
+
     if fill_color is not None:
         cmd = "convert -transparent \"#FFFFFF\" " + \
             png_path + " " + png_path
@@ -334,7 +344,7 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
             cmd = "convert " + png_path + " -background " + \
                 fill_color + " -alpha remove " + png_path
             os.system(cmd)
-    
+
     os.remove(tif_path)
 
 def _get_transform_from_xr(dataset):
