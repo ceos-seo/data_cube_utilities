@@ -270,9 +270,8 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
             utilities.clear_attrs(dataset_out)
         else:
             for key in list(dataset_slice.data_vars):
-                dataset_out[key].values[dataset_slice.ndvi.values >
-                                        dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values >
-                                                                                             dataset_out.ndvi.values]
+                dataset_out[key].values[dataset_slice.ndvi.values > dataset_out.ndvi.values] = \
+                    dataset_slice[key].values[dataset_slice.ndvi.values > dataset_out.ndvi.values]
     # Handle datatype conversions.
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
@@ -522,7 +521,6 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     #     log_strs.append("dataset_in_dtypes:" + str(dataset_in_dtypes))
     #     log_strs.append("after conversions - dataset_out:" + str(dataset_out))
     #     log_strs.append("after conversions - sum of dataset_out no_data:" + str(dataset_out.where(dataset_out == no_data).sum()))
-
     return dataset_out
 
 def restore_or_convert_dtypes(dtype_for_all, band_list, dataset_in_dtypes, dataset_out, no_data):
