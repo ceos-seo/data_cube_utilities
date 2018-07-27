@@ -29,6 +29,12 @@ import datetime
 import shutil
 import uuid
 import rasterio
+import functools
+import operator
+
+def list_prod(lst):
+    """Takes the product of elements in a list."""
+    return functools.reduce(operator.mul, lst)
 
 def check_for_float(array):
     """
