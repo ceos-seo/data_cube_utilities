@@ -22,6 +22,7 @@ from matplotlib.ticker import FuncFormatter
 import calendar, datetime, time
 import pytz
 from matplotlib.colors import LinearSegmentedColormap
+from scipy import stats
 
 from scipy.interpolate import interp1d
 
@@ -151,9 +152,14 @@ def full_linear_regression(ds):
   
 def xarray_plot_data_vars_over_time(dataset, frac_dates=None):
     """
-    Plot all data variables in an xarray.Dataset on a shared set of axes. 
-    The only dimension and coordinate must be 'time'.
-    The `frac_dates` parameter determines the fraction of dates to show on the x axis.
+    Plot a line plot of all data variables in an xarray.Dataset on a shared set of axes.
+    
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        The Dataset containing data variables to plot. The only dimension and coordinate must be 'time'.
+    frac_dates: float
+        The fraction of dates to label on the x-axis.
     """
     data_var_names = list(dataset.data_vars)
     len_dataset = dataset.time.size
@@ -162,14 +168,42 @@ def xarray_plot_data_vars_over_time(dataset, frac_dates=None):
         nan_mask = nan_mask & data_arr.notnull().values
         plt.plot(data_arr, marker='o')
     plt.legend(data_var_names)
-    times = dataset.coords['time'].values
+    times = dataset.time.values
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times)))
     if frac_dates is None:
         frac_dates = min(10/len(date_strs), 1)
-    plt.xticks(np.arange(0,len(date_strs))[nan_mask][::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
+    plt.xticks(np.arange(len(date_strs))[nan_mask][::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
                rotation=45, ha='right', rotation_mode='anchor')
     plt.show()
 
+def xarray_scatterplot_data_vars(dataset, frac_dates=None):
+    """
+    Plot a scatterplot of all data variables in an xarray.Dataset on a shared set of axes.
+
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        The Dataset containing data variables to plot.
+    frac_dates: float
+        The fraction of dates to label on the x-axis.
+    """
+    data_var_names = list(dataset.data_vars)
+    len_dataset = dataset.time.size
+    nan_mask = np.full(len_dataset, True)
+    for data_arr in dataset.data_vars.values():
+        nan_mask = nan_mask & data_arr.sum(dim=['latitude', 'longitude']).notnull().values
+        times = data_arr.to_dataframe().index.get_level_values('time').values
+        plt.scatter(stats.rankdata(times, method='dense')-1, data_arr.values.flatten())
+    plt.legend(data_var_names)
+    unique_times = dataset.time.values
+    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), unique_times)))
+    if frac_dates is None:
+        frac_dates = min(10/len(date_strs), 1)
+    plt.xticks(np.arange(len(date_strs))[nan_mask][::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
+               rotation=45, ha='right', rotation_mode='anchor')
+    plt.xlabel('time')
+    plt.show()
+    
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
     Plots several statistics over time - including mean, median, linear regression of the 
