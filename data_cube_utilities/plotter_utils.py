@@ -21,6 +21,7 @@ import matplotlib.ticker as ticker
 from matplotlib.ticker import FuncFormatter
 import calendar, datetime, time
 import pytz
+from matplotlib.colors import LinearSegmentedColormap
 
 from scipy.interpolate import interp1d
 
@@ -30,7 +31,7 @@ def impute_missing_data_1D(data1D):
     passed in, but with missing values either masked out or imputed with appropriate values 
     (currently only using a linear trend). Many linear plotting functions for 1D data often 
     (and should) only connect contiguous,  non-nan data points. This leaves gaps in the 
-    piecewise linear plot, which are graphically undesirable.
+    piecewise linear plot, which are sometimes graphically undesirable.
     
     Parameters
     ----------
@@ -39,32 +40,26 @@ def impute_missing_data_1D(data1D):
         suitably for at least matplotlib plotting. If formatting for other libraries such 
         as seaborn or plotly is necessary, add that formatting requirement as a parameter.
     """
-#     print("data1D:", data1D)
     nan_mask = ~np.isnan(data1D)
     x = np.arange(len(data1D))
     x_no_nan = x[nan_mask]
-#     print("x_no_nan:", x_no_nan)
     data_no_nan = data1D[nan_mask]
-#     print("data_no_nan:", data_no_nan)
     if len(x_no_nan) >= 2:
         f = interp1d(x_no_nan, data_no_nan)
         # Select points for interpolation.
         interpolation_x_mask = (x_no_nan[0]<=x) & (x<=x_no_nan[-1])
-#         print("interpolation_x_mask:", interpolation_x_mask)
         interpolation_x = x[interpolation_x_mask]
-#         print("interpolation_x:", interpolation_x)
         data1D_interp = np.arange(len(data1D), dtype=np.float32)
         # The ends of data1D may contain NaNs that must be included.
         end_nan_inds = x[(x<=x_no_nan[0]) | (x_no_nan[-1]<=x)]
-#         end_nan_inds = np.setdiff1d(x[[0,-1]], x_no_nan, assume_unique=True)
-#         print("end_nan_inds:", end_nan_inds)
         data1D_interp[end_nan_inds] = np.nan
         data1D_interp[interpolation_x_mask] = f(interpolation_x)
-#         print("data1D_interp:", data1D_interp)
         return data1D_interp
     else: # Cannot interpolate with a single non-nan point.
         return data1D
-    
+
+## Datetime functions ##
+
 def n64_to_epoch(timestamp):
     ts = pd.to_datetime(str(timestamp)) 
     ts = ts.strftime('%Y-%m-%d')
@@ -74,6 +69,57 @@ def n64_to_epoch(timestamp):
     aware_timestamp = tz_UTC.localize(naive_timestamp)
     epoch = aware_timestamp.strftime("%s")
     return (int) (epoch)
+
+def np_dt64_to_str(np_datetime, fmt='%Y-%m-%d'):
+    """Converts a NumPy datetime64 object to a string based on a format string supplied to pandas strftime."""
+    return pd.to_datetime(str(np_datetime)).strftime(fmt)
+
+def tfmt(x, pos=None):
+    return time.strftime("%Y-%m-%d",time.gmtime(x))
+
+## End datetime functions ##
+
+## Matplotlib colormap functions ##
+
+def create_discrete_color_map(th, colors, alpha, cmap_name='my_cmap'):
+    """
+    Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
+    
+    Parameters
+    ----------
+    th: list
+        Threshold values. Must be between 0.0 and 1.0 - noninclusive.
+    colors: list
+        Colors to use between thresholds, so `len(colors) == len(th)+1`.
+        Colors can be string names of matplotlib colors or 3-tuples of rgb values.
+    alpha: float
+        The alpha values to use for the colors, so `len(alpha) == len(colors)`.
+    cmap_name: str
+        The name of the colormap for matplotlib.
+    """
+    import matplotlib as mpl
+    th = [0.0] + th + [1.0]
+    cdict = {}
+    # These are fully-saturated red, green, and blue - not the matplotlib colors for 'red', 'green', and 'blue'.
+    primary_colors = ['red', 'green', 'blue'] 
+    # Get the 3-tuples of rgb values for the colors.
+    color_rgbs = [(mpl.colors.to_rgb(color) if isinstance(color,str) else color) for color in colors]
+    # For each color entry to go into the color dictionary...
+    for primary_color_ind, primary_color in enumerate(primary_colors):
+        cdict_entry = [None]*len(th)
+        # For each threshold (as well as 0.0 and 1.0), specify the values for this primary color.
+        for row_ind, th_ind in enumerate(range(len(th))):
+            # Get the two colors that this threshold corresponds to.
+            th_color_inds = [0,0] if th_ind==0 else \
+                            [len(colors)-1, len(colors)-1] if th_ind==len(th)-1 else \
+                            [th_ind-1, th_ind]
+            primary_color_vals = [color_rgbs[th_color_ind][primary_color_ind] for th_color_ind in th_color_inds]
+            cdict_entry[row_ind] = (th[th_ind],) + tuple(primary_color_vals)
+        cdict[primary_color] = cdict_entry
+    cmap = LinearSegmentedColormap(cmap_name, cdict)
+    return cmap
+
+## End matplotlib colormap functions ##
 
 def regression_massage(ds): 
     t_len = len(ds["time"])
@@ -102,9 +148,27 @@ def full_linear_regression(ds):
     time = np.array(time)
     time.astype(int)
     return list(zip(time,value))
-    
-def tfmt(x, pos=None):
-    return time.strftime("%Y-%m-%d",time.gmtime(x))
+  
+def xarray_plot_data_vars_over_time(dataset, frac_dates=None):
+    """
+    Plot all data variables in an xarray.Dataset on a shared set of axes. 
+    The only dimension and coordinate must be 'time'.
+    The `frac_dates` parameter determines the fraction of dates to show on the x axis.
+    """
+    data_var_names = list(dataset.data_vars)
+    len_dataset = dataset.time.size
+    nan_mask = np.full(len_dataset, True)
+    for data_arr in dataset.data_vars.values():
+        nan_mask = nan_mask & data_arr.notnull().values
+        plt.plot(data_arr, marker='o')
+    plt.legend(data_var_names)
+    times = dataset.coords['time'].values
+    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times)))
+    if frac_dates is None:
+        frac_dates = min(10/len(date_strs), 1)
+    plt.xticks(np.arange(0,len(date_strs))[nan_mask][::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
+               rotation=45, ha='right', rotation_mode='anchor')
+    plt.show()
 
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
