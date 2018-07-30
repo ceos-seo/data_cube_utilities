@@ -62,7 +62,7 @@ def _display_list_of_plottables(plotables, maxwidth = 3, name= 'figure', h=4,w=1
 			plt.imshow(item)
 		plt.show()
 	else:
-		raise Execption("YOU NEED TO PASS A LIST")
+		raise Exception("YOU NEED TO PASS A LIST")
 
 
 def _reversedim(M,k=0):
