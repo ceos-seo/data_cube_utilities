@@ -63,13 +63,10 @@ def impute_missing_data_1D(data1D):
 
 def n64_to_epoch(timestamp):
     ts = pd.to_datetime(str(timestamp)) 
-    ts = ts.strftime('%Y-%m-%d')
-    tz_UTC = pytz.timezone('UTC')
     time_format = "%Y-%m-%d"
-    naive_timestamp = datetime.datetime.strptime(ts, time_format)
-    aware_timestamp = tz_UTC.localize(naive_timestamp)
-    epoch = aware_timestamp.strftime("%s")
-    return (int) (epoch)
+    ts = ts.strftime(time_format)
+    epoch = int(time.mktime(time.strptime(ts, time_format)))
+    return epoch
 
 def np_dt64_to_str(np_datetime, fmt='%Y-%m-%d'):
     """Converts a NumPy datetime64 object to a string based on a format string supplied to pandas strftime."""
@@ -148,9 +145,9 @@ def full_linear_regression(ds):
     value.astype(int)
     time = np.array(time)
     time.astype(int)
-    return list(zip(time,value))
-  
-def xarray_plot_data_vars_over_time(dataset, frac_dates=None):
+    return list(zip(time,value))  
+    
+def xarray_plot_data_vars_over_time(dataset, frac_dates=None, colors=['orange', 'blue']):
     """
     Plot a line plot of all data variables in an xarray.Dataset on a shared set of axes.
     
@@ -160,25 +157,30 @@ def xarray_plot_data_vars_over_time(dataset, frac_dates=None):
         The Dataset containing data variables to plot. The only dimension and coordinate must be 'time'.
     frac_dates: float
         The fraction of dates to label on the x-axis.
+    colors: list
+        A list of strings denoting colors for each data variable's points. 
+        For example, 'red' or 'blue' are acceptable.
     """
-    data_var_names = list(dataset.data_vars)
+    data_var_names = sorted(list(dataset.data_vars))
     len_dataset = dataset.time.size
     nan_mask = np.full(len_dataset, True)
-    for data_arr in dataset.data_vars.values():
+    for i, data_arr_name in enumerate(data_var_names):
+        data_arr = dataset[data_arr_name]
         nan_mask = nan_mask & data_arr.notnull().values
-        plt.plot(data_arr, marker='o')
-    plt.legend(data_var_names)
+        plt.plot(data_arr[nan_mask], marker='o', c=colors[i])
     times = dataset.time.values
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times)))
     if frac_dates is None:
         frac_dates = min(10/len(date_strs), 1)
-    plt.xticks(np.arange(len(date_strs))[nan_mask][::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
+    plt.xticks(np.arange(len(date_strs[nan_mask]))[::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
                rotation=45, ha='right', rotation_mode='anchor')
+    plt.legend(data_var_names, loc='upper right')
     plt.show()
-
-def xarray_scatterplot_data_vars(dataset, frac_dates=None):
+    
+def xarray_scatterplot_data_vars(dataset, frac_dates=None, colors=['blue', 'orange'], markersize=0.25):
     """
     Plot a scatterplot of all data variables in an xarray.Dataset on a shared set of axes.
+    Currently requires a 'time' coordinate, which constitutes the x-axis.
 
     Parameters
     ----------
@@ -186,15 +188,19 @@ def xarray_scatterplot_data_vars(dataset, frac_dates=None):
         The Dataset containing data variables to plot.
     frac_dates: float
         The fraction of dates to label on the x-axis.
+    colors: list
+        A list of strings denoting abbreviated colors for each data variable's points. 
+        For example, 'r' is red and 'b' is blue.
+    markersize: float
+        The size of markers in the scatterplot.
     """
     data_var_names = list(dataset.data_vars)
     len_dataset = dataset.time.size
     nan_mask = np.full(len_dataset, True)
-    for data_arr in dataset.data_vars.values():
+    for i, data_arr in enumerate(dataset.data_vars.values()):
         nan_mask = nan_mask & data_arr.sum(dim=['latitude', 'longitude']).notnull().values
         times = data_arr.to_dataframe().index.get_level_values('time').values
-        plt.scatter(stats.rankdata(times, method='dense')-1, data_arr.values.flatten())
-    plt.legend(data_var_names)
+        plt.scatter(stats.rankdata(times, method='dense')-1, data_arr.values.flatten(), c=colors[i], s=markersize)
     unique_times = dataset.time.values
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), unique_times)))
     if frac_dates is None:
@@ -202,6 +208,77 @@ def xarray_scatterplot_data_vars(dataset, frac_dates=None):
     plt.xticks(np.arange(len(date_strs))[nan_mask][::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
                rotation=45, ha='right', rotation_mode='anchor')
     plt.xlabel('time')
+    plt.legend(data_var_names, loc='upper right')
+    plt.show()
+    
+def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, select_every=1, resolution=None, 
+                                                     frac_dates=None, colors=['orange', 'blue']):
+    """
+    For an xarray.Dataset, plot a boxplot of NDVI and line plot of WOFS across time.
+    
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        A Dataset formatted as follows: 
+            coordinates: time, latitude, longitude.
+            data variables: ndvi, wofs
+    select_every: int
+        Select one out of this number of values from boxplot_data - so 1 selects all data.
+    resolution: str
+        Denotes the resolution of aggregation. Only options are None or 'weekly'.
+    frac_dates: float
+        The fraction of dates to label on the x-axis when not aggregating.
+    colors: list
+        A list of strings denoting colors for each data variable's points. 
+        For example, 'red' or 'blue' are acceptable.
+    """
+    plotting_data = dataset.stack(lat_lon=('latitude', 'longitude'))
+    time_agg_str = 'weekofyear' if resolution is not None and resolution == 'weekly' else 'time'
+    if time_agg_str == 'weekofyear':
+        plotting_data = plotting_data.groupby('time.'+time_agg_str).mean(dim='time')
+    fig, ax = plt.subplots(figsize=(9,6))
+    ndvi_box_color, wofs_line_color = ('orange', 'blue')
+    max_weeks_per_year = 54
+    
+    times = plotting_data['time'].values if time_agg_str == 'time' else np.arange(1,max_weeks_per_year+1)
+    num_times = len(times) if time_agg_str == 'time' else max_weeks_per_year
+    
+    # NDVI boxplot boxes
+    # The data formatted for matplotlib.pyplot.boxplot().
+    ndvi_formatted_data = xr.DataArray(np.full((num_times,len(plotting_data.ndvi[0,::select_every].values)), np.nan))
+    for i in range(len(plotting_data[time_agg_str])):
+        if time_agg_str == 'time':
+            ndvi_formatted_data.loc[i-1,:] = plotting_data.isel(time=i).ndvi.values[::select_every]
+        elif time_agg_str == 'weekofyear':
+            ndvi_formatted_data.loc[i-1,:] = plotting_data[{time_agg_str:i}].ndvi.values[::select_every]
+    ndvi_nan_mask = ~np.isnan(ndvi_formatted_data)
+    filtered_formatted_data = np.array([d[m] for d, m in zip(ndvi_formatted_data, ndvi_nan_mask)])
+    bp = ax.boxplot(filtered_formatted_data, widths=[0.6]*len(filtered_formatted_data), 
+                    patch_artist=True, boxprops=dict(facecolor=ndvi_box_color), 
+                    flierprops=dict(marker='o', markersize=0.25))
+
+    # WOFS line
+    wofs_formatted_data = xr.DataArray(np.full((num_times,len(plotting_data.wofs[0,::select_every].values)), np.nan))
+    for i in range(len(plotting_data[time_agg_str])):
+        if time_agg_str == 'time':
+            wofs_formatted_data.loc[i-1,:] = plotting_data.isel(time=i).wofs.values[::select_every]
+        elif time_agg_str == 'weekofyear':
+            wofs_formatted_data.loc[i-1,:] = plotting_data[{time_agg_str:i}].wofs.values[::select_every]
+    wofs_line_plot_data = np.nanmean(wofs_formatted_data.values, axis=1)
+    wofs_nan_mask = ~np.isnan(wofs_line_plot_data)
+    line = ax.plot(np.arange(len(wofs_line_plot_data))[wofs_nan_mask], wofs_line_plot_data[wofs_nan_mask], c=wofs_line_color)
+
+    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times))) if time_agg_str=='time' else \
+                naive_months_ticks_by_week(list(range(1, max_weeks_per_year+1)))
+    if frac_dates is None:
+        frac_dates = min(9/len(date_strs), 1)
+    x_locs = list(range(1,len(date_strs)+1))[::int(1/frac_dates)] if time_agg_str == 'time' else \
+             list(range(1,len(date_strs)+1))
+    x_labels = date_strs[::int(1/frac_dates)] if time_agg_str == 'time' else date_strs
+    plt.xticks(x_locs, x_labels, rotation=45, ha='right', rotation_mode='anchor')
+
+    plt.legend(handles=[bp['boxes'][0],line[0]], labels=list(plotting_data.data_vars), loc='best')
+    plt.tight_layout()
     plt.show()
     
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
@@ -238,15 +315,15 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     #Shaded Area
     quarter = np.nanpercentile(
     dataset.values.reshape((
-        landsat_dataset.dims['time'],
-        landsat_dataset.dims['latitude'] * landsat_dataset.dims['longitude'])),
+        dataset.coords['time'].shape[0],
+        dataset.coords['latitude'].shape[0] * dataset.coords['longitude'].shape[0])),
         25,
         axis = 1
     )
     three_quarters = np.nanpercentile(
     dataset.values.reshape((
-        landsat_dataset.dims['time'],
-        landsat_dataset.dims['latitude'] * landsat_dataset.dims['longitude'])),
+        dataset.coords['time'].shape[0],
+        dataset.coords['latitude'].shape[0] * dataset.coords['longitude'].shape[0])),
         75,
         axis = 1
     )
@@ -261,12 +338,6 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
         
     #Medians
     plt.plot(times,medians,color="black",marker="o",linestyle='None', label = "Medians")
-    
-    #Linear Regression (on everything)
-    #Data formatted in a way for needed for Guassian and Linear Regression
-    #regression_list = full_linear_regression(dataset)
-    #formatted_time, value = zip(*regression_list)
-    #formatted_time = np.array(formatted_time)
     
     #The Actual Plot
     plt.plot(times,mean,color="blue",label="Mean")
@@ -293,6 +364,8 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     ax.set_ylabel('Value', fontsize=fontsize)
     plt.show()
 
+
+    
 def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", plot_max = False, plot_min = False):
     times = dataset.time.values
     mpl.style.use('seaborn')
@@ -342,3 +415,69 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
         plt.plot(times, y, marker="o")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.xticks(rotation=90)    
+
+def remove_non_unique_ordered_list_str(ordered_list):
+    """
+    Sets all occurrences of a value in an ordered list after its first occurence to ''.
+    For example, ['a', 'a', 'b', 'b', 'c'] would become ['a', '', 'b', '', 'c'].
+    """
+    prev_unique_str = ""
+    for i in range(len(ordered_list)):
+        current_str = ordered_list[i]
+        if current_str != prev_unique_str:
+            prev_unique_str = current_str
+        else:
+            ordered_list[i] = ""
+    return ordered_list
+
+## Misc ##
+
+# For February, assume leap years are included.
+days_per_month = {1:31, 2:29, 3:31, 4:30, 5:31, 6:30, 
+                  7:31, 8:31, 9:30, 10:31, 11:30, 12:31}
+
+def get_weeks_per_month(num_weeks):
+    """
+    Including January, give 5 weeks to every third month - accounting for 
+    variation between 52 and 54 weeks in a year by adding weeks to the last 3 months.
+    """
+    last_months_num_weeks = None
+    if num_weeks <= 52:
+        last_months_num_weeks = [5,4,4]
+    elif num_weeks == 53:
+        last_months_num_weeks = [5,4,5]
+    elif num_weeks == 54:
+        last_months_num_weeks = [5,5,5]
+    return {month_int:num_weeks for (month_int,num_weeks) in zip(days_per_month.keys(), [5,4,4]*3+last_months_num_weeks)}
+
+month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+def week_ints_to_month_names(week_ints):
+    """
+    Converts an ordinal numbers for weeks (in range [1,54]) to their 3-letter names.
+    """
+    weeks_per_month = get_weeks_per_month(max(week_ints))
+    week_month_strs = []
+    for week_int in week_ints:
+        month_int = -1
+        for current_month_int, current_month_weeks in weeks_per_month.items():
+            week_int -= current_month_weeks
+            if week_int <= 0:
+                month_int = current_month_int
+                break
+        week_month_strs.append(month_names[month_int-1])
+    return week_month_strs
+
+def naive_months_ticks_by_week(week_ints=None):
+    """
+    Given a list of week numbers (in range [1,54]), returns a list of month strings separated by spaces.
+    Covers 54 weeks if no list-like of week numbers is given.
+    This is only intended to be used for labeling axes in plotting.
+    """
+    month_ticks_by_week = []
+    if week_ints is None: # Give month ticks for all weeks.
+        month_ticks_by_week = week_ints_to_month_names(list(range(54)))
+    else:
+        month_ticks_by_week = remove_non_unique_ordered_list_str(week_ints_to_month_names(week_ints))
+    return month_ticks_by_week
