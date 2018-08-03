@@ -147,7 +147,7 @@ def full_linear_regression(ds):
     time.astype(int)
     return list(zip(time,value))  
     
-def xarray_plot_data_vars_over_time(dataset, frac_dates=None, colors=['orange', 'blue']):
+def xarray_plot_data_vars_over_time(dataset, colors=['orange', 'blue']):
     """
     Plot a line plot of all data variables in an xarray.Dataset on a shared set of axes.
     
@@ -155,8 +155,6 @@ def xarray_plot_data_vars_over_time(dataset, frac_dates=None, colors=['orange', 
     ----------
     dataset: xarray.Dataset
         The Dataset containing data variables to plot. The only dimension and coordinate must be 'time'.
-    frac_dates: float
-        The fraction of dates to label on the x-axis.
     colors: list
         A list of strings denoting colors for each data variable's points. 
         For example, 'red' or 'blue' are acceptable.
@@ -170,14 +168,12 @@ def xarray_plot_data_vars_over_time(dataset, frac_dates=None, colors=['orange', 
         plt.plot(data_arr[nan_mask], marker='o', c=colors[i])
     times = dataset.time.values
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times)))
-    if frac_dates is None:
-        frac_dates = min(10/len(date_strs), 1)
-    plt.xticks(np.arange(len(date_strs[nan_mask]))[::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
+    plt.xticks(np.arange(len(date_strs[nan_mask])), date_strs[nan_mask], 
                rotation=45, ha='right', rotation_mode='anchor')
     plt.legend(data_var_names, loc='upper right')
     plt.show()
     
-def xarray_scatterplot_data_vars(dataset, frac_dates=None, colors=['blue', 'orange'], markersize=0.25):
+def xarray_scatterplot_data_vars(dataset, figure_kwargs={'figsize':(12,6)}, colors=['blue', 'orange'], markersize=5):
     """
     Plot a scatterplot of all data variables in an xarray.Dataset on a shared set of axes.
     Currently requires a 'time' coordinate, which constitutes the x-axis.
@@ -188,31 +184,35 @@ def xarray_scatterplot_data_vars(dataset, frac_dates=None, colors=['blue', 'oran
         The Dataset containing data variables to plot.
     frac_dates: float
         The fraction of dates to label on the x-axis.
+    figure_kwargs: dict
+        A dictionary of kwargs for matplotlib figure creation.
     colors: list
         A list of strings denoting abbreviated colors for each data variable's points. 
         For example, 'r' is red and 'b' is blue.
     markersize: float
         The size of markers in the scatterplot.
     """
+    plt.figure(**figure_kwargs)
     data_var_names = list(dataset.data_vars)
     len_dataset = dataset.time.size
     nan_mask = np.full(len_dataset, True)
     for i, data_arr in enumerate(dataset.data_vars.values()):
-        nan_mask = nan_mask & data_arr.sum(dim=['latitude', 'longitude']).notnull().values
+        if len(list(dataset.dims)) > 1:
+            dims_to_check_for_nulls = [dim for dim in list(dataset.dims) if dim != 'time']
+            nan_mask = nan_mask & data_arr.notnull().any(dim=dims_to_check_for_nulls).values 
+        else:
+            nan_mask = data_arr.notnull().values
         times = data_arr.to_dataframe().index.get_level_values('time').values
         plt.scatter(stats.rankdata(times, method='dense')-1, data_arr.values.flatten(), c=colors[i], s=markersize)
     unique_times = dataset.time.values
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), unique_times)))
-    if frac_dates is None:
-        frac_dates = min(10/len(date_strs), 1)
-    plt.xticks(np.arange(len(date_strs))[nan_mask][::int(1/frac_dates)], date_strs[nan_mask][::int(1/frac_dates)], 
+    plt.xticks(np.arange(len(date_strs))[nan_mask], date_strs[nan_mask], 
                rotation=45, ha='right', rotation_mode='anchor')
     plt.xlabel('time')
     plt.legend(data_var_names, loc='upper right')
     plt.show()
     
-def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, select_every=1, resolution=None, 
-                                                     frac_dates=None, colors=['orange', 'blue']):
+def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, colors=['orange', 'blue']):
     """
     For an xarray.Dataset, plot a boxplot of NDVI and line plot of WOFS across time.
     
@@ -222,59 +222,53 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, select_every=1, re
         A Dataset formatted as follows: 
             coordinates: time, latitude, longitude.
             data variables: ndvi, wofs
-    select_every: int
-        Select one out of this number of values from boxplot_data - so 1 selects all data.
     resolution: str
         Denotes the resolution of aggregation. Only options are None or 'weekly'.
-    frac_dates: float
-        The fraction of dates to label on the x-axis when not aggregating.
     colors: list
         A list of strings denoting colors for each data variable's points. 
         For example, 'red' or 'blue' are acceptable.
     """
     plotting_data = dataset.stack(lat_lon=('latitude', 'longitude'))
     time_agg_str = 'weekofyear' if resolution is not None and resolution == 'weekly' else 'time'
-    if time_agg_str == 'weekofyear':
+    if time_agg_str != 'time':
         plotting_data = plotting_data.groupby('time.'+time_agg_str).mean(dim='time')
     fig, ax = plt.subplots(figsize=(9,6))
     ndvi_box_color, wofs_line_color = ('orange', 'blue')
     max_weeks_per_year = 54
-    
-    times = plotting_data['time'].values if time_agg_str == 'time' else np.arange(1,max_weeks_per_year+1)
-    num_times = len(times) if time_agg_str == 'time' else max_weeks_per_year
+    times = plotting_data[time_agg_str].values
     
     # NDVI boxplot boxes
     # The data formatted for matplotlib.pyplot.boxplot().
-    ndvi_formatted_data = xr.DataArray(np.full((num_times,len(plotting_data.ndvi[0,::select_every].values)), np.nan))
-    for i in range(len(plotting_data[time_agg_str])):
-        if time_agg_str == 'time':
-            ndvi_formatted_data.loc[i-1,:] = plotting_data.isel(time=i).ndvi.values[::select_every]
-        elif time_agg_str == 'weekofyear':
-            ndvi_formatted_data.loc[i-1,:] = plotting_data[{time_agg_str:i}].ndvi.values[::select_every]
+    ndvi_formatted_data = xr.DataArray(np.full_like(plotting_data.ndvi.values, np.nan))
+    for i, time in enumerate(times):
+        ndvi_formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}].ndvi.values
     ndvi_nan_mask = ~np.isnan(ndvi_formatted_data)
-    filtered_formatted_data = np.array([d[m] for d, m in zip(ndvi_formatted_data, ndvi_nan_mask)])
-    bp = ax.boxplot(filtered_formatted_data, widths=[0.6]*len(filtered_formatted_data), 
-                    patch_artist=True, boxprops=dict(facecolor=ndvi_box_color), 
-                    flierprops=dict(marker='o', markersize=0.25))
+    filtered_formatted_data = [] # Data formatted for matplotlib.pyplot.boxplot().
+    acq_inds_to_keep = [] # Indices of acquisitions to keep. Other indicies contain all nan values.
+    for i, (d, m) in enumerate(zip(ndvi_formatted_data, ndvi_nan_mask)):
+        if len(d[m] != 0):
+            filtered_formatted_data.append(d[m])
+            acq_inds_to_keep.append(i)
+    times_no_nan = times[acq_inds_to_keep]
+    epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
+    x_locs = epochs if time_agg_str == 'time' else times_no_nan
+    box_width = 0.5*np.min(np.diff(x_locs))
+    bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
+                    positions=x_locs, patch_artist=True, boxprops=dict(facecolor=ndvi_box_color), 
+                    flierprops=dict(marker='o', markersize=0.25), 
+                    manage_xticks=False) # `manage_xticks=False` to avoid excessive padding on the x-axis.
 
     # WOFS line
-    wofs_formatted_data = xr.DataArray(np.full((num_times,len(plotting_data.wofs[0,::select_every].values)), np.nan))
-    for i in range(len(plotting_data[time_agg_str])):
-        if time_agg_str == 'time':
-            wofs_formatted_data.loc[i-1,:] = plotting_data.isel(time=i).wofs.values[::select_every]
-        elif time_agg_str == 'weekofyear':
-            wofs_formatted_data.loc[i-1,:] = plotting_data[{time_agg_str:i}].wofs.values[::select_every]
+    wofs_formatted_data = xr.DataArray(np.full_like(plotting_data.wofs.values, np.nan))
+    for i, time in enumerate(times):
+        wofs_formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}].wofs.values
     wofs_line_plot_data = np.nanmean(wofs_formatted_data.values, axis=1)
     wofs_nan_mask = ~np.isnan(wofs_line_plot_data)
-    line = ax.plot(np.arange(len(wofs_line_plot_data))[wofs_nan_mask], wofs_line_plot_data[wofs_nan_mask], c=wofs_line_color)
+    line = ax.plot(x_locs, wofs_line_plot_data[wofs_nan_mask], c=wofs_line_color)
 
-    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times))) if time_agg_str=='time' else \
-                naive_months_ticks_by_week(list(range(1, max_weeks_per_year+1)))
-    if frac_dates is None:
-        frac_dates = min(9/len(date_strs), 1)
-    x_locs = list(range(1,len(date_strs)+1))[::int(1/frac_dates)] if time_agg_str == 'time' else \
-             list(range(1,len(date_strs)+1))
-    x_labels = date_strs[::int(1/frac_dates)] if time_agg_str == 'time' else date_strs
+    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else \
+                naive_months_ticks_by_week(times_no_nan)
+    x_labels = date_strs
     plt.xticks(x_locs, x_labels, rotation=45, ha='right', rotation_mode='anchor')
 
     plt.legend(handles=[bp['boxes'][0],line[0]], labels=list(plotting_data.data_vars), loc='best')
