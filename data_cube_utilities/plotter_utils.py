@@ -306,9 +306,7 @@ def xarray_time_series_plot(dataset, data_plot_types, fig_params={'figsize':(12,
     max_weeks_per_year = 54
     
     # TODO: Check the type of time scale (e.g. week of year, month of year) to determine time_agg_str.
-#     print('plotting_data.coords:', list(plotting_data.coords))
-#     print('plotting_data.data_vars:', list(plotting_data.data_vars))
-    possible_time_agg_strs = ['weekofyear', 'monthofyear']
+    possible_time_agg_strs = ['week', 'month']
     time_agg_str = 'time'
     for possible_time_agg_str in possible_time_agg_strs:
         if possible_time_agg_str in list(plotting_data.coords):
@@ -351,7 +349,8 @@ def xarray_time_series_plot(dataset, data_plot_types, fig_params={'figsize':(12,
     x_locs = epochs if time_agg_str == 'time' else times_no_nan
 #     print("x_locs:", x_locs)
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else\
-                naive_months_ticks_by_week(times_no_nan)
+                naive_months_ticks_by_week(times_no_nan) if time_agg_str=='week' else\
+                month_ints_to_month_names(times_no_nan)
 #     print("date_strs:", date_strs)
     plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
     plt.legend(handles=[plot for plot in plots.values()], labels=list(data_plot_types.keys()), loc='best')
@@ -528,9 +527,15 @@ def get_weeks_per_month(num_weeks):
 month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
+def month_ints_to_month_names(month_ints):
+    """
+    Converts ordinal numbers for months (in range [1,12]) to their 3-letter names.
+    """
+    return [month_names[i-1] for i in month_ints]
+
 def week_ints_to_month_names(week_ints):
     """
-    Converts an ordinal numbers for weeks (in range [1,54]) to their 3-letter names.
+    Converts ordinal numbers for weeks (in range [1,54]) to their months' 3-letter names.
     """
     weeks_per_month = get_weeks_per_month(max(week_ints))
     week_month_strs = []
