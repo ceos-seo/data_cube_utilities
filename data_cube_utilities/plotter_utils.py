@@ -275,6 +275,77 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
+def xarray_time_series_plot(dataset, data_plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}):
+    """
+    Plot data variables in an xarray.Dataset together in one figure, 
+    but with different plot types for each (e.g. box-and-whisker plot, line plot, scatter plot).
+    
+    Paramaeters
+    -----------
+    dataset: xarray.Dataset 
+        A Dataset containing some bands like NDVI or WOFS.
+        Must have coordinates: time, latitude, longitude.
+    data_plot_types: dict
+        Dictionary mapping names of DataArrays in the Dataset to plot to 
+        their plot types (e.g. {'ndvi':'point', 'wofs':'line'}).
+    fig_params: dict
+        Figure parameters dictionary (e.g. {'figsize':(12,6)}).
+    component_plot_params: dict
+        Dictionary mapping parameter names to dictionaries of matplotlib 
+        formatting parameters for individual plots (e.g. {'ndvi':{'color':'red'}, 'wofs':{'color':'blue'}}).
+    """
+    plotting_data = dataset.stack(lat_lon=('latitude', 'longitude'))
+    print('plotting_data:', plotting_data)
+    fig, ax = plt.subplots(figsize=(9,6))
+    plots = {}
+    max_weeks_per_year = 54
+    
+    # TODO: Check the type of time scale (e.g. week of year, month of year) to determine time_agg_str.
+    time_agg_str = 'time'
+    times = plotting_data[time_agg_str].values
+    print('times:', times)
+    times_no_nan = set()
+    
+    for data_arr_name in data_plot_types:
+        formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values, np.nan))
+        for i, time in enumerate(times):
+            formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}][data_arr_name].values
+        plot_data = np.nanmean(formatted_data.values, axis=1)
+        print('plot_data:', plot_data)
+        nan_mask = ~np.isnan(plot_data)
+        print('plot_data[nan_mask]:', plot_data[nan_mask])
+        print('times[nan_mask]:', times[nan_mask])
+        current_times = times[nan_mask]
+        current_epochs = np.array(list(map(n64_to_epoch, current_times))) if time_agg_str == 'time' else None
+        current_x_locs = current_epochs if time_agg_str == 'time' else times_no_nan
+        times_no_nan.update(current_times)
+        plots[data_arr_name] = ax.scatter(current_epochs, plot_data[nan_mask])
+    print('times_no_nan:', times_no_nan)
+    epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
+    x_locs = epochs if time_agg_str == 'time' else times_no_nan
+    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else \
+                naive_months_ticks_by_week(times_no_nan)
+    plt.xticks(epochs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
+    return
+
+    # WOFS line
+    wofs_formatted_data = xr.DataArray(np.full_like(plotting_data.wofs.values, np.nan))
+    for i, time in enumerate(times):
+        wofs_formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}].wofs.values
+    wofs_line_plot_data = np.nanmean(wofs_formatted_data.values, axis=1)
+    wofs_nan_mask = ~np.isnan(wofs_line_plot_data)
+    line = ax.plot(x_locs, wofs_line_plot_data[wofs_nan_mask], c=wofs_line_color)
+
+    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else \
+                naive_months_ticks_by_week(times_no_nan)
+    x_labels = date_strs
+    plt.xticks(x_locs, x_labels, rotation=45, ha='right', rotation_mode='anchor')
+
+    plt.legend(handles=[bp['boxes'][0],line[0]], labels=list(plotting_data.data_vars), loc='best')
+    plt.tight_layout()
+    plt.show()
+    # TODO: 
+    
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
     Plots several statistics over time - including mean, median, linear regression of the 
@@ -357,7 +428,6 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     ax.set_xlabel('Time', fontsize=fontsize)
     ax.set_ylabel('Value', fontsize=fontsize)
     plt.show()
-
 
     
 def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", plot_max = False, plot_min = False):
