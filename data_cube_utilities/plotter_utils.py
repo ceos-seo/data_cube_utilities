@@ -327,8 +327,9 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
         current_x_locs = current_epochs if time_agg_str == 'time' else current_times
         times_no_nan.update(current_times)
         plot_type = plot_types[data_arr_name]
+        plot_params = component_plot_params.get(data_arr_name, {})
         if plot_type == 'scatter':
-            plots[data_arr_name] = ax.scatter(current_x_locs, plot_data[nan_mask])
+            plots[data_arr_name] = ax.scatter(current_x_locs, plot_data[nan_mask], **plot_params)
         elif plot_type == 'box':
             boxplot_nan_mask = ~np.isnan(formatted_data)
             filtered_formatted_data = [] # Data formatted for matplotlib.pyplot.boxplot().
@@ -339,10 +340,11 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
                     acq_inds_to_keep.append(i)
             boxplot_times_no_nan = times[acq_inds_to_keep]
             box_width = 0.5*np.min(np.diff(current_x_locs))
+            boxprops = plot_params.pop('boxprops', dict(facecolor='orange'))
             bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
-                            positions=current_x_locs, patch_artist=True, boxprops=dict(facecolor='orange'), #TODO: Set boxprops properly.
+                            positions=current_x_locs, patch_artist=True, boxprops=boxprops, #TODO: Set boxprops properly.
                             flierprops=dict(marker='o', markersize=0.25), 
-                            manage_xticks=False) # `manage_xticks=False` to avoid excessive padding on the x-axis.
+                            manage_xticks=False, **plot_params) # `manage_xticks=False` to avoid excessive padding on the x-axis.
             plots[data_arr_name] = bp['boxes'][0]
     times_no_nan = sorted(list(times_no_nan))
     epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
