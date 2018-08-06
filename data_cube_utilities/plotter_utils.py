@@ -234,7 +234,6 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
         plotting_data = plotting_data.groupby('time.'+time_agg_str).mean(dim='time')
     fig, ax = plt.subplots(figsize=(9,6))
     ndvi_box_color, wofs_line_color = ('orange', 'blue')
-    max_weeks_per_year = 54
     times = plotting_data[time_agg_str].values
     
     # NDVI boxplot boxes
@@ -275,7 +274,7 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
-def xarray_time_series_plot(dataset, data_plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}):
+def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}):
     """
     Plot data variables in an xarray.Dataset together in one figure, 
     but with different plot types for each (e.g. box-and-whisker plot, line plot, scatter plot).
@@ -285,7 +284,7 @@ def xarray_time_series_plot(dataset, data_plot_types, fig_params={'figsize':(12,
     dataset: xarray.Dataset 
         A Dataset containing some bands like NDVI or WOFS.
         Must have coordinates: time, latitude, longitude.
-    data_plot_types: dict
+    plot_types: dict
         Dictionary mapping names of DataArrays in the Dataset to plot to 
         their plot types (e.g. {'ndvi':'point', 'wofs':'line'}).
     fig_params: dict
@@ -300,60 +299,57 @@ def xarray_time_series_plot(dataset, data_plot_types, fig_params={'figsize':(12,
 #         plotting_data = plotting_data.stack(lat_lon=('latitude', 'longitude'))
 
     plotting_data = plotting_data.stack(lat_lon=('latitude', 'longitude'))
-#     print('plotting_data:', plotting_data)
     fig, ax = plt.subplots(figsize=(9,6))
     plots = {}
-    max_weeks_per_year = 54
     
-    # TODO: Check the type of time scale (e.g. week of year, month of year) to determine time_agg_str.
     possible_time_agg_strs = ['week', 'month']
     time_agg_str = 'time'
     for possible_time_agg_str in possible_time_agg_strs:
         if possible_time_agg_str in list(plotting_data.coords):
             time_agg_str = possible_time_agg_str
             break
-#     time_agg_str = 'time' if 'time' in list(plotting_data.coords) else\
-#                    'weekofyear' if 'weekofyear' in list(plotting_data.coords) else\
-#                    'monthofyear' if 'monthofyear' in list(plotting_data.coords)
-#     print('time_agg_str:', time_agg_str)
     times = plotting_data[time_agg_str].values
-#     print('times:', times)
     times_no_nan = set()
     
-    for data_arr_name in data_plot_types:
-#         formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values, np.nan))
+    for data_arr_name in plot_types:
         if len(plotting_data[data_arr_name].values.shape) > 1:    
             formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values, np.nan)) 
         else:
             formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values.reshape(-1,1), np.nan)) 
-#         print("formatted_data.shape:", formatted_data.shape)
         for i, time in enumerate(times):
-#             print("1:", plotting_data.loc[{time_agg_str:time}])
-#             formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}][data_arr_name].values
             formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}][data_arr_name].values
-#         print("formatted_data:", formatted_data)
         plot_data = np.nanmean(formatted_data.values, axis=1)
-#         print('plot_data:', plot_data)
         nan_mask = ~np.isnan(plot_data)
-#         print('plot_data[nan_mask]:', plot_data[nan_mask])
-#         print('times[nan_mask]:', times[nan_mask])
         current_times = times[nan_mask]
         current_epochs = np.array(list(map(n64_to_epoch, current_times))) if time_agg_str == 'time' else None
-#         print('current_epochs:', current_epochs)
         current_x_locs = current_epochs if time_agg_str == 'time' else current_times
         times_no_nan.update(current_times)
-        plots[data_arr_name] = ax.scatter(current_x_locs, plot_data[nan_mask])
+        plot_type = plot_types[data_arr_name]
+        if plot_type == 'scatter':
+            plots[data_arr_name] = ax.scatter(current_x_locs, plot_data[nan_mask])
+        elif plot_type == 'box':
+            boxplot_nan_mask = ~np.isnan(formatted_data)
+            filtered_formatted_data = [] # Data formatted for matplotlib.pyplot.boxplot().
+            acq_inds_to_keep = [] # Indices of acquisitions to keep. Other indicies contain all nan values.
+            for i, (d, m) in enumerate(zip(formatted_data, boxplot_nan_mask)):
+                if len(d[m] != 0):
+                    filtered_formatted_data.append(d.values[m])
+                    acq_inds_to_keep.append(i)
+            boxplot_times_no_nan = times[acq_inds_to_keep]
+            box_width = 0.5*np.min(np.diff(current_x_locs))
+            bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
+                            positions=current_x_locs, patch_artist=True, boxprops=dict(facecolor='orange'), #TODO: Set boxprops properly.
+                            flierprops=dict(marker='o', markersize=0.25), 
+                            manage_xticks=False) # `manage_xticks=False` to avoid excessive padding on the x-axis.
+            plots[data_arr_name] = bp['boxes'][0]
     times_no_nan = sorted(list(times_no_nan))
-#     print('times_no_nan:', times_no_nan)
     epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
     x_locs = epochs if time_agg_str == 'time' else times_no_nan
-#     print("x_locs:", x_locs)
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else\
                 naive_months_ticks_by_week(times_no_nan) if time_agg_str=='week' else\
                 month_ints_to_month_names(times_no_nan)
-#     print("date_strs:", date_strs)
     plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
-    plt.legend(handles=[plot for plot in plots.values()], labels=list(data_plot_types.keys()), loc='best')
+    plt.legend(handles=[plot for plot in plots.values()], labels=list(plot_types.keys()), loc='best')
     plt.tight_layout()
     
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
