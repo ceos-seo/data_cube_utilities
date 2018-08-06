@@ -274,7 +274,7 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
-def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}):
+def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}, fig=None):
     """
     Plot data variables in an xarray.Dataset together in one figure, 
     but with different plot types for each (e.g. box-and-whisker plot, line plot, scatter plot).
@@ -292,14 +292,16 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     component_plot_params: dict
         Dictionary mapping parameter names to dictionaries of matplotlib 
         formatting parameters for individual plots (e.g. {'ndvi':{'color':'red'}, 'wofs':{'color':'blue'}}).
+    fig: matplotlib.figure.Figure
+        The figure to use for the plot. The figure must have at least one Axes object.
+        You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
+        The code ``fig = plt.figure()`` will not provide the Axes object.
     """
-    plotting_data = dataset
-
-#     if set(('latitude', 'longitude')).issubset(list(dataset.coords)):
-#         plotting_data = plotting_data.stack(lat_lon=('latitude', 'longitude'))
-
-    plotting_data = plotting_data.stack(lat_lon=('latitude', 'longitude'))
-    fig, ax = plt.subplots(figsize=(9,6))
+    plotting_data = dataset.stack(lat_lon=('latitude', 'longitude'))
+    if fig is None:
+        fig, ax = plt.subplots(figsize=(9,6))
+    else:
+        ax = fig.axes[0]
     plots = {}
     
     possible_time_agg_strs = ['week', 'month']
