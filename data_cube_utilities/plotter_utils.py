@@ -294,57 +294,68 @@ def xarray_time_series_plot(dataset, data_plot_types, fig_params={'figsize':(12,
         Dictionary mapping parameter names to dictionaries of matplotlib 
         formatting parameters for individual plots (e.g. {'ndvi':{'color':'red'}, 'wofs':{'color':'blue'}}).
     """
-    plotting_data = dataset.stack(lat_lon=('latitude', 'longitude'))
-    print('plotting_data:', plotting_data)
+    plotting_data = dataset
+
+#     if set(('latitude', 'longitude')).issubset(list(dataset.coords)):
+#         plotting_data = plotting_data.stack(lat_lon=('latitude', 'longitude'))
+
+    plotting_data = plotting_data.stack(lat_lon=('latitude', 'longitude'))
+#     print('plotting_data:', plotting_data)
     fig, ax = plt.subplots(figsize=(9,6))
     plots = {}
     max_weeks_per_year = 54
     
     # TODO: Check the type of time scale (e.g. week of year, month of year) to determine time_agg_str.
+#     print('plotting_data.coords:', list(plotting_data.coords))
+#     print('plotting_data.data_vars:', list(plotting_data.data_vars))
+    possible_time_agg_strs = ['weekofyear', 'monthofyear']
     time_agg_str = 'time'
+    for possible_time_agg_str in possible_time_agg_strs:
+        if possible_time_agg_str in list(plotting_data.coords):
+            time_agg_str = possible_time_agg_str
+            break
+#     time_agg_str = 'time' if 'time' in list(plotting_data.coords) else\
+#                    'weekofyear' if 'weekofyear' in list(plotting_data.coords) else\
+#                    'monthofyear' if 'monthofyear' in list(plotting_data.coords)
+#     print('time_agg_str:', time_agg_str)
     times = plotting_data[time_agg_str].values
-    print('times:', times)
+#     print('times:', times)
     times_no_nan = set()
     
     for data_arr_name in data_plot_types:
-        formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values, np.nan))
+#         formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values, np.nan))
+        if len(plotting_data[data_arr_name].values.shape) > 1:    
+            formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values, np.nan)) 
+        else:
+            formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values.reshape(-1,1), np.nan)) 
+#         print("formatted_data.shape:", formatted_data.shape)
         for i, time in enumerate(times):
+#             print("1:", plotting_data.loc[{time_agg_str:time}])
+#             formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}][data_arr_name].values
             formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}][data_arr_name].values
+#         print("formatted_data:", formatted_data)
         plot_data = np.nanmean(formatted_data.values, axis=1)
-        print('plot_data:', plot_data)
+#         print('plot_data:', plot_data)
         nan_mask = ~np.isnan(plot_data)
-        print('plot_data[nan_mask]:', plot_data[nan_mask])
-        print('times[nan_mask]:', times[nan_mask])
+#         print('plot_data[nan_mask]:', plot_data[nan_mask])
+#         print('times[nan_mask]:', times[nan_mask])
         current_times = times[nan_mask]
         current_epochs = np.array(list(map(n64_to_epoch, current_times))) if time_agg_str == 'time' else None
-        current_x_locs = current_epochs if time_agg_str == 'time' else times_no_nan
+#         print('current_epochs:', current_epochs)
+        current_x_locs = current_epochs if time_agg_str == 'time' else current_times
         times_no_nan.update(current_times)
-        plots[data_arr_name] = ax.scatter(current_epochs, plot_data[nan_mask])
-    print('times_no_nan:', times_no_nan)
+        plots[data_arr_name] = ax.scatter(current_x_locs, plot_data[nan_mask])
+    times_no_nan = sorted(list(times_no_nan))
+#     print('times_no_nan:', times_no_nan)
     epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
     x_locs = epochs if time_agg_str == 'time' else times_no_nan
-    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else \
+#     print("x_locs:", x_locs)
+    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else\
                 naive_months_ticks_by_week(times_no_nan)
-    plt.xticks(epochs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
-    return
-
-    # WOFS line
-    wofs_formatted_data = xr.DataArray(np.full_like(plotting_data.wofs.values, np.nan))
-    for i, time in enumerate(times):
-        wofs_formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}].wofs.values
-    wofs_line_plot_data = np.nanmean(wofs_formatted_data.values, axis=1)
-    wofs_nan_mask = ~np.isnan(wofs_line_plot_data)
-    line = ax.plot(x_locs, wofs_line_plot_data[wofs_nan_mask], c=wofs_line_color)
-
-    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else \
-                naive_months_ticks_by_week(times_no_nan)
-    x_labels = date_strs
-    plt.xticks(x_locs, x_labels, rotation=45, ha='right', rotation_mode='anchor')
-
-    plt.legend(handles=[bp['boxes'][0],line[0]], labels=list(plotting_data.data_vars), loc='best')
+#     print("date_strs:", date_strs)
+    plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
+    plt.legend(handles=[plot for plot in plots.values()], labels=list(data_plot_types.keys()), loc='best')
     plt.tight_layout()
-    plt.show()
-    # TODO: 
     
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
