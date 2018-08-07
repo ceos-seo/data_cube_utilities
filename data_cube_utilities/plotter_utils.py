@@ -275,7 +275,7 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
-def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}, fit_params={}, fig=None):
+def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}, fit_params={}, fig=None, ax=None):
     """
     Plot data variables in an xarray.Dataset together in one figure, with different plot types for each 
     (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to means or medians along time.
@@ -292,6 +292,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
         their plot types (e.g. {'ndvi':'point', 'wofs':'line'}).
     fig_params: dict
         Figure parameters dictionary (e.g. {'figsize':(12,6)}).
+        Used to create a Figure ``if fig is None and ax is None``.
     component_plot_params: dict
         Dictionary mapping parameter names to dictionaries of matplotlib 
         formatting parameters for individual plots (e.g. {'ndvi':{'color':'red'}, 'wofs':{'color':'blue'}}).
@@ -303,12 +304,13 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
         The figure to use for the plot. The figure must have at least one Axes object.
         You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
         The code ``fig = plt.figure()`` will not provide the Axes object.
+        The Axes object used will be the first.
+    ax: matplotlib.axes.Axes
+        The axes to use for the plot.
     """
     plotting_data = dataset.stack(lat_lon=('latitude', 'longitude'))
-    if fig is None:
-        fig, ax = plt.subplots(figsize=(9,6))
-    else:
-        ax = fig.axes[0]
+    # Retrieve or create the axes if necessary.
+    ax = retrieve_or_create_ax(fig, ax, **fig_params)
     
     possible_time_agg_strs = ['week', 'weekofyear', 'month']
     time_agg_str = 'time'
@@ -364,7 +366,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     fit_plots = {}
     fit_labels = []
     for data_arr_name, (agg_type, fit_type) in fit_params.items():
-        subset_dataset = dataset.sel(time=times_no_nan)[data_arr_name]
+        subset_dataset = dataset.loc[{time_agg_str:times_no_nan}][data_arr_name]
         non_time_dims = list(set(subset_dataset.dims)-{time_agg_str})
         if agg_type == 'mean':
             y = subset_dataset.mean(dim=non_time_dims).values
@@ -372,13 +374,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
             y = subset_dataset.median(dim=non_time_dims).values
         # Handle differences in plotting methods.
         if fit_type == 'gaussian':
-            mean = np.nanmean(y)
-            sigma = np.nanstd(y)
-            def gaus(x,a,x0,sigma):
-                return a*exp(-(x-x0)**2/(2*sigma**2))
-            popt,pcov = curve_fit(gaus,x_locs,y,p0=[1,mean,sigma])
-            x_smooth = np.linspace(x_locs.min(), x_locs.max(), 200)
-            fit_plots[data_arr_name], = ax.plot(x_smooth, gaus(x_smooth,*popt), '-')
+            fit_plots[data_arr_name] = plot_gaussian(x_locs, y, ax=ax)
             fit_labels.append('Gaussian fit of {} of {}'.format(agg_type, data_arr_name))
     # Label the axes and create the legend.
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else\
@@ -388,6 +384,61 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     plt.legend(handles=[plot for plot in data_var_plots.values()]+[fit_plot for fit_plot in fit_plots.values()], 
                labels=list(plot_types.keys())+fit_labels, loc='best')
     plt.tight_layout()
+
+def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
+    """
+    Returns an appropriate Axes object given possible Figure or Axes objects.
+    If neither is supplied, a new figure will be created with associated axes.
+    """
+    if fig is None:
+        if ax is None:
+            fig, ax = plt.subplots(**fig_params)
+    else:
+        ax = fig.axes[0]
+    return ax
+    
+## Begin curve fitting ##
+
+def gaussian(x,a,x0,sigma):
+    return a*exp(-(x-x0)**2/(2*sigma**2))
+    
+def plot_gaussian(x, y, n_pts=200, fig_params={'figsize':(12,6)}, plotting_kwargs={'linestyle': '-'}, fig=None, ax=None):
+    """
+    Parameters
+    ----------
+    x: np.ndarray
+        The x values to fit to.
+    y: np.ndarray
+        The y values to fit to.
+    n_pts: int
+        The number of points to use for the smoothed fit. More will result in a smoother curve.
+    fig_params: dict
+        Figure parameters dictionary (e.g. {'figsize':(12,6)}).
+        Used to create a Figure ``if fig is None and ax is None``.
+    plotting_kwargs: dict
+        The kwargs for the call to ``matplotlib.axes.Axes.plot()``.
+    fig: matplotlib.figure.Figure
+        The figure to use for the plot. The figure must have at least one Axes object.
+        You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
+        The code ``fig = plt.figure()`` will not provide the Axes object. 
+        The Axes object used will be the first.
+    ax: matplotlib.axes.Axes
+        The axes to use for the plot.
+        
+    Returns
+    -------
+    lines: matplotlib.lines.Line2D
+        Can be used as a handle for a matplotlib legend (i.e. plt.legend(handles=...)) among other things.
+    """
+    # Retrieve or create the axes if necessary.
+    ax = retrieve_or_create_ax(fig, ax, **fig_params)
+    
+    mean, sigma = np.nanmean(y), np.nanstd(y)
+    popt,pcov = curve_fit(gaussian,x,y,p0=[1,mean,sigma])
+    x_smooth = np.linspace(x.min(), x.max(), n_pts)
+    return ax.plot(x_smooth, gaussian(x_smooth,*popt), **plotting_kwargs)[0]
+    
+## End curve fitting ##
     
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
