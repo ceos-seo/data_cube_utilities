@@ -8,12 +8,13 @@ import utils.data_cube_utilities.data_access_api as dc_api
 from utils.data_cube_utilities.dc_utilities import perform_timeseries_analysis
 from utils.data_cube_utilities.dc_mosaic import ls7_unpack_qa
 from rasterstats import zonal_stats
-from scipy import stats
+from scipy import stats, exp
 from scipy.stats import norm
 import pylab
 import matplotlib as mpl
 from scipy.signal import gaussian
 from scipy.ndimage import filters
+from scipy.optimize import curve_fit
 from sklearn import linear_model
 from scipy.interpolate import spline
 import matplotlib.mlab as mlab
@@ -274,7 +275,7 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
-def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}, fig=None):
+def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}, fit_params={}, fig=None):
     """
     Plot data variables in an xarray.Dataset together in one figure, 
     but with different plot types for each (e.g. box-and-whisker plot, line plot, scatter plot).
@@ -292,6 +293,10 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     component_plot_params: dict
         Dictionary mapping parameter names to dictionaries of matplotlib 
         formatting parameters for individual plots (e.g. {'ndvi':{'color':'red'}, 'wofs':{'color':'blue'}}).
+    fit_params: dict
+        Dictionary mapping parameter names to types fo curve fits. e.g. {'ndvi': 'gaussian'}.
+        The curves fit to means along all dimesions except time to create a curve in the 2D plot.
+        Curve types can be any of ['gaussian'].
     fig: matplotlib.figure.Figure
         The figure to use for the plot. The figure must have at least one Axes object.
         You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
@@ -302,7 +307,6 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
         fig, ax = plt.subplots(figsize=(9,6))
     else:
         ax = fig.axes[0]
-    plots = {}
     
     possible_time_agg_strs = ['week', 'month']
     time_agg_str = 'time'
@@ -313,47 +317,70 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     times = plotting_data[time_agg_str].values
     times_no_nan = set()
     
-    for data_arr_name in plot_types:
+    # Data variable plots.
+    data_var_plots = {}
+    for data_arr_name, plot_type in plot_types.items():
         if len(plotting_data[data_arr_name].values.shape) > 1:    
             formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values, np.nan)) 
         else:
             formatted_data = xr.DataArray(np.full_like(plotting_data[data_arr_name].values.reshape(-1,1), np.nan)) 
         for i, time in enumerate(times):
             formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}][data_arr_name].values
+        # Take a mean of all values for each time.
         plot_data = np.nanmean(formatted_data.values, axis=1)
+        # Any times with all nan data are ignored in any plot type.
         nan_mask = ~np.isnan(plot_data)
         current_times = times[nan_mask]
         current_epochs = np.array(list(map(n64_to_epoch, current_times))) if time_agg_str == 'time' else None
         current_x_locs = current_epochs if time_agg_str == 'time' else current_times
+        # Large scales for x_locs can break the curve fitting for some reason.
+        current_x_locs = (current_x_locs - current_x_locs.min()) / (current_x_locs.max() - current_x_locs.min())
         times_no_nan.update(current_times)
-        plot_type = plot_types[data_arr_name]
         plot_params = component_plot_params.get(data_arr_name, {})
+        # Create specified plot types.
         if plot_type == 'scatter':
-            plots[data_arr_name] = ax.scatter(current_x_locs, plot_data[nan_mask], **plot_params)
+            data_var_plots[data_arr_name] = ax.scatter(current_x_locs, plot_data[nan_mask], **plot_params)
         elif plot_type == 'box':
             boxplot_nan_mask = ~np.isnan(formatted_data)
             filtered_formatted_data = [] # Data formatted for matplotlib.pyplot.boxplot().
-            acq_inds_to_keep = [] # Indices of acquisitions to keep. Other indicies contain all nan values.
             for i, (d, m) in enumerate(zip(formatted_data, boxplot_nan_mask)):
                 if len(d[m] != 0):
                     filtered_formatted_data.append(d.values[m])
-                    acq_inds_to_keep.append(i)
-            boxplot_times_no_nan = times[acq_inds_to_keep]
             box_width = 0.5*np.min(np.diff(current_x_locs))
             boxprops = plot_params.pop('boxprops', dict(facecolor='orange'))
+            flierprops = plot_params.pop('flierprops', dict(marker='o', markersize=0.25))
             bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
-                            positions=current_x_locs, patch_artist=True, boxprops=boxprops, #TODO: Set boxprops properly.
-                            flierprops=dict(marker='o', markersize=0.25), 
+                            positions=current_x_locs, patch_artist=True, boxprops=boxprops, flierprops=flierprops, 
                             manage_xticks=False, **plot_params) # `manage_xticks=False` to avoid excessive padding on the x-axis.
-            plots[data_arr_name] = bp['boxes'][0]
+            data_var_plots[data_arr_name] = bp['boxes'][0]
     times_no_nan = sorted(list(times_no_nan))
     epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
     x_locs = epochs if time_agg_str == 'time' else times_no_nan
+    x_locs = (x_locs - x_locs.min()) / (x_locs.max() - x_locs.min())
+    
+    # Curve fitting.
+    fit_plots = {}
+    fit_labels = []
+    for data_arr_name, fit_type in fit_params.items():
+        if fit_type == 'gaussian':
+            subset_dataset = dataset.sel(time=times_no_nan)[data_arr_name]
+            non_time_dims = list(set(subset_dataset.dims)-{time_agg_str})
+            means = subset_dataset.mean(dim=non_time_dims).values
+            mean = np.nanmean(subset_dataset.values)
+            sigma = np.nanstd(subset_dataset.values)
+            def gaus(x,a,x0,sigma):
+                return a*exp(-(x-x0)**2/(2*sigma**2))
+            popt,pcov = curve_fit(gaus,x_locs,means,p0=[1,mean,sigma])
+            x_smooth = np.linspace(x_locs.min(), x_locs.max(), 200)
+            fit_plots[data_arr_name], = ax.plot(x_smooth, gaus(x_smooth,*popt), '-')
+            fit_labels.append('Gaussian fit of {}'.format(data_arr_name))
+    # Label the axes and create the legend.
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else\
                 naive_months_ticks_by_week(times_no_nan) if time_agg_str=='week' else\
                 month_ints_to_month_names(times_no_nan)
     plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
-    plt.legend(handles=[plot for plot in plots.values()], labels=list(plot_types.keys()), loc='best')
+    plt.legend(handles=[plot for plot in data_var_plots.values()]+[fit_plot for fit_plot in fit_plots.values()], 
+               labels=list(plot_types.keys())+fit_labels, loc='best')
     plt.tight_layout()
     
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
@@ -390,15 +417,15 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     #Shaded Area
     quarter = np.nanpercentile(
     dataset.values.reshape((
-        dataset.coords['time'].shape[0],
-        dataset.coords['latitude'].shape[0] * dataset.coords['longitude'].shape[0])),
+        landsat_dataset.dims['time'],
+        landsat_dataset.dims['latitude'] * landsat_dataset.dims['longitude'])),
         25,
         axis = 1
     )
     three_quarters = np.nanpercentile(
     dataset.values.reshape((
-        dataset.coords['time'].shape[0],
-        dataset.coords['latitude'].shape[0] * dataset.coords['longitude'].shape[0])),
+        landsat_dataset.dims['time'],
+        landsat_dataset.dims['latitude'] * landsat_dataset.dims['longitude'])),
         75,
         axis = 1
     )
@@ -413,6 +440,12 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
         
     #Medians
     plt.plot(times,medians,color="black",marker="o",linestyle='None', label = "Medians")
+    
+    #Linear Regression (on everything)
+    #Data formatted in a way for needed for Guassian and Linear Regression
+    #regression_list = full_linear_regression(dataset)
+    #formatted_time, value = zip(*regression_list)
+    #formatted_time = np.array(formatted_time)
     
     #The Actual Plot
     plt.plot(times,mean,color="blue",label="Mean")
@@ -438,7 +471,6 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     ax.set_xlabel('Time', fontsize=fontsize)
     ax.set_ylabel('Value', fontsize=fontsize)
     plt.show()
-
     
 def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", plot_max = False, plot_min = False):
     times = dataset.time.values
