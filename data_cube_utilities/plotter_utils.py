@@ -279,6 +279,8 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     """
     Plot data variables in an xarray.Dataset together in one figure, with different plot types for each 
     (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to means or medians along time.
+    Handles data binned with xarray.Dataset methods resample() and groupby(). That is, it handles data binned along time
+    or across years (e.g. by week of year).
     
     Paramaeters
     -----------
@@ -308,7 +310,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     else:
         ax = fig.axes[0]
     
-    possible_time_agg_strs = ['week', 'month']
+    possible_time_agg_strs = ['week', 'weekofyear', 'month']
     time_agg_str = 'time'
     for possible_time_agg_str in possible_time_agg_strs:
         if possible_time_agg_str in list(plotting_data.coords):
@@ -353,7 +355,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
                             positions=current_x_locs, patch_artist=True, boxprops=boxprops, flierprops=flierprops, 
                             manage_xticks=False, **plot_params) # `manage_xticks=False` to avoid excessive padding on the x-axis.
             data_var_plots[data_arr_name] = bp['boxes'][0]
-    times_no_nan = sorted(list(times_no_nan))
+    times_no_nan = np.sort(np.array(list(times_no_nan)))#sorted(list(times_no_nan))
     epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
     x_locs = epochs if time_agg_str == 'time' else times_no_nan
     x_locs = (x_locs - x_locs.min()) / (x_locs.max() - x_locs.min())
@@ -380,7 +382,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
             fit_labels.append('Gaussian fit of {} of {}'.format(agg_type, data_arr_name))
     # Label the axes and create the legend.
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else\
-                naive_months_ticks_by_week(times_no_nan) if time_agg_str=='week' else\
+                naive_months_ticks_by_week(times_no_nan) if time_agg_str in ['week', 'weekofyear'] else\
                 month_ints_to_month_names(times_no_nan)
     plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
     plt.legend(handles=[plot for plot in data_var_plots.values()]+[fit_plot for fit_plot in fit_plots.values()], 
