@@ -402,7 +402,7 @@ def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
     
 ## Begin curve fitting ##
 
-def gaussian(x,a,x0,sigma):
+def gauss(x,a,x0,sigma):
     return a*exp(-(x-x0)**2/(2*sigma**2))
     
 def plot_gaussian(x, y, n_pts=200, fig_params={'figsize':(12,6)}, plotting_kwargs={'linestyle': '-'}, fig=None, ax=None):
@@ -437,9 +437,9 @@ def plot_gaussian(x, y, n_pts=200, fig_params={'figsize':(12,6)}, plotting_kwarg
     ax = retrieve_or_create_ax(fig, ax, **fig_params)
     
     mean, sigma = np.nanmean(y), np.nanstd(y)
-    popt,pcov = curve_fit(gaussian,x,y,p0=[1,mean,sigma])
+    popt,pcov = curve_fit(gauss,x,y,p0=[1,mean,sigma], maxfev=10000)
     x_smooth = np.linspace(x.min(), x.max(), n_pts)
-    return ax.plot(x_smooth, gaussian(x_smooth,*popt), **plotting_kwargs)[0]
+    return ax.plot(x_smooth, gauss(x_smooth,*popt), **plotting_kwargs)[0]
     
 ## End curve fitting ##
     
@@ -464,69 +464,66 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     
     #Calculations
     times = dataset.time.values
-    times = list(map(n64_to_epoch, times))
-    times = np.array(times)
-    times = np.sort(times)
-    mean  = dataset.mean(dim=['latitude','longitude'],  skipna = True).values
-    medians = dataset.median(dim=['latitude','longitude'], skipna = True)
+    epochs = np.sort(np.array(list(map(n64_to_epoch, times))))
+    x_locs = (epochs - epochs.min()) / (epochs.max() - epochs.min())
+    means  = dataset.mean(dim=['latitude','longitude'],  skipna = True).values
+    medians = dataset.median(dim=['latitude','longitude'], skipna = True).values
+    mask = ~np.isnan(means) & ~np.isnan(medians)
     
-    std_dev = np.nanstd(mean)
     plt.figure(figsize=figsize)
     ax = plt.gca()
 
     #Shaded Area
-    quarter = np.nanpercentile(
-    dataset.values.reshape((
-        landsat_dataset.dims['time'],
-        landsat_dataset.dims['latitude'] * landsat_dataset.dims['longitude'])),
-        25,
-        axis = 1
-    )
-    three_quarters = np.nanpercentile(
-    dataset.values.reshape((
-        landsat_dataset.dims['time'],
-        landsat_dataset.dims['latitude'] * landsat_dataset.dims['longitude'])),
-        75,
-        axis = 1
-    )
+    with warnings.catch_warnings():
+        # Ignore warning about encountering an All-NaN slice. Some acquisitions have all-NaN values.
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        quarter = np.nanpercentile(
+        dataset.values.reshape((
+            len(dataset['time']),
+            len(dataset['latitude']) * len(dataset['longitude']))),
+            25,
+            axis = 1
+        )
+        three_quarters = np.nanpercentile(
+        dataset.values.reshape((
+            len(dataset['time']),
+            len(dataset['latitude']) * len(dataset['longitude']))),
+            75,
+            axis = 1
+        )
     np.array(quarter)
     np.array(three_quarters)
     ax.grid(color='lightgray', linestyle='-', linewidth=1)
-    fillcolor1='gray'
-    fillcolor2='brown'
+    fillcolor='gray'
     fillalpha=0.4
-    plt.fill_between(times, mean, quarter,  interpolate=False, color=fillcolor1, alpha=fillalpha,label="25th")
-    plt.fill_between(times, mean, three_quarters, interpolate=False, color=fillcolor1, alpha=fillalpha,label="75th")
+    plt.fill_between(x_locs, means, quarter,  interpolate=False, color=fillcolor, alpha=fillalpha,label="25th")
+    plt.fill_between(x_locs, means, three_quarters, interpolate=False, color=fillcolor, alpha=fillalpha,label="75th")
         
     #Medians
-    plt.plot(times,medians,color="black",marker="o",linestyle='None', label = "Medians")
+    plt.plot(x_locs,medians,color="black",marker="o",linestyle='None', label = "Medians")
     
     #Linear Regression (on everything)
     #Data formatted in a way for needed for Guassian and Linear Regression
-    #regression_list = full_linear_regression(dataset)
-    #formatted_time, value = zip(*regression_list)
-    #formatted_time = np.array(formatted_time)
     
     #The Actual Plot
-    plt.plot(times,mean,color="blue",label="Mean")
+    
+    plt.plot(x_locs,means,color="blue",label="Mean")
 
     #Linear Regression (on mean)
-    m, b = np.polyfit(times, mean, 1)
-    plt.plot(times, m*times + b, '-', color="red",label="linear regression of mean",linewidth = 3.0)
+    m, b = np.polyfit(x_locs[mask], means[mask], 1)
+    plt.plot(x_locs, m*x_locs + b, '-', color="red",label="linear regression of measn",linewidth = 3.0)
 
     #Gaussian Curve
-    b = gaussian(len(times), std_dev)
-    ga = filters.convolve1d(mean, b/b.sum(),mode="reflect")
-    x_smooth = np.linspace(times.min(),times.max(), 200)
-    y_smooth = spline(times, ga, x_smooth)
-    plt.plot(x_smooth, y_smooth, '-',label="Gaussian Smoothed of mean", alpha=1, color='limegreen',linewidth = 3.0)
-    
+    plot_gaussian(x_locs[mask], means[mask], ax=ax,
+                  plotting_kwargs=dict(linestyle='-', label="Gaussian Smoothed of means", 
+                                       alpha=1, color='limegreen',linewidth = 3.0))
     
     #Formatting
+    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times[mask])))
     ax.grid(color='k', alpha=0.1, linestyle='-', linewidth=1)
     ax.xaxis.set_major_formatter(FuncFormatter(tfmt))
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=legend_fontsize)
-    plt.xticks(rotation=45, fontsize=fontsize)
+    plt.xticks(x_locs, date_strs, rotation=45, fontsize=fontsize)
     plt.yticks(fontsize=fontsize)
     ax.set_xlabel('Time', fontsize=fontsize)
     ax.set_ylabel('Value', fontsize=fontsize)
@@ -582,6 +579,10 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.xticks(rotation=90)    
 
+
+
+## Misc ##
+
 def remove_non_unique_ordered_list_str(ordered_list):
     """
     Sets all occurrences of a value in an ordered list after its first occurence to ''.
@@ -595,8 +596,6 @@ def remove_non_unique_ordered_list_str(ordered_list):
         else:
             ordered_list[i] = ""
     return ordered_list
-
-## Misc ##
 
 # For February, assume leap years are included.
 days_per_month = {1:31, 2:29, 3:31, 4:30, 5:31, 6:30, 
