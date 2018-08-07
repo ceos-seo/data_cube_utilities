@@ -363,6 +363,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     times_no_nan = np.sort(np.array(list(times_no_nan)))#sorted(list(times_no_nan))
     epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
     x_locs = epochs if time_agg_str == 'time' else times_no_nan
+    # Epochs are large integer values that can cause curve fitting to fail for some reason.
     x_locs = (x_locs - x_locs.min()) / (x_locs.max() - x_locs.min())
     
     # Curve fitting.
