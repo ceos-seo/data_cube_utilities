@@ -24,6 +24,7 @@ import calendar, datetime, time
 import pytz
 from matplotlib.colors import LinearSegmentedColormap
 from scipy import stats
+import warnings
 
 from scipy.interpolate import interp1d
 
@@ -331,7 +332,9 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
         for i, time in enumerate(times):
             formatted_data.loc[i,:] = plotting_data.loc[{time_agg_str:time}][data_arr_name].values
         # Take a mean of all values for each time.
-        plot_data = np.nanmean(formatted_data.values, axis=1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning) # Ignore warning about taking the mean of an empty slice.
+            plot_data = np.nanmean(formatted_data.values, axis=1)
         # Any times with all nan data are ignored in any plot type.
         nan_mask = ~np.isnan(plot_data)
         current_times = times[nan_mask]
@@ -407,9 +410,9 @@ def plot_gaussian(x, y, n_pts=200, fig_params={'figsize':(12,6)}, plotting_kwarg
     Parameters
     ----------
     x: np.ndarray
-        The x values to fit to.
+        A 1D NumPy array. The x values to fit to.
     y: np.ndarray
-        The y values to fit to.
+        A 1D NumPy array. The y values to fit to.
     n_pts: int
         The number of points to use for the smoothed fit. More will result in a smoother curve.
     fig_params: dict
