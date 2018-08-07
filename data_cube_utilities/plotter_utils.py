@@ -277,8 +277,8 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     
 def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}, fit_params={}, fig=None):
     """
-    Plot data variables in an xarray.Dataset together in one figure, 
-    but with different plot types for each (e.g. box-and-whisker plot, line plot, scatter plot).
+    Plot data variables in an xarray.Dataset together in one figure, with different plot types for each 
+    (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to means or medians along time.
     
     Paramaeters
     -----------
@@ -294,9 +294,9 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
         Dictionary mapping parameter names to dictionaries of matplotlib 
         formatting parameters for individual plots (e.g. {'ndvi':{'color':'red'}, 'wofs':{'color':'blue'}}).
     fit_params: dict
-        Dictionary mapping parameter names to types fo curve fits. e.g. {'ndvi': 'gaussian'}.
-        The curves fit to means along all dimesions except time to create a curve in the 2D plot.
-        Curve types can be any of ['gaussian'].
+        Dictionary mapping parameter names to 2-tuples of strings in ['mean', 'median'] and types of curve fits. 
+        e.g. {'ndvi': ('mean', 'gaussian')}. The curves fit to means or medians along all dimensions except time 
+        to create a curve in the 2D plot. Curve types can be any of ['gaussian'].
     fig: matplotlib.figure.Figure
         The figure to use for the plot. The figure must have at least one Axes object.
         You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
@@ -361,19 +361,23 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     # Curve fitting.
     fit_plots = {}
     fit_labels = []
-    for data_arr_name, fit_type in fit_params.items():
+    for data_arr_name, (agg_type, fit_type) in fit_params.items():
+        subset_dataset = dataset.sel(time=times_no_nan)[data_arr_name]
+        non_time_dims = list(set(subset_dataset.dims)-{time_agg_str})
+        if agg_type == 'mean':
+            y = subset_dataset.mean(dim=non_time_dims).values
+        elif agg_type == 'median':
+            y = subset_dataset.median(dim=non_time_dims).values
+        # Handle differences in plotting methods.
         if fit_type == 'gaussian':
-            subset_dataset = dataset.sel(time=times_no_nan)[data_arr_name]
-            non_time_dims = list(set(subset_dataset.dims)-{time_agg_str})
-            means = subset_dataset.mean(dim=non_time_dims).values
-            mean = np.nanmean(subset_dataset.values)
-            sigma = np.nanstd(subset_dataset.values)
+            mean = np.nanmean(y)
+            sigma = np.nanstd(y)
             def gaus(x,a,x0,sigma):
                 return a*exp(-(x-x0)**2/(2*sigma**2))
-            popt,pcov = curve_fit(gaus,x_locs,means,p0=[1,mean,sigma])
+            popt,pcov = curve_fit(gaus,x_locs,y,p0=[1,mean,sigma])
             x_smooth = np.linspace(x_locs.min(), x_locs.max(), 200)
             fit_plots[data_arr_name], = ax.plot(x_smooth, gaus(x_smooth,*popt), '-')
-            fit_labels.append('Gaussian fit of {}'.format(data_arr_name))
+            fit_labels.append('Gaussian fit of {} of {}'.format(agg_type, data_arr_name))
     # Label the axes and create the legend.
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_no_nan))) if time_agg_str=='time' else\
                 naive_months_ticks_by_week(times_no_nan) if time_agg_str=='week' else\
