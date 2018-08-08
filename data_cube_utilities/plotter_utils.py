@@ -586,7 +586,8 @@ def ignore_warnings(func, *args, **kwargs):
     """Runs a function while ignoring warnings"""
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return func(*args, **kwargs)
+        ret = func(*args, **kwargs)
+    return ret
 
 def np_min_max_scale(arr):
     """Min-max scales a NumPy array"""
