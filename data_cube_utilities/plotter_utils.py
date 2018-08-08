@@ -276,7 +276,7 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
-def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, component_plot_params={}, fit_params={}, fig=None, ax=None):
+def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)}, component_plot_params={}, fit_params={}, fig=None, ax=None, max_times_per_plot=None):
     """
     Plot data variables in an xarray.Dataset together in one figure, with different plot types for each 
     (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to means or medians along time.
@@ -287,7 +287,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
     -----------
     dataset: xarray.Dataset 
         A Dataset containing some bands like NDVI or WOFS.
-        Must have coordinates: time, latitude, longitude - in that order.
+        The primary coordinate must be 'time'.
     plot_types: dict
         Dictionary mapping names of DataArrays in the Dataset to plot to 
         their plot types (e.g. {'ndvi':'point', 'wofs':'line'}).
@@ -301,17 +301,19 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
         Dictionary mapping parameter names to 2-tuples of strings in ['mean', 'median'] and types of curve fits. 
         e.g. {'ndvi': ('mean', 'gaussian')}. The curves fit to means or medians along all dimensions except time 
         to create a curve in the 2D plot. Curve types can be any of ['gaussian'].
+        Note that in the case of multiple plots being created (see ``max_times_per_plot`` below), figsize will be the size
+        of each plot - not the entire figure.
     fig: matplotlib.figure.Figure
         The figure to use for the plot. The figure must have at least one Axes object.
         You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
         The code ``fig = plt.figure()`` will not provide the Axes object.
-        The Axes object used will be the first.
+        The Axes object used will be the first. This is ignored if ``max_times_per_plot`` is less than the number of times.
     ax: matplotlib.axes.Axes
-        The axes to use for the plot.
+        The axes to use for the plot. This is ignored if ``max_times_per_plot`` is less than the number of times.
+    max_times_per_plot: int
+        The maximum number of times per plot. If specified, one plot will be generated for each group 
+        of this many times. The plots will be arranged in a grid.
     """
-    # Retrieve or create the axes if necessary.
-    ax = retrieve_or_create_ax(fig, ax, **fig_params)
-    
     # Determine how the data was aggregated, if at all.
     possible_time_agg_strs = ['week', 'weekofyear', 'month']
     time_agg_str = 'time'
@@ -321,71 +323,104 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(12,6)}, 
             break
     # Make the data 2D - time and a stack of all other dimensions.
     non_time_dims = list(set(dataset.dims)-{time_agg_str})
-    plotting_data = dataset.stack(stacked_data=non_time_dims)
-    times = plotting_data[time_agg_str].values
-    times_not_all_nan = set() # A list of times for which at least one DataArray did not have all NaN values.
+    all_plotting_data = dataset.stack(stacked_data=non_time_dims)
+    all_times = all_plotting_data[time_agg_str].values
+    # Mask out times for which no data variable has any non-NaN data.
+    nan_mask_data_vars = list(all_plotting_data.notnull().data_vars.values())
+    time_nan_mask = nan_mask_data_vars[0].values
+    for data_var in nan_mask_data_vars[1:]:
+        time_nan_mask = time_nan_mask | data_var.values
+    time_nan_mask = np.any(time_nan_mask, axis=1)
+    times_not_all_nan = all_times[time_nan_mask]
+    all_plotting_data = all_plotting_data.loc[{time_agg_str:times_not_all_nan}]
+    all_times = all_times[time_nan_mask]
+   
     
-    # Data variable plots.
-    data_arr_plots = {}
-    for data_arr_name, plot_type in plot_types.items():
-        data_arr_plotting_data = plotting_data[data_arr_name].values
-        # Any times with all nan data are ignored in any plot type.
-        nan_mask = np.any(~np.isnan(data_arr_plotting_data), axis=1)
-        current_times = times[nan_mask]
-        current_epochs = np.array(list(map(n64_to_epoch, current_times))) if time_agg_str == 'time' else None
-        # Large scales for x_locs can break the curve fitting for some reason.
-        current_x_locs = np_min_max_scale(current_epochs if time_agg_str == 'time' else current_times)
-        times_not_all_nan.update(current_times)
-        plot_params = component_plot_params.get(data_arr_name, {})
-        # Create specified plot types.
-        if plot_type == 'scatter':
-            # Ignore warning about taking the mean of an empty slice.        
-            means = ignore_warnings(np.nanmean, data_arr_plotting_data, axis=1)
-            data_arr_plots[data_arr_name] = ax.scatter(current_x_locs, means[nan_mask], **plot_params)
-        elif plot_type == 'box':
-            boxplot_nan_mask = ~np.isnan(data_arr_plotting_data)
-            filtered_formatted_data = [] # Data formatted for matplotlib.pyplot.boxplot().
-            for i, (d, m) in enumerate(zip(data_arr_plotting_data, boxplot_nan_mask)):
-                if len(d[m] != 0):
-                    filtered_formatted_data.append(d[m])
-            box_width = 0.5*np.min(np.diff(current_x_locs))
-            # Provide default arguments.
-            boxprops = plot_params.pop('boxprops', dict(facecolor='orange'))
-            flierprops = plot_params.pop('flierprops', dict(marker='o', markersize=0.25))
-            bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
-                            positions=current_x_locs, patch_artist=True, boxprops=boxprops, flierprops=flierprops, 
-                            manage_xticks=False, **plot_params) # `manage_xticks=False` to avoid excessive padding on the x-axis.
-            data_arr_plots[data_arr_name] = bp['boxes'][0]
-    times_not_all_nan = np.sort(np.array(list(times_not_all_nan)))
-    epochs = np.array(list(map(n64_to_epoch, times_not_all_nan))) if time_agg_str == 'time' else None
-    x_locs = np_min_max_scale(epochs if time_agg_str == 'time' else times_not_all_nan)
+    # Handle the potential for multiple plots.
+    max_times_per_plot = len(all_times) if max_times_per_plot is None else max_times_per_plot
+    num_plots = int(np.ceil(len(all_times)/max_times_per_plot))
+    subset_num_cols = 2
+    subset_num_rows = int(np.ceil(num_plots / subset_num_cols))
+    if num_plots > 1:
+        figsize = fig_params.pop('figsize')
+        fig = plt.figure(figsize=figsize, **fig_params)
     
-    # Curve fitting.
-    fit_plots = {}
-    fit_labels = []
-    for data_arr_name, (agg_type, fit_type) in fit_params.items():
-        # First consider only times for which at least one DataArray did not have all NaN values.
-        subset_dataset = plotting_data.loc[{time_agg_str:times_not_all_nan}][data_arr_name]
-        # Note that the dimensions of variables here are likely smaller than in the primary plotting loop above.
-        data_arr_plotting_data = subset_dataset.values
-        # This particular DataArray may still have all-NaN slices, so we mask before plotting.
-        nan_mask = np.any(~np.isnan(data_arr_plotting_data), axis=1)
-        if agg_type == 'mean':
-            y = ignore_warnings(np.nanmean, data_arr_plotting_data, axis=1)
-        elif agg_type == 'median':
-            y = ignore_warnings(np.nanmedian, data_arr_plotting_data, axis=1)        
-        # Handle differences in plotting methods.
-        if fit_type == 'gaussian':
-            fit_plots[data_arr_name] = plot_gaussian(x_locs[nan_mask], y[nan_mask], ax=ax)
-            fit_labels.append('Gaussian fit of {} of {}'.format(agg_type, data_arr_name))
-    # Label the axes and create the legend.
-    date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_not_all_nan))) if time_agg_str=='time' else\
-                naive_months_ticks_by_week(times_not_all_nan) if time_agg_str in ['week', 'weekofyear'] else\
-                month_ints_to_month_names(times_not_all_nan)
-    plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
-    plt.legend(handles=[plot for plot in data_arr_plots.values()]+[fit_plot for fit_plot in fit_plots.values()], 
-               labels=list(plot_types.keys())+fit_labels, loc='best')
-    plt.tight_layout()
+    # Create each figure.
+    for time_ind, fig_ind in zip(range(0, len(all_times), max_times_per_plot), range(num_plots)):
+        time_extents = all_times[[time_ind, min(time_ind+max_times_per_plot, len(all_times)-1)]]
+        # Retrieve or create the axes if necessary.
+        if len(all_times) <= max_times_per_plot:
+            ax = retrieve_or_create_ax(fig, ax, **fig_params)
+        else:
+            ax = fig.add_subplot(subset_num_rows, subset_num_cols, fig_ind + 1)
+        times = all_times[time_ind:time_ind+max_times_per_plot]
+        plotting_data = all_plotting_data.loc[{time_agg_str:times}]
+        times_not_all_nan = set() # A list of times for which at least one DataArray does not have all NaN values.
+    
+        # Data variable plots.
+        data_arr_plots = {}
+        for data_arr_name, plot_type in plot_types.items():
+            data_arr_plotting_data = plotting_data[data_arr_name].values
+            # Any times with all nan data are ignored in any plot type.
+            nan_mask = np.any(~np.isnan(data_arr_plotting_data), axis=1)
+            current_times = times[nan_mask]
+            current_epochs = np.array(list(map(n64_to_epoch, current_times))) if time_agg_str == 'time' else None
+            # Large scales for x_locs can break the curve fitting for some reason.
+            current_x_locs = np_min_max_scale(current_epochs if time_agg_str == 'time' else current_times)
+            times_not_all_nan.update(current_times)
+            plot_params = component_plot_params.get(data_arr_name, {})
+            # Create specified plot types.
+            if plot_type == 'scatter':
+                # Ignore warning about taking the mean of an empty slice.        
+                means = ignore_warnings(np.nanmean, data_arr_plotting_data, axis=1)
+                data_arr_plots[data_arr_name] = ax.scatter(current_x_locs, means[nan_mask], **plot_params)
+            elif plot_type == 'box':
+                boxplot_nan_mask = ~np.isnan(data_arr_plotting_data)
+                filtered_formatted_data = [] # Data formatted for matplotlib.pyplot.boxplot().
+                for i, (d, m) in enumerate(zip(data_arr_plotting_data, boxplot_nan_mask)):
+                    if len(d[m] != 0):
+                        filtered_formatted_data.append(d[m])
+                box_width = 0.5*np.min(np.diff(current_x_locs))
+                # Provide default arguments.
+                boxprops = plot_params.pop('boxprops', dict(facecolor='orange'))
+                flierprops = plot_params.pop('flierprops', dict(marker='o', markersize=0.25))
+                bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
+                                positions=current_x_locs, patch_artist=True, boxprops=boxprops, flierprops=flierprops, 
+                                manage_xticks=False, **plot_params) # `manage_xticks=False` to avoid excessive padding on the x-axis.
+                data_arr_plots[data_arr_name] = bp['boxes'][0]
+        times_not_all_nan = np.sort(np.array(list(times_not_all_nan)))
+        epochs = np.array(list(map(n64_to_epoch, times_not_all_nan))) if time_agg_str == 'time' else None
+        x_locs = np_min_max_scale(epochs if time_agg_str == 'time' else times_not_all_nan)
+
+        # Curve fitting.
+        fit_plots = {}
+        fit_labels = []
+        for data_arr_name, (agg_type, fit_type) in fit_params.items():
+            # First consider only times for which at least one DataArray did not have all NaN values.
+            subset_dataset = plotting_data.loc[{time_agg_str:times_not_all_nan}][data_arr_name]
+            # Note that the dimensions of variables here are likely smaller than in the primary plotting loop above.
+            data_arr_plotting_data = subset_dataset.values
+            # This particular DataArray may still have all-NaN slices, so we mask before plotting.
+            nan_mask = np.any(~np.isnan(data_arr_plotting_data), axis=1)
+            if agg_type == 'mean':
+                y = ignore_warnings(np.nanmean, data_arr_plotting_data, axis=1)
+            elif agg_type == 'median':
+                y = ignore_warnings(np.nanmedian, data_arr_plotting_data, axis=1)        
+            # Handle differences in plotting methods.
+            if fit_type == 'gaussian':
+                if len(x_locs[nan_mask]) < 3:
+                    continue # 3 data points are needed to determine a unique Gaussian.
+                fit_plots[data_arr_name] = plot_gaussian(x_locs[nan_mask], y[nan_mask], ax=ax)
+                fit_labels.append('Gaussian fit of {} of {}'.format(agg_type, data_arr_name))
+        # Label the axes and create the legend.
+        date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_not_all_nan))) if time_agg_str=='time' else\
+                    naive_months_ticks_by_week(times_not_all_nan) if time_agg_str in ['week', 'weekofyear'] else\
+                    month_ints_to_month_names(times_not_all_nan)
+        plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
+        plt.legend(handles=[plot for plot in data_arr_plots.values()]+[fit_plot for fit_plot in fit_plots.values()], 
+                   labels=list(plot_types.keys())+fit_labels, loc='best')
+        plt.title("Figure {}: Time Range {} to {}".format(fig_ind, date_strs[0], date_strs[-1]))
+        plt.tight_layout()
 
 def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
     """
