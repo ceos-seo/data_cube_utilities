@@ -334,7 +334,6 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
     times_not_all_nan = all_times[time_nan_mask]
     all_plotting_data = all_plotting_data.loc[{time_agg_str:times_not_all_nan}]
     all_times = all_times[time_nan_mask]
-   
     
     # Handle the potential for multiple plots.
     max_times_per_plot = len(all_times) if max_times_per_plot is None else max_times_per_plot
@@ -380,7 +379,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
                 for i, (d, m) in enumerate(zip(data_arr_plotting_data, boxplot_nan_mask)):
                     if len(d[m] != 0):
                         filtered_formatted_data.append(d[m])
-                box_width = 0.5*np.min(np.diff(current_x_locs))
+                box_width = 0.5*np.min(np.diff(current_x_locs)) if len(current_x_locs) > 1 else 0.5
                 # Provide default arguments.
                 boxprops = plot_params.pop('boxprops', dict(facecolor='orange'))
                 flierprops = plot_params.pop('flierprops', dict(marker='o', markersize=0.25))
@@ -626,7 +625,7 @@ def ignore_warnings(func, *args, **kwargs):
 
 def np_min_max_scale(arr):
     """Min-max scales a NumPy array"""
-    return (arr - arr.min()) / (arr.max() - arr.min())
+    return (arr - arr.min()) / (arr.max() - arr.min()) if len(arr) > 1 else np.array([0.5])
 
 def remove_non_unique_ordered_list_str(ordered_list):
     """
