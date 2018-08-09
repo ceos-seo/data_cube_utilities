@@ -27,15 +27,18 @@ def create_2D_mosaic_clean_mask(clean_mask):
 def landsat_clean_mask_invalid(dataset):
     """
     Masks out invalid data according to the LANDSAT 7 and 8 surface reflectance 
-    specifications.
+    specifications. See this document: 
+    https://landsat.usgs.gov/sites/default/files/documents/ledaps_product_guide.pdf pages 19-20.
     
     Parameters
     ----------
     dataset: xarray.Dataset
         An xarray `Dataset` containing bands such as 'red', 'green', or 'blue'.
     """
-    data_bands = dataset.drop('pixel_qa')
-    return data_bands.where((0 < data_bands) & (data_bands < 10000))
+    data_arr_names = [arr_name for arr_name in list(dataset.data_vars) if arr_name not in ['pixel_qa', 'radsat_qa', 'cloud_qa']]
+    for data_arr_name in data_arr_names:
+        dataset[data_arr_name] = dataset[data_arr_name].where((0 < dataset[data_arr_name]) & (dataset[data_arr_name] < 10000))
+    return dataset
     
 
 def landsat_qa_clean_mask(dataset, platform):

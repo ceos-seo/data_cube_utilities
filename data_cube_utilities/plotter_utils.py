@@ -470,7 +470,7 @@ def plot_gaussian(x, y, n_pts=200, fig_params={'figsize':(12,6)}, plotting_kwarg
     ax = retrieve_or_create_ax(fig, ax, **fig_params)
     
     mean, sigma = np.nanmean(y), np.nanstd(y)
-    popt,pcov = curve_fit(gauss,x,y,p0=[1,mean,sigma], maxfev=10000)
+    popt,pcov = curve_fit(gauss,x,y,p0=[1,mean,sigma], maxfev=np.iinfo(np.int32).max)
     x_smooth = np.linspace(x.min(), x.max(), n_pts)
     return ax.plot(x_smooth, gauss(x_smooth,*popt), **plotting_kwargs)[0]
     
