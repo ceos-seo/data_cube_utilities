@@ -276,7 +276,8 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
-def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)}, component_plot_params={}, fit_params={}, fig=None, ax=None, max_times_per_plot=None):
+def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)}, component_plot_params={}, fit_params={}, 
+                            scale_params={}, fig=None, ax=None, max_times_per_plot=None):
     """
     Plot data variables in an xarray.Dataset together in one figure, with different plot types for each 
     (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to means or medians along time.
@@ -295,14 +296,19 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
         Figure parameters dictionary (e.g. {'figsize':(12,6)}).
         Used to create a Figure ``if fig is None and ax is None``.
     component_plot_params: dict
-        Dictionary mapping parameter names to dictionaries of matplotlib 
+        Dictionary mapping names of DataArrays to dictionaries of matplotlib 
         formatting parameters for individual plots (e.g. {'ndvi':{'color':'red'}, 'wofs':{'color':'blue'}}).
     fit_params: dict
-        Dictionary mapping parameter names to 2-tuples of strings in ['mean', 'median'] and types of curve fits. 
+        Dictionary mapping names of DataArrays to 2-tuples of strings in ['mean', 'median'] and types of curve fits. 
         e.g. {'ndvi': ('mean', 'gaussian')}. The curves fit to means or medians along all dimensions except time 
         to create a curve in the 2D plot. Curve types can be any of ['gaussian'].
         Note that in the case of multiple plots being created (see ``max_times_per_plot`` below), figsize will be the size
         of each plot - not the entire figure.
+    scale_params: dict
+        Dictionary mapping names of DataArrays to scaling methods (e.g. {'ndvi': None, 'wofs':'norm'}). 
+        The options are [None, 'std', 'norm']. The option ``None``, which is the default, performs no scaling. 
+        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
+        Note that of these options, only normalizing guarantees that the y values will be in a fixed range - namely [0,1].
     fig: matplotlib.figure.Figure
         The figure to use for the plot. The figure must have at least one Axes object.
         You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
@@ -325,99 +331,112 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
     non_time_dims = list(set(dataset.dims)-{time_agg_str})
     all_plotting_data = dataset.stack(stacked_data=non_time_dims)
     all_times = all_plotting_data[time_agg_str].values
-    # Mask out times for which no data variable has any non-NaN data.
-    nan_mask_data_vars = list(all_plotting_data.notnull().data_vars.values())
-    time_nan_mask = nan_mask_data_vars[0].values
-    for data_var in nan_mask_data_vars[1:]:
-        time_nan_mask = time_nan_mask | data_var.values
+    # Mask out times for which no data variable to plot has any non-NaN data.
+    nan_mask_data_vars = list(all_plotting_data[list(plot_types.keys())].notnull().data_vars.values())
+    for i, data_var in enumerate(nan_mask_data_vars):
+        time_nan_mask = data_var.values if i == 0 else time_nan_mask | data_var.values
     time_nan_mask = np.any(time_nan_mask, axis=1)
     times_not_all_nan = all_times[time_nan_mask]
     all_plotting_data = all_plotting_data.loc[{time_agg_str:times_not_all_nan}]
-    all_times = all_times[time_nan_mask]
     
     # Handle the potential for multiple plots.
-    max_times_per_plot = len(all_times) if max_times_per_plot is None else max_times_per_plot
-    num_plots = int(np.ceil(len(all_times)/max_times_per_plot))
+    max_times_per_plot = len(times_not_all_nan) if max_times_per_plot is None else max_times_per_plot
+    num_plots = int(np.ceil(len(times_not_all_nan)/max_times_per_plot))
     subset_num_cols = 2
     subset_num_rows = int(np.ceil(num_plots / subset_num_cols))
     if num_plots > 1:
         figsize = fig_params.pop('figsize')
         fig = plt.figure(figsize=figsize, **fig_params)
     
-    # Create each figure.
-    for time_ind, fig_ind in zip(range(0, len(all_times), max_times_per_plot), range(num_plots)):
-        time_extents = all_times[[time_ind, min(time_ind+max_times_per_plot, len(all_times)-1)]]
+    # Create each plot.
+    for time_ind, fig_ind in zip(range(0, len(times_not_all_nan), max_times_per_plot), range(num_plots)):
+        lower_time_bound_ind, upper_time_bound_ind = time_ind, min(time_ind+max_times_per_plot, len(times_not_all_nan))
+        time_extents = times_not_all_nan[[lower_time_bound_ind, upper_time_bound_ind-1]]
         # Retrieve or create the axes if necessary.
-        if len(all_times) <= max_times_per_plot:
+        if len(times_not_all_nan) <= max_times_per_plot:
             ax = retrieve_or_create_ax(fig, ax, **fig_params)
         else:
             ax = fig.add_subplot(subset_num_rows, subset_num_cols, fig_ind + 1)
-        times = all_times[time_ind:time_ind+max_times_per_plot]
-        plotting_data = all_plotting_data.loc[{time_agg_str:times}]
-        times_not_all_nan = set() # A list of times for which at least one DataArray does not have all NaN values.
-    
-        # Data variable plots.
+        fig_times_not_all_nan = times_not_all_nan[lower_time_bound_ind:upper_time_bound_ind]
+        plotting_data = all_plotting_data.loc[{time_agg_str:fig_times_not_all_nan}]
+        epochs = np.array(list(map(n64_to_epoch, fig_times_not_all_nan))) if time_agg_str == 'time' else None
+        x_locs = np_min_max_scale(epochs if time_agg_str == 'time' else fig_times_not_all_nan)
+        
+        legend_labels = []
+        
+        # Data variable plots within each plot.
         data_arr_plots = {}
         for data_arr_name, plot_type in plot_types.items():
-            data_arr_plotting_data = plotting_data[data_arr_name].values
+            full_data_arr_plotting_data = plotting_data[data_arr_name].values
             # Any times with all nan data are ignored in any plot type.
-            nan_mask = np.any(~np.isnan(data_arr_plotting_data), axis=1)
-            current_times = times[nan_mask]
-            current_epochs = np.array(list(map(n64_to_epoch, current_times))) if time_agg_str == 'time' else None
+            data_arr_nan_mask = np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
+            # Add this data variable label to the legend if it has any data to plot.
+            if np.any(data_arr_nan_mask):
+                legend_labels.append(data_arr_name) 
+            else:
+                continue
+            # Remove times with all nan data.
+            data_arr_plotting_data = full_data_arr_plotting_data[data_arr_nan_mask]
+    
+            # Scale
+            scaling = scale_params.get(data_arr_name, None)
+            if scaling is not None:
+                data_arr_plotting_data = np_scale(data_arr_plotting_data, full_data_arr_plotting_data, 
+                                                  min_max=(0.0,1.0), scaling=scaling)
+
+            data_arr_times = fig_times_not_all_nan[data_arr_nan_mask]
+            data_arr_epochs = epochs[data_arr_nan_mask]
             # Large scales for x_locs can break the curve fitting for some reason.
-            current_x_locs = np_min_max_scale(current_epochs if time_agg_str == 'time' else current_times)
-            times_not_all_nan.update(current_times)
+            data_arr_x_locs = x_locs[data_arr_nan_mask]
             plot_params = component_plot_params.get(data_arr_name, {})
             # Create specified plot types.
             if plot_type == 'scatter':
                 # Ignore warning about taking the mean of an empty slice.        
                 means = ignore_warnings(np.nanmean, data_arr_plotting_data, axis=1)
-                data_arr_plots[data_arr_name] = ax.scatter(current_x_locs, means[nan_mask], **plot_params)
+                data_arr_plots[data_arr_name] = ax.scatter(data_arr_x_locs, means, **plot_params)
             elif plot_type == 'box':
                 boxplot_nan_mask = ~np.isnan(data_arr_plotting_data)
                 filtered_formatted_data = [] # Data formatted for matplotlib.pyplot.boxplot().
                 for i, (d, m) in enumerate(zip(data_arr_plotting_data, boxplot_nan_mask)):
                     if len(d[m] != 0):
                         filtered_formatted_data.append(d[m])
-                box_width = 0.5*np.min(np.diff(current_x_locs)) if len(current_x_locs) > 1 else 0.5
+                box_width = 0.5*np.min(np.diff(data_arr_x_locs)) if len(data_arr_x_locs) > 1 else 0.5
                 # Provide default arguments.
                 boxprops = plot_params.pop('boxprops', dict(facecolor='orange'))
                 flierprops = plot_params.pop('flierprops', dict(marker='o', markersize=0.25))
                 bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
-                                positions=current_x_locs, patch_artist=True, boxprops=boxprops, flierprops=flierprops, 
+                                positions=data_arr_x_locs, patch_artist=True, boxprops=boxprops, flierprops=flierprops, 
                                 manage_xticks=False, **plot_params) # `manage_xticks=False` to avoid excessive padding on the x-axis.
                 data_arr_plots[data_arr_name] = bp['boxes'][0]
-        times_not_all_nan = np.sort(np.array(list(times_not_all_nan)))
-        epochs = np.array(list(map(n64_to_epoch, times_not_all_nan))) if time_agg_str == 'time' else None
-        x_locs = np_min_max_scale(epochs if time_agg_str == 'time' else times_not_all_nan)
 
         # Curve fitting.
         fit_plots = {}
         fit_labels = []
         for data_arr_name, (agg_type, fit_type) in fit_params.items():
             # First consider only times for which at least one DataArray did not have all NaN values.
-            subset_dataset = plotting_data.loc[{time_agg_str:times_not_all_nan}][data_arr_name]
             # Note that the dimensions of variables here are likely smaller than in the primary plotting loop above.
-            data_arr_plotting_data = subset_dataset.values
+            full_data_arr_plotting_data = plotting_data[data_arr_name].values
             # This particular DataArray may still have all-NaN slices, so we mask before plotting.
-            nan_mask = np.any(~np.isnan(data_arr_plotting_data), axis=1)
+            data_arr_nan_mask = np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
+            data_arr_plotting_data = full_data_arr_plotting_data[data_arr_nan_mask]
+            data_arr_x_locs = x_locs[data_arr_nan_mask]
             if agg_type == 'mean':
                 y = ignore_warnings(np.nanmean, data_arr_plotting_data, axis=1)
             elif agg_type == 'median':
-                y = ignore_warnings(np.nanmedian, data_arr_plotting_data, axis=1)        
+                y = ignore_warnings(np.nanmedian, data_arr_plotting_data, axis=1)
             # Handle differences in plotting methods.
             if fit_type == 'gaussian':
-                if len(x_locs[nan_mask]) < 3:
+                if len(data_arr_x_locs) < 3:
                     continue # 3 data points are needed to determine a unique Gaussian.
-                fit_plots[data_arr_name] = plot_gaussian(x_locs[nan_mask], y[nan_mask], ax=ax)
+                fit_plots[data_arr_name] = plot_gaussian(data_arr_x_locs, y, ax=ax)
                 fit_labels.append('Gaussian fit of {} of {}'.format(agg_type, data_arr_name))
         # Label the axes and create the legend.
-        date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times_not_all_nan))) if time_agg_str=='time' else\
-                    naive_months_ticks_by_week(times_not_all_nan) if time_agg_str in ['week', 'weekofyear'] else\
-                    month_ints_to_month_names(times_not_all_nan)
+        date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), fig_times_not_all_nan))) if time_agg_str=='time' else\
+                    naive_months_ticks_by_week(fig_times_not_all_nan) if time_agg_str in ['week', 'weekofyear'] else\
+                    month_ints_to_month_names(fig_times_not_all_nan)
         plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
         plt.legend(handles=[plot for plot in data_arr_plots.values()]+[fit_plot for fit_plot in fit_plots.values()], 
-                   labels=list(plot_types.keys())+fit_labels, loc='best')
+                   labels=legend_labels+fit_labels, loc='best')
         plt.title("Figure {}: Time Range {} to {}".format(fig_ind, date_strs[0], date_strs[-1]))
         plt.tight_layout()
 
@@ -616,6 +635,38 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
 
 ## Misc ##
 
+def xarray_values_in(data, values, data_vars=None):
+    """
+    Returns a mask for an xarray Dataset or DataArray, with True wherever the value is in values.
+    
+    Parameters
+    ----------
+    data: xarray.Dataset or xarray.DataArray
+        The data to check for value matches.
+    values: list-like
+        The values to check for.
+    data_vars: list-like
+        The data variables to check - given by name.
+    
+    Returns
+    -------
+    mask: np.ndarray
+        A NumPy array shaped like ``data``. The mask can be used to mask ``data``.
+        That is, ``data.where(mask)`` is an intended use.
+    """
+    if isinstance(data, xr.Dataset):
+        mask = np.full_like(list(data.data_vars.values())[0], False, dtype=np.bool)
+        data_arr_names = list(data.data_vars) if data_vars is None else data_vars
+        for data_arr_name in data_arr_names:
+            data_arr = data[data_arr_name]
+            for value in values:
+                mask = mask | (data_arr.values == value)
+    elif isinstance(data, xr.DataArray):
+        mask = np.full_like(data, False, dtype=np.bool)
+        for value in values:
+            mask = mask | (data.values == value)
+    return mask
+
 def ignore_warnings(func, *args, **kwargs):
     """Runs a function while ignoring warnings"""
     with warnings.catch_warnings():
@@ -623,9 +674,53 @@ def ignore_warnings(func, *args, **kwargs):
         ret = func(*args, **kwargs)
     return ret
 
-def np_min_max_scale(arr):
-    """Min-max scales a NumPy array"""
-    return (arr - arr.min()) / (arr.max() - arr.min()) if len(arr) > 1 else np.array([0.5])
+def np_scale(arr, pop_arr=None, pop_min_max=None, mean_std=None, min_max=None, scaling='norm'):
+    """
+    Scales a NumPy array with standard scaling or norm scaling.
+    
+    Parameters
+    ----------
+    arr: numpy.ndarray
+        The NumPy array to scale.
+    pop_arr: numpy.ndarray
+        The NumPy array to treat as the population. 
+        If specified, all members of arr must be within pop_arr or min_max must be specified.
+    pop_min_max: tuple
+        A 2-tuple of the population minimum and maximum, in that order. 
+        Supercedes pop_arr when normalizing.
+    mean_std: tuple
+        A 2-tuple of the population mean and standard deviation, in that order. 
+        Supercedes pop_arr when standard scaling.
+    min_max: tuple
+        A 2-tuple which specifies the desired range of the final output - the minimum and the maximum, in that order.
+        If all values are the same after standardizing or normalizing, all values will become min_max[0].
+    scaling: str
+        The options are ['std', 'norm']. 
+        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
+    
+    Raises
+    ------
+    ``ValueError`` 
+        If the maximum and minimum values are identical or the maximum is smaller than the minimum.
+    """
+    pop_arr = arr if pop_arr is None else pop_arr
+    if scaling == 'norm':
+        pop_min, pop_max = (pop_min_max[0], pop_min_max[1]) if pop_min_max is not None else (pop_arr.min(), pop_arr.max())
+        numerator, denominator = arr - pop_min, pop_max - pop_min
+    elif scaling == 'std':
+        mean, std = mean_std if mean_std is not None else pop_arr.mean(), pop_arr.std()
+        numerator, denominator = arr - mean, std
+    # Primary scaling
+    new_arr = arr
+    scaling_performed = False
+    if denominator - 0.0 > 0.00001:
+        new_arr = numerator / denominator
+        scaling_performed = True
+    # Optional final scaling.
+    if min_max is not None:
+        new_arr = np.interp(new_arr, (new_arr.min(), new_arr.max()), min_max) if scaling_performed else \
+                  np.full_like(new_arr, min_max[0])
+    return new_arr
 
 def remove_non_unique_ordered_list_str(ordered_list):
     """
