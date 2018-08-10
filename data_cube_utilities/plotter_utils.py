@@ -305,6 +305,7 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
         Note that in the case of multiple plots being created (see ``max_times_per_plot`` below), figsize will be the size
         of each plot - not the entire figure.
     scale_params: dict
+        Currently not used.
         Dictionary mapping names of DataArrays to scaling methods (e.g. {'ndvi': None, 'wofs':'norm'}). 
         The options are [None, 'std', 'norm']. The option ``None``, which is the default, performs no scaling. 
         The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
@@ -338,6 +339,11 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
     time_nan_mask = np.any(time_nan_mask, axis=1)
     times_not_all_nan = all_times[time_nan_mask]
     all_plotting_data = all_plotting_data.loc[{time_agg_str:times_not_all_nan}]
+    # Scale
+#     scaling = scale_params.get(data_arr_name, None)
+#     if scaling is not None:
+#         data_arr_plotting_data = np_scale(data_arr_plotting_data, full_data_arr_plotting_data, 
+#                                           min_max=(0.0,1.0), scaling=scaling)
     
     # Handle the potential for multiple plots.
     max_times_per_plot = len(times_not_all_nan) if max_times_per_plot is None else max_times_per_plot
@@ -377,13 +383,6 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
                 continue
             # Remove times with all nan data.
             data_arr_plotting_data = full_data_arr_plotting_data[data_arr_nan_mask]
-    
-            # Scale
-            scaling = scale_params.get(data_arr_name, None)
-            if scaling is not None:
-                data_arr_plotting_data = np_scale(data_arr_plotting_data, full_data_arr_plotting_data, 
-                                                  min_max=(0.0,1.0), scaling=scaling)
-
             data_arr_times = fig_times_not_all_nan[data_arr_nan_mask]
             data_arr_epochs = epochs[data_arr_nan_mask]
             # Large scales for x_locs can break the curve fitting for some reason.
@@ -402,10 +401,10 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
                         filtered_formatted_data.append(d[m])
                 box_width = 0.5*np.min(np.diff(data_arr_x_locs)) if len(data_arr_x_locs) > 1 else 0.5
                 # Provide default arguments.
-                boxprops = plot_params.pop('boxprops', dict(facecolor='orange'))
-                flierprops = plot_params.pop('flierprops', dict(marker='o', markersize=0.25))
+                plot_params.setdefault('boxprops', dict(facecolor='orange'))
+                plot_params.setdefault('flierprops', dict(marker='o', markersize=0.25))
                 bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
-                                positions=data_arr_x_locs, patch_artist=True, boxprops=boxprops, flierprops=flierprops, 
+                                positions=data_arr_x_locs, patch_artist=True, 
                                 manage_xticks=False, **plot_params) # `manage_xticks=False` to avoid excessive padding on the x-axis.
                 data_arr_plots[data_arr_name] = bp['boxes'][0]
 
