@@ -26,6 +26,10 @@ from matplotlib.colors import LinearSegmentedColormap
 from scipy import stats
 import warnings
 
+from .curve_fitting import gaussian_fit, poly_fit
+from .scale import xr_scale, np_scale
+from .dc_utilities import ignore_warnings
+
 from scipy.interpolate import interp1d
 
 def impute_missing_data_1D(data1D):
@@ -81,7 +85,7 @@ def tfmt(x, pos=None):
 
 ## Matplotlib colormap functions ##
 
-def create_discrete_color_map(th, colors, alpha, cmap_name='my_cmap'):
+def create_discrete_color_map(th, colors, data_range=(0.0,1.0), cmap_name='my_cmap'):
     """
     Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
     
@@ -91,17 +95,23 @@ def create_discrete_color_map(th, colors, alpha, cmap_name='my_cmap'):
         Threshold values. Must be between 0.0 and 1.0 - noninclusive.
     colors: list
         Colors to use between thresholds, so `len(colors) == len(th)+1`.
-        Colors can be string names of matplotlib colors or 3-tuples of rgb values.
-    alpha: float
-        The alpha values to use for the colors, so `len(alpha) == len(colors)`.
+        Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
+    data_range: list-like
+        A 2-tuple of the minimum and maximum values the data may take.
     cmap_name: str
         The name of the colormap for matplotlib.
     """
     import matplotlib as mpl
+    # Normalize threshold values based on the data range.
+    th = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), th))
+    # Normalize color values.
+    for i, color in enumerate(colors):
+        if isinstance(color, tuple):
+            colors[i] = [rgb/255 for rgb in color]
     th = [0.0] + th + [1.0]
     cdict = {}
     # These are fully-saturated red, green, and blue - not the matplotlib colors for 'red', 'green', and 'blue'.
-    primary_colors = ['red', 'green', 'blue'] 
+    primary_colors = ['red', 'green', 'blue']
     # Get the 3-tuples of rgb values for the colors.
     color_rgbs = [(mpl.colors.to_rgb(color) if isinstance(color,str) else color) for color in colors]
     # For each color entry to go into the color dictionary...
@@ -455,18 +465,6 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
                    labels=legend_labels+fit_labels, loc='best')
         plt.title("Figure {}: Time Range {} to {}".format(fig_ind, date_strs[0], date_strs[-1]))
         plt.tight_layout()
-
-def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
-    """
-    Returns an appropriate Axes object given possible Figure or Axes objects.
-    If neither is supplied, a new figure will be created with associated axes.
-    """
-    if fig is None:
-        if ax is None:
-            fig, ax = plt.subplots(**fig_params)
-    else:
-        ax = fig.axes[0]
-    return ax
     
 ## Curve fitting ##
 
@@ -521,59 +519,8 @@ def plot_curvefit(x, y, fit_type, fit_kwargs={}, x_smooth=None, n_pts=200, fig_p
         cs = CubicSpline(x,y)
         y_smooth = cs(x_smooth)
     return ax.plot(x_smooth, y_smooth, **plotting_kwargs)[0]
-
-def gauss(x,a,x0,sigma):
-    return a*exp(-(x-x0)**2/(2*sigma**2))
-
-def gaussian_fit(x, y, x_smooth=None, n_pts=200):
-    """
-    Fits a Gaussian to some data - x and y. Returns predicted interpolation values.
-    
-    Parameters
-    ----------
-    x: list-like
-        The x values of the data to fit to.
-    y: list-like
-        The y values of the data to fit to.
-    x_smooth: list-like
-        The exact x values to interpolate for. Supercedes `n_pts`.
-    n_pts: int
-        The number of evenly spaced points spanning the range of `x` to interpolate for.
-    """
-    if x_smooth is None:
-        x_smooth = np.linspace(x.min(), x.max(), n_pts)
-    mean, sigma = np.nanmean(y), np.nanstd(y)
-    popt,pcov = curve_fit(gauss,x,y,p0=[1,mean,sigma], maxfev=np.iinfo(np.int32).max)
-    return gauss(x_smooth,*popt)
-    
-def poly_fit(x, y, degree, x_smooth=None, n_pts=200):
-    """
-    Fits a polynomial of any positive integer degree to some data - x and y. Returns predicted interpolation values.
-    
-    Parameters
-    ----------
-    x: list-like
-        The x values of the data to fit to.
-    y: list-like
-        The y values of the data to fit to.
-    x_smooth: list-like
-        The exact x values to interpolate for. Supercedes `n_pts`.
-    n_pts: int
-        The number of evenly spaced points spanning the range of `x` to interpolate for.
-    degree: int
-        The degree of the polynomial to fit.
-    """
-    if x_smooth is None:
-        x_smooth = np.linspace(x.min(), x.max(), n_pts)
-    return np.array([np.array([coef*(x_val**current_degree) for coef, current_degree in 
-                               zip(np.polyfit(x, y, degree), range(degree, -1, -1))]).sum() for x_val in x_smooth])
     
 ## End curve fitting ##
-
-## Misc ##
-
-
-## End Misc ##
 
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
@@ -711,121 +658,19 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.xticks(rotation=90)    
 
-
-
 ## Misc ##
 
-def xarray_sortby_coord(dataset, coord):
+def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
     """
-    Sort an xarray.Dataset by a coordinate. xarray.Dataset.sortby() sometimes fails, so this is an alternative.
-    Credit to https://stackoverflow.com/a/42600594/5449970.
+    Returns an appropriate Axes object given possible Figure or Axes objects.
+    If neither is supplied, a new figure will be created with associated axes.
     """
-    return dataset.loc[{coord:np.sort(dataset.coords[coord].values)}]
-
-def xarray_values_in(data, values, data_vars=None):
-    """
-    Returns a mask for an xarray Dataset or DataArray, with True wherever the value is in values.
-    
-    Parameters
-    ----------
-    data: xarray.Dataset or xarray.DataArray
-        The data to check for value matches.
-    values: list-like
-        The values to check for.
-    data_vars: list-like
-        The names of the data variables to check.
-    
-    Returns
-    -------
-    mask: np.ndarray
-        A NumPy array shaped like ``data``. The mask can be used to mask ``data``.
-        That is, ``data.where(mask)`` is an intended use.
-    """
-    if isinstance(data, xr.Dataset):
-        mask = np.full_like(list(data.data_vars.values())[0], False, dtype=np.bool)
-        for data_arr in data.data_vars.values():
-            for value in values:
-                mask = mask | (data_arr.values == value)
-    elif isinstance(data, xr.DataArray):
-        mask = np.full_like(data, False, dtype=np.bool)
-        for value in values:
-            mask = mask | (data.values == value)
-    return mask
-
-def ignore_warnings(func, *args, **kwargs):
-    """Runs a function while ignoring warnings"""
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        ret = func(*args, **kwargs)
-    return ret
-
-def xr_scale(data, data_vars=None, min_max=None, scaling='norm'):
-    """
-    Scales an xarray Dataset or DataArray with standard scaling or norm scaling.
-    
-    Parameters
-    ----------
-    data: xarray.Dataset or xarray.DataArray
-        The NumPy array to scale.
-    data_vars: list
-        The names of the data variables to scale.
-    min_max: tuple
-        A 2-tuple which specifies the desired range of the final output - the minimum and the maximum, in that order.
-        If all values are the same, all values will become min_max[0].
-    scaling: str
-        The options are ['std', 'norm']. 
-        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
-    """
-    data = data.copy()
-    if isinstance(data, xr.Dataset):
-        data_arr_names = list(data.data_vars) if data_vars is None else data_vars
-        for data_arr_name in data_arr_names:
-            data_arr = data[data_arr_name]
-            data_arr.values = np_scale(data_arr.values, min_max=min_max, scaling=scaling)
-    elif isinstance(data, xr.DataArray): 
-        data.values = np_scale(data.values, min_max=min_max, scaling=scaling)
-    return data
-    
-def np_scale(arr, pop_arr=None, pop_min_max=None, mean_std=None, min_max=None, scaling='norm'):
-    """
-    Scales a NumPy array with standard scaling or norm scaling.
-    
-    Parameters
-    ----------
-    arr: numpy.ndarray
-        The NumPy array to scale.
-    pop_arr: numpy.ndarray
-        The NumPy array to treat as the population. 
-        If specified, all members of arr must be within pop_arr or min_max must be specified.
-    pop_min_max: tuple
-        A 2-tuple of the population minimum and maximum, in that order. 
-        Supercedes pop_arr when normalizing.
-    mean_std: tuple
-        A 2-tuple of the population mean and standard deviation, in that order. 
-        Supercedes pop_arr when standard scaling.
-    min_max: tuple
-        A 2-tuple which specifies the desired range of the final output - the minimum and the maximum, in that order.
-        If all values are the same, all values will become min_max[0].
-    scaling: str
-        The options are ['std', 'norm']. 
-        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
-    """
-    pop_arr = arr if pop_arr is None else pop_arr
-    if scaling == 'norm':
-        pop_min, pop_max = (pop_min_max[0], pop_min_max[1]) if pop_min_max is not None else (np.nanmin(pop_arr), np.nanmax(pop_arr))
-        numerator, denominator = arr - pop_min, pop_max - pop_min
-    elif scaling == 'std':
-        mean, std = mean_std if mean_std is not None else (np.nanmean(pop_arr), np.nanstd(pop_arr))
-        numerator, denominator = arr - mean, std
-    # Primary scaling
-    new_arr = arr
-    if denominator > 0:
-        new_arr = numerator / denominator
-    # Optional final scaling.
-    if min_max is not None:
-        new_arr = np.interp(new_arr, (np.nanmin(new_arr), np.nanmax(new_arr)), min_max) if denominator > 0 else \
-                  np.full_like(new_arr, min_max[0]) # The values are identical - set all values to the low end of the desired range.
-    return new_arr
+    if fig is None:
+        if ax is None:
+            fig, ax = plt.subplots(**fig_params)
+    else:
+        ax = fig.axes[0]
+    return ax
 
 def remove_non_unique_ordered_list_str(ordered_list):
     """

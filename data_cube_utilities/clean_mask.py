@@ -73,5 +73,32 @@ def landsat_qa_clean_mask(dataset, platform):
     #use logical or statement to elect viable pixels for analysis
     return np.logical_or(clear_xarray.values.astype(bool), water_xarray.values.astype(bool))
 
-
-
+def xarray_values_in(data, values, data_vars=None):
+    """
+    Returns a mask for an xarray Dataset or DataArray, with `True` wherever the value is in values.
+    
+    Parameters
+    ----------
+    data: xarray.Dataset or xarray.DataArray
+        The data to check for value matches.
+    values: list-like
+        The values to check for.
+    data_vars: list-like
+        The names of the data variables to check.
+    
+    Returns
+    -------
+    mask: np.ndarray
+        A NumPy array shaped like ``data``. The mask can be used to mask ``data``.
+        That is, ``data.where(mask)`` is an intended use.
+    """
+    if isinstance(data, xr.Dataset):
+        mask = np.full_like(list(data.data_vars.values())[0], False, dtype=np.bool)
+        for data_arr in data.data_vars.values():
+            for value in values:
+                mask = mask | (data_arr.values == value)
+    elif isinstance(data, xr.DataArray):
+        mask = np.full_like(data, False, dtype=np.bool)
+        for value in values:
+            mask = mask | (data.values == value)
+    return mask
