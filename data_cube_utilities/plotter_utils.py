@@ -293,22 +293,23 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
         Dictionary mapping names of DataArrays in the Dataset to plot to 
         their plot types (e.g. {'ndvi':'point', 'wofs':'line'}).
     fig_params: dict
-        Figure parameters dictionary (e.g. {'figsize':(12,6)}).
-        Used to create a Figure ``if fig is None and ax is None``.
+        Figure parameters dictionary (e.g. {'figsize':(12,6)}). Used to create a Figure ``if fig is None and ax is None``.
+        Note that in the case of multiple plots being created (see ``max_times_per_plot`` below), figsize will be the size
+        of each plot - not the entire figure.
     component_plot_params: dict
         Dictionary mapping names of DataArrays to dictionaries of matplotlib 
         formatting parameters for individual plots (e.g. {'ndvi':{'color':'red'}, 'wofs':{'color':'blue'}}).
     fit_params: dict
-        Dictionary mapping names of DataArrays to 2-tuples of strings in ['mean', 'median'] and types of curve fits. 
-        e.g. {'ndvi': ('mean', 'gaussian')}. The curves fit to means or medians along all dimensions except time 
-        to create a curve in the 2D plot. Curve types can be any of ['gaussian'].
-        Note that in the case of multiple plots being created (see ``max_times_per_plot`` below), figsize will be the size
-        of each plot - not the entire figure.
+        Dictionary mapping names of DataArrays to 2-tuples, each of whose first element is a string representing 
+        an aggregation method (any of ['mean', 'median']) and whose second element is a dictionary mapping string 
+        names of types of curve fits to packed keyword arguments (**kwargs) (e.g. {'ndvi': ('mean', ('poly', {'degree': 3}))}). 
+        The curves fit to means or medians along all dimensions except time to create a curve in the 2D plot. 
+        Curve types can be any of ['gaussian', 'poly', or 'cubic_spline'], for a Gaussian fit, polynomial fit, and cubic spline, 
+        respectively. Note that of these options, a cubic spline will fit the closest.
     scale_params: dict
         Currently not used.
-        Dictionary mapping names of DataArrays to scaling methods (e.g. {'ndvi': None, 'wofs':'norm'}). 
-        The options are [None, 'std', 'norm']. The option ``None``, which is the default, performs no scaling. 
-        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
+        Dictionary mapping names of DataArrays to scaling methods (e.g. {'ndvi': 'std', 'wofs':'norm'}). 
+        The options are ['std', 'norm']. The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
         Note that of these options, only normalizing guarantees that the y values will be in a fixed range - namely [0,1].
     fig: matplotlib.figure.Figure
         The figure to use for the plot. The figure must have at least one Axes object.
@@ -320,6 +321,9 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
     max_times_per_plot: int
         The maximum number of times per plot. If specified, one plot will be generated for each group 
         of this many times. The plots will be arranged in a grid.
+        
+    :Authors:
+        John Rattz (john.c.rattz@ama-inc.com)
     """
     # Determine how the data was aggregated, if at all.
     possible_time_agg_strs = ['week', 'weekofyear', 'month']
@@ -330,7 +334,10 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
             break
     # Make the data 2D - time and a stack of all other dimensions.
     non_time_dims = list(set(dataset.dims)-{time_agg_str})
-    all_plotting_data = dataset.stack(stacked_data=non_time_dims)
+    primary_plotting_bands = list(plot_types.keys())
+    curve_fit_plotting_bands = list(fit_params.keys())
+    all_plotting_bands = list(set(primary_plotting_bands + curve_fit_plotting_bands))
+    all_plotting_data = dataset[all_plotting_bands].stack(stacked_data=non_time_dims)
     all_times = all_plotting_data[time_agg_str].values
     # Mask out times for which no data variable to plot has any non-NaN data.
     nan_mask_data_vars = list(all_plotting_data[list(plot_types.keys())].notnull().data_vars.values())
@@ -339,11 +346,13 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
     time_nan_mask = np.any(time_nan_mask, axis=1)
     times_not_all_nan = all_times[time_nan_mask]
     all_plotting_data = all_plotting_data.loc[{time_agg_str:times_not_all_nan}]
+    
     # Scale
-#     scaling = scale_params.get(data_arr_name, None)
-#     if scaling is not None:
-#         data_arr_plotting_data = np_scale(data_arr_plotting_data, full_data_arr_plotting_data, 
-#                                           min_max=(0.0,1.0), scaling=scaling)
+    if isinstance(scale_params, str): # if scale_params denotes the scaling type for the whole Dataset, scale the Dataset.
+        all_plotting_data = xr_scale(all_plotting_data, scaling=scale_params)
+    elif len(scale_params) > 0: # else, it is a dictionary denoting how to scale each DataArray.
+        for data_arr_name, scaling in scale_params.items():
+            all_plotting_data[data_arr_name] = xr_scale(all_plotting_data[data_arr_name], scaling=scaling)
     
     # Handle the potential for multiple plots.
     max_times_per_plot = len(times_not_all_nan) if max_times_per_plot is None else max_times_per_plot
@@ -366,13 +375,14 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
         fig_times_not_all_nan = times_not_all_nan[lower_time_bound_ind:upper_time_bound_ind]
         plotting_data = all_plotting_data.loc[{time_agg_str:fig_times_not_all_nan}]
         epochs = np.array(list(map(n64_to_epoch, fig_times_not_all_nan))) if time_agg_str == 'time' else None
-        x_locs = np_min_max_scale(epochs if time_agg_str == 'time' else fig_times_not_all_nan)
+        x_locs = np_scale(epochs if time_agg_str == 'time' else fig_times_not_all_nan)
         
         legend_labels = []
         
         # Data variable plots within each plot.
         data_arr_plots = {}
         for data_arr_name, plot_type in plot_types.items():
+            assert plot_type in ['scatter', 'box'], r"For the '{}' DataArray: plot_type '{}' not recognized".format(data_arr_name, plot_type)
             full_data_arr_plotting_data = plotting_data[data_arr_name].values
             # Any times with all nan data are ignored in any plot type.
             data_arr_nan_mask = np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
@@ -383,8 +393,6 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
                 continue
             # Remove times with all nan data.
             data_arr_plotting_data = full_data_arr_plotting_data[data_arr_nan_mask]
-            data_arr_times = fig_times_not_all_nan[data_arr_nan_mask]
-            data_arr_epochs = epochs[data_arr_nan_mask]
             # Large scales for x_locs can break the curve fitting for some reason.
             data_arr_x_locs = x_locs[data_arr_nan_mask]
             plot_params = component_plot_params.get(data_arr_name, {})
@@ -402,7 +410,8 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
                 box_width = 0.5*np.min(np.diff(data_arr_x_locs)) if len(data_arr_x_locs) > 1 else 0.5
                 # Provide default arguments.
                 plot_params.setdefault('boxprops', dict(facecolor='orange'))
-                plot_params.setdefault('flierprops', dict(marker='o', markersize=0.25))
+                plot_params.setdefault('flierprops', dict(marker='o', markersize=0.5))
+                plot_params.setdefault('showfliers', False)
                 bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
                                 positions=data_arr_x_locs, patch_artist=True, 
                                 manage_xticks=False, **plot_params) # `manage_xticks=False` to avoid excessive padding on the x-axis.
@@ -411,24 +420,32 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
         # Curve fitting.
         fit_plots = {}
         fit_labels = []
-        for data_arr_name, (agg_type, fit_type) in fit_params.items():
-            # First consider only times for which at least one DataArray did not have all NaN values.
-            # Note that the dimensions of variables here are likely smaller than in the primary plotting loop above.
+        for data_arr_name, (agg_type, (fit_type, fit_kwargs)) in fit_params.items():
             full_data_arr_plotting_data = plotting_data[data_arr_name].values
-            # This particular DataArray may still have all-NaN slices, so we mask before plotting.
             data_arr_nan_mask = np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
+            if np.any(data_arr_nan_mask):
+                legend_labels.append(data_arr_name) 
+            else:
+                continue
             data_arr_plotting_data = full_data_arr_plotting_data[data_arr_nan_mask]
             data_arr_x_locs = x_locs[data_arr_nan_mask]
             if agg_type == 'mean':
                 y = ignore_warnings(np.nanmean, data_arr_plotting_data, axis=1)
             elif agg_type == 'median':
                 y = ignore_warnings(np.nanmedian, data_arr_plotting_data, axis=1)
-            # Handle differences in plotting methods.
+            # Handle differences among plotting methods.
             if fit_type == 'gaussian':
                 if len(data_arr_x_locs) < 3:
-                    continue # 3 data points are needed to determine a unique Gaussian.
-                fit_plots[data_arr_name] = plot_gaussian(data_arr_x_locs, y, ax=ax)
+                    continue # 3 data points are needed to determine a unique Gaussian.        
                 fit_labels.append('Gaussian fit of {} of {}'.format(agg_type, data_arr_name))
+            elif fit_type == 'poly':
+                assert 'degree' in fit_kwargs, r"For the '{}' DataArray: When using 'poly' as the fit type," \
+                                                "the fit kwargs must have 'degree' specified.".format(data_arr_name)
+                fit_labels.append('Degree {} polynomial fit of {} of {}'.format(fit_kwargs['degree'], agg_type, data_arr_name))
+            elif fit_type == 'cubic_spline':
+                fit_labels.append('Cubic spline fit of {} of {}'.format(agg_type, data_arr_name))
+            # Create and plot the curve fit.
+            fit_plots[data_arr_name] = plot_curvefit(data_arr_x_locs, y, fit_type, fit_kwargs, ax=ax)
         # Label the axes and create the legend.
         date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), fig_times_not_all_nan))) if time_agg_str=='time' else\
                     naive_months_ticks_by_week(fig_times_not_all_nan) if time_agg_str in ['week', 'weekofyear'] else\
@@ -451,21 +468,26 @@ def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
         ax = fig.axes[0]
     return ax
     
-## Begin curve fitting ##
+## Curve fitting ##
 
-def gauss(x,a,x0,sigma):
-    return a*exp(-(x-x0)**2/(2*sigma**2))
-    
-def plot_gaussian(x, y, n_pts=200, fig_params={'figsize':(12,6)}, plotting_kwargs={'linestyle': '-'}, fig=None, ax=None):
+def plot_curvefit(x, y, fit_type, fit_kwargs={}, x_smooth=None, n_pts=200, fig_params={'figsize':(12,6)}, plotting_kwargs={'linestyle': '-'}, fig=None, ax=None):
     """
+    Plots a curve fit given x values, y values, a type of curve to plot, and parameters for that curve.
+    
     Parameters
     ----------
     x: np.ndarray
         A 1D NumPy array. The x values to fit to.
     y: np.ndarray
         A 1D NumPy array. The y values to fit to.
+    fit_type: str
+        The type of curve to fit. One of ['poly', 'gaussian', 'cubic_spline'].
+        The option 'poly' plots a polynomial fit. The option 'gaussian' plots a Gaussian fit.
+        The option 'cubic_spline' plots a cubic spline fit.
+    x_smooth: list-like
+        The exact x values to interpolate for. Supercedes `n_pts`.
     n_pts: int
-        The number of points to use for the smoothed fit. More will result in a smoother curve.
+        The number of evenly spaced points spanning the range of `x` to interpolate for.
     fig_params: dict
         Figure parameters dictionary (e.g. {'figsize':(12,6)}).
         Used to create a Figure ``if fig is None and ax is None``.
@@ -486,14 +508,73 @@ def plot_gaussian(x, y, n_pts=200, fig_params={'figsize':(12,6)}, plotting_kwarg
     """
     # Retrieve or create the axes if necessary.
     ax = retrieve_or_create_ax(fig, ax, **fig_params)
+    if x_smooth is None:
+        x_smooth = np.linspace(x.min(), x.max(), n_pts)
+    if fit_type == 'gaussian':
+        y_smooth = gaussian_fit(x, y, x_smooth)
+    elif fit_type == 'poly':
+        assert 'degree' in fit_kwargs.keys(), "When plotting a polynomal fit, there must be" \
+                                              "a 'degree' entry in the fit_kwargs parameter."
+        degree = fit_kwargs['degree']
+        y_smooth = poly_fit(x, y, degree, x_smooth)
+    elif fit_type == 'cubic_spline':
+        cs = CubicSpline(x,y)
+        y_smooth = cs(x_smooth)
+    return ax.plot(x_smooth, y_smooth, **plotting_kwargs)[0]
+
+def gauss(x,a,x0,sigma):
+    return a*exp(-(x-x0)**2/(2*sigma**2))
+
+def gaussian_fit(x, y, x_smooth=None, n_pts=200):
+    """
+    Fits a Gaussian to some data - x and y. Returns predicted interpolation values.
     
+    Parameters
+    ----------
+    x: list-like
+        The x values of the data to fit to.
+    y: list-like
+        The y values of the data to fit to.
+    x_smooth: list-like
+        The exact x values to interpolate for. Supercedes `n_pts`.
+    n_pts: int
+        The number of evenly spaced points spanning the range of `x` to interpolate for.
+    """
+    if x_smooth is None:
+        x_smooth = np.linspace(x.min(), x.max(), n_pts)
     mean, sigma = np.nanmean(y), np.nanstd(y)
     popt,pcov = curve_fit(gauss,x,y,p0=[1,mean,sigma], maxfev=np.iinfo(np.int32).max)
-    x_smooth = np.linspace(x.min(), x.max(), n_pts)
-    return ax.plot(x_smooth, gauss(x_smooth,*popt), **plotting_kwargs)[0]
+    return gauss(x_smooth,*popt)
+    
+def poly_fit(x, y, degree, x_smooth=None, n_pts=200):
+    """
+    Fits a polynomial of any positive integer degree to some data - x and y. Returns predicted interpolation values.
+    
+    Parameters
+    ----------
+    x: list-like
+        The x values of the data to fit to.
+    y: list-like
+        The y values of the data to fit to.
+    x_smooth: list-like
+        The exact x values to interpolate for. Supercedes `n_pts`.
+    n_pts: int
+        The number of evenly spaced points spanning the range of `x` to interpolate for.
+    degree: int
+        The degree of the polynomial to fit.
+    """
+    if x_smooth is None:
+        x_smooth = np.linspace(x.min(), x.max(), n_pts)
+    return np.array([np.array([coef*(x_val**current_degree) for coef, current_degree in 
+                               zip(np.polyfit(x, y, degree), range(degree, -1, -1))]).sum() for x_val in x_smooth])
     
 ## End curve fitting ##
-    
+
+## Misc ##
+
+
+## End Misc ##
+
 def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
     Plots several statistics over time - including mean, median, linear regression of the 
@@ -634,6 +715,13 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
 
 ## Misc ##
 
+def xarray_sortby_coord(dataset, coord):
+    """
+    Sort an xarray.Dataset by a coordinate. xarray.Dataset.sortby() sometimes fails, so this is an alternative.
+    Credit to https://stackoverflow.com/a/42600594/5449970.
+    """
+    return dataset.loc[{coord:np.sort(dataset.coords[coord].values)}]
+
 def xarray_values_in(data, values, data_vars=None):
     """
     Returns a mask for an xarray Dataset or DataArray, with True wherever the value is in values.
@@ -645,7 +733,7 @@ def xarray_values_in(data, values, data_vars=None):
     values: list-like
         The values to check for.
     data_vars: list-like
-        The data variables to check - given by name.
+        The names of the data variables to check.
     
     Returns
     -------
@@ -655,9 +743,7 @@ def xarray_values_in(data, values, data_vars=None):
     """
     if isinstance(data, xr.Dataset):
         mask = np.full_like(list(data.data_vars.values())[0], False, dtype=np.bool)
-        data_arr_names = list(data.data_vars) if data_vars is None else data_vars
-        for data_arr_name in data_arr_names:
-            data_arr = data[data_arr_name]
+        for data_arr in data.data_vars.values():
             for value in values:
                 mask = mask | (data_arr.values == value)
     elif isinstance(data, xr.DataArray):
@@ -673,6 +759,33 @@ def ignore_warnings(func, *args, **kwargs):
         ret = func(*args, **kwargs)
     return ret
 
+def xr_scale(data, data_vars=None, min_max=None, scaling='norm'):
+    """
+    Scales an xarray Dataset or DataArray with standard scaling or norm scaling.
+    
+    Parameters
+    ----------
+    data: xarray.Dataset or xarray.DataArray
+        The NumPy array to scale.
+    data_vars: list
+        The names of the data variables to scale.
+    min_max: tuple
+        A 2-tuple which specifies the desired range of the final output - the minimum and the maximum, in that order.
+        If all values are the same, all values will become min_max[0].
+    scaling: str
+        The options are ['std', 'norm']. 
+        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
+    """
+    data = data.copy()
+    if isinstance(data, xr.Dataset):
+        data_arr_names = list(data.data_vars) if data_vars is None else data_vars
+        for data_arr_name in data_arr_names:
+            data_arr = data[data_arr_name]
+            data_arr.values = np_scale(data_arr.values, min_max=min_max, scaling=scaling)
+    elif isinstance(data, xr.DataArray): 
+        data.values = np_scale(data.values, min_max=min_max, scaling=scaling)
+    return data
+    
 def np_scale(arr, pop_arr=None, pop_min_max=None, mean_std=None, min_max=None, scaling='norm'):
     """
     Scales a NumPy array with standard scaling or norm scaling.
@@ -692,33 +805,26 @@ def np_scale(arr, pop_arr=None, pop_min_max=None, mean_std=None, min_max=None, s
         Supercedes pop_arr when standard scaling.
     min_max: tuple
         A 2-tuple which specifies the desired range of the final output - the minimum and the maximum, in that order.
-        If all values are the same after standardizing or normalizing, all values will become min_max[0].
+        If all values are the same, all values will become min_max[0].
     scaling: str
         The options are ['std', 'norm']. 
         The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
-    
-    Raises
-    ------
-    ``ValueError`` 
-        If the maximum and minimum values are identical or the maximum is smaller than the minimum.
     """
     pop_arr = arr if pop_arr is None else pop_arr
     if scaling == 'norm':
-        pop_min, pop_max = (pop_min_max[0], pop_min_max[1]) if pop_min_max is not None else (pop_arr.min(), pop_arr.max())
+        pop_min, pop_max = (pop_min_max[0], pop_min_max[1]) if pop_min_max is not None else (np.nanmin(pop_arr), np.nanmax(pop_arr))
         numerator, denominator = arr - pop_min, pop_max - pop_min
     elif scaling == 'std':
-        mean, std = mean_std if mean_std is not None else pop_arr.mean(), pop_arr.std()
+        mean, std = mean_std if mean_std is not None else (np.nanmean(pop_arr), np.nanstd(pop_arr))
         numerator, denominator = arr - mean, std
     # Primary scaling
     new_arr = arr
-    scaling_performed = False
-    if denominator - 0.0 > 0.00001:
+    if denominator > 0:
         new_arr = numerator / denominator
-        scaling_performed = True
     # Optional final scaling.
     if min_max is not None:
-        new_arr = np.interp(new_arr, (new_arr.min(), new_arr.max()), min_max) if scaling_performed else \
-                  np.full_like(new_arr, min_max[0])
+        new_arr = np.interp(new_arr, (np.nanmin(new_arr), np.nanmax(new_arr)), min_max) if denominator > 0 else \
+                  np.full_like(new_arr, min_max[0]) # The values are identical - set all values to the low end of the desired range.
     return new_arr
 
 def remove_non_unique_ordered_list_str(ordered_list):
