@@ -83,54 +83,6 @@ def tfmt(x, pos=None):
 
 ## End datetime functions ##
 
-## Matplotlib colormap functions ##
-
-def create_discrete_color_map(th, colors, data_range=(0.0,1.0), cmap_name='my_cmap'):
-    """
-    Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
-    
-    Parameters
-    ----------
-    th: list
-        Threshold values. Must be between 0.0 and 1.0 - noninclusive.
-    colors: list
-        Colors to use between thresholds, so `len(colors) == len(th)+1`.
-        Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
-    data_range: list-like
-        A 2-tuple of the minimum and maximum values the data may take.
-    cmap_name: str
-        The name of the colormap for matplotlib.
-    """
-    import matplotlib as mpl
-    # Normalize threshold values based on the data range.
-    th = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), th))
-    # Normalize color values.
-    for i, color in enumerate(colors):
-        if isinstance(color, tuple):
-            colors[i] = [rgb/255 for rgb in color]
-    th = [0.0] + th + [1.0]
-    cdict = {}
-    # These are fully-saturated red, green, and blue - not the matplotlib colors for 'red', 'green', and 'blue'.
-    primary_colors = ['red', 'green', 'blue']
-    # Get the 3-tuples of rgb values for the colors.
-    color_rgbs = [(mpl.colors.to_rgb(color) if isinstance(color,str) else color) for color in colors]
-    # For each color entry to go into the color dictionary...
-    for primary_color_ind, primary_color in enumerate(primary_colors):
-        cdict_entry = [None]*len(th)
-        # For each threshold (as well as 0.0 and 1.0), specify the values for this primary color.
-        for row_ind, th_ind in enumerate(range(len(th))):
-            # Get the two colors that this threshold corresponds to.
-            th_color_inds = [0,0] if th_ind==0 else \
-                            [len(colors)-1, len(colors)-1] if th_ind==len(th)-1 else \
-                            [th_ind-1, th_ind]
-            primary_color_vals = [color_rgbs[th_color_ind][primary_color_ind] for th_color_ind in th_color_inds]
-            cdict_entry[row_ind] = (th[th_ind],) + tuple(primary_color_vals)
-        cdict[primary_color] = cdict_entry
-    cmap = LinearSegmentedColormap(cmap_name, cdict)
-    return cmap
-
-## End matplotlib colormap functions ##
-
 def regression_massage(ds): 
     t_len = len(ds["time"])
     s_len = len(ds["latitude"]) * len(ds["longitude"])
@@ -396,11 +348,13 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
             full_data_arr_plotting_data = plotting_data[data_arr_name].values
             # Any times with all nan data are ignored in any plot type.
             data_arr_nan_mask = np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
-            # Add this data variable label to the legend if it has any data to plot.
-            if np.any(data_arr_nan_mask):
+            
+            # Add this data variable label to the legend if it has enough data to plot.
+            if ~skip_plot(np.sum(data_arr_nan_mask), plot_type, component_plot_params):
                 legend_labels.append(data_arr_name) 
-            else:
+            else: # Else, plot the next data variable instead.
                 continue
+            
             # Remove times with all nan data.
             data_arr_plotting_data = full_data_arr_plotting_data[data_arr_nan_mask]
             # Large scales for x_locs can break the curve fitting for some reason.
@@ -433,10 +387,12 @@ def xarray_time_series_plot(dataset, plot_types, fig_params={'figsize':(18,12)},
         for data_arr_name, (agg_type, (fit_type, fit_kwargs)) in fit_params.items():
             full_data_arr_plotting_data = plotting_data[data_arr_name].values
             data_arr_nan_mask = np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
-            if np.any(data_arr_nan_mask):
-                legend_labels.append(data_arr_name) 
+            
+            if ~skip_plot(np.sum(data_arr_nan_mask), fit_type, fit_kwargs): 
+                legend_labels.append(data_arr_name)
             else:
                 continue
+            
             data_arr_plotting_data = full_data_arr_plotting_data[data_arr_nan_mask]
             data_arr_x_locs = x_locs[data_arr_nan_mask]
             if agg_type == 'mean':
@@ -657,7 +613,55 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
         plt.plot(times, y, marker="o")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.xticks(rotation=90)    
+    
+## Matplotlib colormap functions ##
 
+def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
+    """
+    Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
+    
+    Parameters
+    ----------
+    data_range: list-like
+        A 2-tuple of the minimum and maximum values the data may take.
+    th: list
+        Threshold values. Must be in the range of `data_range` - noninclusive.
+    colors: list
+        Colors to use between thresholds, so `len(colors) == len(th)+1`.
+        Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
+    cmap_name: str
+        The name of the colormap for matplotlib.
+    """
+    import matplotlib as mpl
+    # Normalize threshold values based on the data range.
+    th = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), th))
+    # Normalize color values.
+    for i, color in enumerate(colors):
+        if isinstance(color, tuple):
+            colors[i] = [rgb/255 for rgb in color]
+    th = [0.0] + th + [1.0]
+    cdict = {}
+    # These are fully-saturated red, green, and blue - not the matplotlib colors for 'red', 'green', and 'blue'.
+    primary_colors = ['red', 'green', 'blue']
+    # Get the 3-tuples of rgb values for the colors.
+    color_rgbs = [(mpl.colors.to_rgb(color) if isinstance(color,str) else color) for color in colors]
+    # For each color entry to go into the color dictionary...
+    for primary_color_ind, primary_color in enumerate(primary_colors):
+        cdict_entry = [None]*len(th)
+        # For each threshold (as well as 0.0 and 1.0), specify the values for this primary color.
+        for row_ind, th_ind in enumerate(range(len(th))):
+            # Get the two colors that this threshold corresponds to.
+            th_color_inds = [0,0] if th_ind==0 else \
+                            [len(colors)-1, len(colors)-1] if th_ind==len(th)-1 else \
+                            [th_ind-1, th_ind]
+            primary_color_vals = [color_rgbs[th_color_ind][primary_color_ind] for th_color_ind in th_color_inds]
+            cdict_entry[row_ind] = (th[th_ind],) + tuple(primary_color_vals)
+        cdict[primary_color] = cdict_entry
+    cmap = LinearSegmentedColormap(cmap_name, cdict)
+    return cmap
+
+## End matplotlib colormap functions ##
+        
 ## Misc ##
 
 def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
@@ -671,6 +675,17 @@ def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
     else:
         ax = fig.axes[0]
     return ax
+
+def skip_plot(n_pts, plot_type, kwargs={}):
+    """Returns a boolean denoting whether to skip plotting data given the number of points it contains."""
+    min_pts_dict = {'scatter': 1, 'box': 1, 'gaussian': 3, 'poly': 1, 'cubic_spline': 3}
+    min_pts = min_pts_dict[plot_type]
+    if plot_type == 'poly':
+        assert 'degree' in kwargs.keys(), "When plotting a polynomal fit, there must be" \
+                                              "a 'degree' entry in the fit_kwargs parameter."
+        degree = kwargs['degree']
+        min_pts = min_pts + degree
+    return n_pts < min_pts
 
 def remove_non_unique_ordered_list_str(ordered_list):
     """
