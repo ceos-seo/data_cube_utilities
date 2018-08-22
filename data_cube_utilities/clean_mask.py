@@ -41,9 +41,13 @@ def landsat_clean_mask_invalid(dataset):
     return dataset
     
 
-def landsat_qa_clean_mask(dataset, platform):
+def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water']):
     """
-    Returns a clean_mask for `dataset` that masks out clouds.
+    Returns a clean_mask for `dataset` that masks out various types of terrain cover using the
+    Landsat pixel_qa band.
+    
+    See "pixel_qa band" here: https://landsat.usgs.gov/landsat-surface-reflectance-quality-assessment 
+    and Section 7 here: https://landsat.usgs.gov/sites/default/files/documents/lasrc_product_guide.pdf.
     
     Parameters
     ----------
@@ -53,6 +57,24 @@ def landsat_qa_clean_mask(dataset, platform):
     platform: str
         A string denoting the platform to be used. Can be "LANDSAT_5", "LANDSAT_7", or 
         "LANDSAT_8".
+    cover_types: list
+        A list of the cover types to include. Adding a cover type allows it to remain in the masked data.
+        Cover types for all Landsat platforms include: 
+        ['fill', 'clear', 'water', 'shadow', 'snow', 'cloud', 'low_conf_cl', 'med_conf_cl', 'high_conf_cl'].
+        
+        'fill' removes "no_data" values, which indicates an absense of data. This value is -9999 for Landsat platforms.
+        Generally, don't use 'fill'.
+        'clear' allows only clear terrain. 'water' allows only water. 'shadow' allows only cloud shadows.
+        'snow' allows only snow. 'cloud' allows only clouds, but note that it often only selects cloud boundaries. 
+        'low_conf_cl', 'med_conf_cl', and 'high_conf_cl' denote low, medium, and high confidence in cloud coverage.
+        'low_conf_cl' is useful on its own for only removing clouds, however, 'clear' is usually better suited for this.
+        'med_conf_cl' is useful in combination with 'low_conf_cl' to allow slightly heavier cloud coverage.
+        Note that 'med_conf_cl' and 'cloud' are very similar.
+        'high_conf_cl' is useful in combination with both 'low_conf_cl' and 'med_conf_cl'.
+        
+        For Landsat 8, there are more cover types: ['low_conf_cir', 'high_conf_cir', 'terrain_occ'].
+        'low_conf_cir' and 'high_conf_cir' denote low and high confidence in cirrus clouds.
+        'terrain_occ' allows only occluded terrain.
         
     Returns
     -------
@@ -67,11 +89,11 @@ def landsat_qa_clean_mask(dataset, platform):
     }
     
     #Clean mask creation to filter out pixels that are not suitable for analysis
-    clear_xarray  = processing_options[platform](dataset.pixel_qa, "clear")  
-    water_xarray  = processing_options[platform](dataset.pixel_qa, "water")
-    
-    #use logical or statement to elect viable pixels for analysis
-    return np.logical_or(clear_xarray.values.astype(bool), water_xarray.values.astype(bool))
+    clean_mask = None
+    for i, cover_type in enumerate(cover_types):
+        clean_mask = processing_options[platform](dataset.pixel_qa, cover_types[0]) if i == 0 \
+        else clean_mask + processing_options[platform](dataset.pixel_qa, cover_type)
+    return clean_mask
 
 def xarray_values_in(data, values, data_vars=None):
     """
