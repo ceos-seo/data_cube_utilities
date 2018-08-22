@@ -36,6 +36,28 @@ from datetime import datetime
 # Author: KMF
 # Creation date: 2016-06-13
 
+def NDWI(dataset, normalize=False):
+    """
+    Computes the Normalized Difference Water Index for an `xarray.Dataset`.
+    Values should be in the range [-1,1] for valid LANDSAT data (nir and swir1 are positive).
+    
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        An `xarray.Dataset` that must contain 'nir' and 'red' `DataArrays`.
+    normalize: bool
+        Whether or not to normalize to the range [0,1].
+    
+    Returns
+    -------
+    ndvi: xarray.DataArray
+        An `xarray.DataArray` with the same shape as `dataset` - the same coordinates in 
+        the same order.
+    """
+    ndwi = (dataset.nir - dataset.swir1) / (dataset.nir + dataset.swir1)
+    if normalize:
+        ndwi = (ndwi - ndwi.min())/(ndwi.max() - ndwi.min())
+    return ndwi
 
 def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enforce_float64=False):
     """
