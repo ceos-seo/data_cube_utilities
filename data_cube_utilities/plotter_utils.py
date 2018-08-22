@@ -16,7 +16,6 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import CubicSpline
 from sklearn import linear_model
 from scipy.interpolate import spline
-import matplotlib as mpl
 import matplotlib.mlab as mlab
 import matplotlib.ticker as ticker
 from matplotlib.ticker import FuncFormatter
@@ -527,17 +526,14 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
     
 ## End curve fitting ##
 
-def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
+def plot_band(dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
     Plots several statistics over time - including mean, median, linear regression of the 
-    means, Gaussian smoothed curve of means, and the band enclosing the 25th percentiles 
-    and the 75th percentiles. This is very similar to the output of the Comet Time Series 
-    Toolset (https://github.com/CosmiQ/CometTS). 
+    means, Gaussian smoothed curve of means, and the band enclosing the 25th and 75th percentiles. 
+    This is very similar to the output of the Comet Time Series Toolset (https://github.com/CosmiQ/CometTS). 
     
     Parameters
     ----------
-    landsat_dataset: xarray.Dataset
-        An xarray `Dataset` containing longitude, latitude, and time coordinates.
     dataset: xarray.DataArray
         An xarray `DataArray` containing time, latitude, and longitude coordinates.
     figsize: tuple
@@ -545,8 +541,7 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     fontsize: int
         The font size to use for text.
     """
-    
-    #Calculations
+    # Calculations
     times = dataset.time.values
     epochs = np.sort(np.array(list(map(n64_to_epoch, times))))
     x_locs = (epochs - epochs.min()) / (epochs.max() - epochs.min())
@@ -557,7 +552,7 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     plt.figure(figsize=figsize)
     ax = plt.gca()
 
-    #Shaded Area
+    # Shaded Area (percentiles)
     with warnings.catch_warnings():
         # Ignore warning about encountering an All-NaN slice. Some acquisitions have all-NaN values.
         warnings.simplefilter("ignore", category=RuntimeWarning)
@@ -580,27 +575,23 @@ def plot_band(landsat_dataset, dataset, figsize=(20,15), fontsize=24, legend_fon
     ax.grid(color='lightgray', linestyle='-', linewidth=1)
     fillcolor='gray'
     fillalpha=0.4
-    plt.fill_between(x_locs, means, quarter,  interpolate=False, color=fillcolor, alpha=fillalpha,label="25th")
-    plt.fill_between(x_locs, means, three_quarters, interpolate=False, color=fillcolor, alpha=fillalpha,label="75th")
+    plt.fill_between(x_locs, quarter, three_quarters,  interpolate=False, color=fillcolor, alpha=fillalpha, 
+                     label="25th and 75th percentile band")
         
     #Medians
     plt.plot(x_locs,medians,color="black",marker="o",linestyle='None', label = "Medians")
     
-    #Linear Regression (on everything)
-    #Data formatted in a way for needed for Guassian and Linear Regression
-    
     #The Actual Plot
-    
     plt.plot(x_locs,means,color="blue",label="Mean")
 
     #Linear Regression (on mean)
     m, b = np.polyfit(x_locs[mask], means[mask], 1)
-    plt.plot(x_locs, m*x_locs + b, '-', color="red",label="linear regression of measn",linewidth = 3.0)
+    plt.plot(x_locs, m*x_locs + b, '-', color="red",label="linear regression of means",linewidth = 3.0)
 
     #Gaussian Curve
-    plot_gaussian(x_locs[mask], means[mask], ax=ax,
-                  plotting_kwargs=dict(linestyle='-', label="Gaussian Smoothed of means", 
-                                       alpha=1, color='limegreen',linewidth = 3.0))
+    plot_curvefit(x_locs[mask], means[mask], fit_type='gaussian', ax=ax,
+                  plot_kwargs=dict(linestyle='-', label="Gaussian smoothed of means", 
+                                   alpha=1, color='limegreen', linewidth = 3.0))
     
     #Formatting
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times[mask])))
@@ -665,19 +656,20 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
     
 ## Matplotlib colormap functions ##
 
-def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
+def create_discrete_color_map(th, colors, data_range=[0,1], cmap_name='my_cmap'):
     """
     Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
     
     Parameters
     ----------
-    data_range: list-like
-        A 2-tuple of the minimum and maximum values the data may take.
     th: list
         Threshold values. Must be in the range of `data_range` - noninclusive.
     colors: list
         Colors to use between thresholds, so `len(colors) == len(th)+1`.
         Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
+    data_range: list-like
+        A list-like of the minimum and maximum values the data may take, respectively. Used to scale ``th``. 
+        Defaults to [0,1], for which a value of 0.5 in ``th`` would be the midpoint of the possible range.
     cmap_name: str
         The name of the colormap for matplotlib.
     """
