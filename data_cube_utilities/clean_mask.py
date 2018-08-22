@@ -93,7 +93,7 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water']):
     for i, cover_type in enumerate(cover_types):
         clean_mask = processing_options[platform](dataset.pixel_qa, cover_types[0]) if i == 0 \
         else clean_mask + processing_options[platform](dataset.pixel_qa, cover_type)
-    return clean_mask
+    return clean_mask.values
 
 def xarray_values_in(data, values, data_vars=None):
     """
