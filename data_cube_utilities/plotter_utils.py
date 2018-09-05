@@ -1,27 +1,28 @@
-import matplotlib.pyplot as plt
 from datetime import datetime
 import numpy as np
 import pandas as pd
 import datacube as dc
 import xarray as xr
-import utils.data_cube_utilities.data_access_api as dc_api 
+from xarray.ufuncs import logical_and as xr_and
+from xarray.ufuncs import logical_or as xr_or
 from rasterstats import zonal_stats
-from scipy import stats, exp
-from scipy.stats import norm
 import pylab
 import matplotlib as mpl
-from scipy.signal import gaussian
-from scipy.ndimage import filters
-from scipy.optimize import curve_fit
-from scipy.interpolate import CubicSpline
-from sklearn import linear_model
-from scipy.interpolate import spline
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import matplotlib.ticker as ticker
 from matplotlib.ticker import FuncFormatter
+from matplotlib.colors import LinearSegmentedColormap
+from scipy import stats, exp
+from scipy.stats import norm
+from scipy.signal import gaussian
+from scipy.ndimage import filters
+from scipy.optimize import curve_fit
+from scipy.interpolate import spline, CubicSpline
+from sklearn import linear_model
 import calendar, datetime, time
 import pytz
-from matplotlib.colors import LinearSegmentedColormap
 from copy import copy
 from scipy import stats
 import warnings
@@ -250,10 +251,10 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     
 def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)}, scale_params={}, fig=None, ax=None, max_times_per_plot=None, show_legend=True):
     """
-    Plot data variables in an xarray.Dataset together in one figure, with different plot types for each 
-    (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to means or medians along time.
-    Handles data binned with xarray.Dataset methods resample() and groupby(). That is, it handles data binned along time
-    or across years (e.g. by week of year).
+    Plot data variables in an xarray.Dataset together in one figure, with different plot types for 
+    each (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to 
+    aggregations along time. Handles data binned with xarray.Dataset methods resample() and groupby(). 
+    That is, it handles data binned along time (e.g. by week) or across years (e.g. by week of year).
     
     Parameters
     -----------
@@ -261,39 +262,47 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
         A Dataset containing some bands like NDVI or WOFS.
         The primary coordinate must be 'time'.
     plot_descs: dict
-        Dictionary mapping names of DataArrays in the Dataset to plot to dictionaries mapping aggregation types (e.g. 'mean', 'median')
-        to lists of dictionaries mapping plot types (e.g. 'line', 'box', 'scatter') to keyword arguments for plotting.
+        Dictionary mapping names of DataArrays in the Dataset to plot to dictionaries mapping 
+        aggregation types (e.g. 'mean', 'median') to lists of dictionaries mapping plot types 
+        (e.g. 'line', 'box', 'scatter') to keyword arguments for plotting.
         
-        Aggregation happens within time slices and can be many-to-many or many-to-one. Some plot types require many-to-many aggregation, and some other plot types require many-to-one aggregation.
-        Aggregation types can be any of ['mean', 'median', 'none'], with 'none' performing no aggregation.
+        Aggregation happens within time slices and can be many-to-many or many-to-one. 
+        Some plot types require many-to-many aggregation, and some other plot types require 
+        many-to-one aggregation. Aggregation types can be any of ['mean', 'median', 'none'], 
+        with 'none' performing no aggregation.
         
         Plot types can be any of ['scatter', 'line', 'gaussian', 'poly', 'cubic_spline', 'box'].
-        The plot type 'poly' requires a 'degree' entry mapping to an integer in its dictionary of keyword arguments.
+        The plot type 'poly' requires a 'degree' entry mapping to an integer in its dictionary 
+        of keyword arguments.
         
         Here is an example:
         {'ndvi':       {'mean': [{'line': {'color': 'forestgreen', 'alpha':alpha}}],
                         'none':  [{'box': {'boxprops': {'facecolor':'forestgreen', 'alpha':alpha}, 
                                                         'showfliers':False}}]}}
-        This example will create a green line plot of the mean of the 'ndvi' band as well as a green box plot of the 'ndvi' band.
+        This example will create a green line plot of the mean of the 'ndvi' band as well as a 
+        green box plot of the 'ndvi' band.
     fig_params: dict
-        Figure parameters dictionary (e.g. {'figsize':(12,6)}). Used to create a Figure ``if fig is None and ax is None``.
-        Note that in the case of multiple plots being created (see ``max_times_per_plot`` below), figsize will be the size
-        of each plot - not the entire figure.
+        Figure parameters dictionary (e.g. {'figsize':(12,6)}). Used to create a Figure 
+        ``if fig is None and ax is None``. Note that in the case of multiple plots being created 
+        (see ``max_times_per_plot`` below), figsize will be the size of each plot - 
+        not the entire figure.
     scale_params: dict
         Currently not used.
-        Dictionary mapping names of DataArrays to scaling methods (e.g. {'ndvi': 'std', 'wofs':'norm'}). 
-        The options are ['std', 'norm']. The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
-        Note that of these options, only normalizing guarantees that the y values will be in a fixed range - namely [0,1].
+        Dictionary mapping names of DataArrays to scaling methods 
+        (e.g. {'ndvi': 'std', 'wofs':'norm'}). The options are ['std', 'norm']. 
+        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
+        Note that of these options, only normalizing guarantees that the y values will be 
+        in a fixed range - namely [0,1].
     fig: matplotlib.figure.Figure
-        The figure to use for the plot. The figure must have at least one Axes object.
-        You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
-        The code ``fig = plt.figure()`` will not provide the Axes object.
-        The Axes object used will be the first. This is ignored if ``max_times_per_plot`` is less than the number of times.
+        The figure to use for the plot. 
+        If only `fig` is supplied, the Axes object used will be the first. 
+        This argument is ignored if ``max_times_per_plot`` is less than the number of times.
     ax: matplotlib.axes.Axes
-        The axes to use for the plot. This is ignored if ``max_times_per_plot`` is less than the number of times.
+        The axes to use for the plot. 
+        This argument is ignored if ``max_times_per_plot`` is less than the number of times.
     max_times_per_plot: int
-        The maximum number of times per plot. If specified, one plot will be generated for each group 
-        of this many times. The plots will be arranged in a grid.
+        The maximum number of times per plot. If specified, one plot will be generated for 
+        each group of this many times. The plots will be arranged in a row-major grid.
     show_legend: bool
         Whether or not to show the legend.
         
@@ -360,7 +369,7 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
         time_extents = times_not_all_nan[[lower_time_bound_ind, upper_time_bound_ind-1]]
         # Retrieve or create the axes if necessary.
         if len(times_not_all_nan) <= max_times_per_plot:
-            ax = retrieve_or_create_ax(fig, ax, **fig_params)
+            fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_params)
         else:
             ax = fig.add_subplot(subset_num_rows, subset_num_cols, fig_ind + 1)
         fig_times_not_all_nan = times_not_all_nan[lower_time_bound_ind:upper_time_bound_ind]
@@ -500,6 +509,9 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
     -------
     lines: matplotlib.lines.Line2D
         Can be used as a handle for a matplotlib legend (i.e. plt.legend(handles=...)) among other things.
+        
+    :Authors:
+        John Rattz (john.c.rattz@ama-inc.com)
     """
     # Avoid modifying the original arguments.
     fig_params = copy(fig_params)
@@ -509,7 +521,7 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
     plot_kwargs.setdefault('linestyle', '-')
 
     # Retrieve or create the axes if necessary.
-    ax = retrieve_or_create_ax(fig, ax, **fig_params)
+    fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_params)
     if x_smooth is None:
         x_smooth = np.linspace(x.min(), x.max(), n_pts)
     if fit_type == 'gaussian':
@@ -653,25 +665,43 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
         plt.plot(times, y, marker="o")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.xticks(rotation=90)    
+
+## Color utils ##
     
+def convert_name_rgb_255(color):
+    """
+    Converts a name of a matplotlib color to a list of rgb values in the range [0,255]. 
+    Else, returns the original argument.
+
+    Parameters
+    ----------
+    color: str or list (size 3)
+        The color name to convert or a list of red, green, and blue already in range [0,255].
+    """
+    return [255*rgb for rgb in mpl.colors.to_rgb(color)] if isinstance(color,str) else color
+
+## End color utils ##
+
 ## Matplotlib colormap functions ##
 
-def create_discrete_color_map(th, colors, data_range=[0,1], cmap_name='my_cmap'):
+def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
     """
     Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
     
     Parameters
     ----------
+    data_range: list-like
+        A 2-tuple of the minimum and maximum values the data may take.
     th: list
         Threshold values. Must be in the range of `data_range` - noninclusive.
     colors: list
         Colors to use between thresholds, so `len(colors) == len(th)+1`.
         Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
-    data_range: list-like
-        A list-like of the minimum and maximum values the data may take, respectively. Used to scale ``th``. 
-        Defaults to [0,1], for which a value of 0.5 in ``th`` would be the midpoint of the possible range.
     cmap_name: str
         The name of the colormap for matplotlib.
+        
+    :Authors:
+        John Rattz (john.c.rattz@ama-inc.com)
     """
     # Normalize threshold values based on the data range.
     th = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), th))
@@ -701,20 +731,308 @@ def create_discrete_color_map(th, colors, data_range=[0,1], cmap_name='my_cmap')
     return cmap
 
 ## End matplotlib colormap functions ##
+
+### Discrete color plotting (exclusive) ###
+
+def binary_class_change_plot(dataarrays, mask=None, colors=None, 
+                             class_legend_label=None, width=10, 
+                             fig=None, ax=None, *args, **kwargs):
+    """
+    Creates a figure showing one of the following, depending on the format of arguments:
+        1. The change in the extents of a binary pixel classification in a region over time.
+           Pixels are colored based on never, sometimes, or always being a member of the class.
+           In this case, there are 3 regions - never, sometimes, and always.
+        2. The change in the extents of a binary pixel classification in a region over time between
+           two time periods. Pixels are colored based on a change in having zero or more than zero 
+           times in which they are members of the class between the time periods.
+           In this case, there are 4 regions - (never,never),(never,some),(some,never),(some,some).
+    
+    Parameters
+    ----------
+    dataarrays: list-like of xarray.DataArray
+        A list-like of one or two DataArrays of classification values 
+        to plot, which must be either 0 or 1.
+    mask: numpy.ndarray
+        A NumPy array of the same shape as the dataarrays. 
+        The pixels for which it is `True` are colored `color_mask`.
+    colors: list-like:
+        A list-like of list-likes of 3 elements - red, green, and blue values in range [0,255], 
+        or the name of a matplotlib color.
         
+        If `dataarrays` contains one DataArray, these are the colors for pixels. 
+        Provide 3 color entries - for never, sometimes, and always class membership.
+        
+        If `dataarrays` contains two DataArrays, these are the colors for pixels that have zero
+        or more than zero times in which they are members of the class between the time periods.
+        Provide 4 color entires - (never,never),(never,some),(some,never),(some,some) class membership.
+    width: int
+        The width of the created ``matplotlib.figure.Figure``. 
+        The height will be set to maintain aspect ratio.
+    fig: matplotlib.figure.Figure
+        The figure to use for the plot. 
+        If `ax` is not supplied, the Axes object used will be the first.
+    ax: matplotlib.axes.Axes
+        The axes to use for the plot.
+    *args: list
+        Arguments passed to ``matplotlib.pyplot.imshow()``.
+    **kwargs: dict
+        Keyword arguments passed to ``matplotlib.pyplot.imshow()``.
+        
+    Returns
+    -------
+    (fig,ax), pcts: 
+        A 2-tuple of the figure and axes followed by a list of either 3 or 4 percents of 
+        pixel membership, depending on whether `dataarray` contains one or two DataArrays.
+
+        If `dataarrays` contains one DataArray, there are 3 percents for never, sometimes, 
+        and always class membership.
+
+        If `dataarrays` contains two DataArrays, there are 4 percents for 
+        (never,never),(never,some),(some,never),(some,some) class membership.
+    
+    :Authors:
+        John Rattz (john.c.rattz@ama-inc.com)
+    """
+    # Handle conversion of matplotlib color names to lists of rgb values (range [0,255] for plt.imshow()).
+    colors = list(map(convert_name_rgb_255, colors))
+    
+    def get_none_chng_perm_masks(dataarray):
+        """
+        For a DataArray of binary classifications (0 or 1) with a 'time' dimension, 
+        get a list of masks indicating where the points are never, sometimes, or always 
+        a member of the class (1 indicates membership), returned in that order in a list.
+        """
+        # Get the sum of classifications across time.
+        sum_cls = dataarray.sum(dim='time')
+        # Find where pixels are permanent, changing, or never a member of the class.
+        none_mask = sum_cls == 0
+        chng_mask = xr_and(0 < sum_cls, sum_cls < len(dataarray.time))
+        perm_mask = sum_cls == len(dataarray.time)
+        return [none_mask, chng_mask, perm_mask]
+    
+    # Assemble the color masks.
+    masks = []
+    if len(dataarrays) == 1: # Determine extent change in one time period.
+        dataarray = dataarrays[0]
+        masks += get_none_chng_perm_masks(dataarray)#[none_mask, chng_mask, perm_mask]
+    else: # Determine change between two time periods.
+        baseline_da, analysis_da = dataarrays
+        baseline_none_mask, baseline_chng_mask, baseline_perm_mask = get_none_chng_perm_masks(baseline_da)
+        analysis_none_mask, analysis_chng_mask, analysis_perm_mask = get_none_chng_perm_masks(analysis_da)
+        # Find where points are never a member of the class or a member at one or more times.
+        baseline_cls_ever = xr_or(baseline_chng_mask, baseline_perm_mask)
+        analysis_cls_ever = xr_or(analysis_chng_mask, analysis_perm_mask)
+        # Find where points change between never being a member of the class 
+        # and being a member at one or more times between the two periods.
+        no_cls_no_cls_mask = xr_and(baseline_none_mask, analysis_none_mask)
+        no_cls_cls_mask = xr_and(baseline_none_mask, analysis_cls_ever)
+        cls_no_cls_mask = xr_and(baseline_cls_ever, analysis_none_mask)
+        cls_cls_mask = xr_and(baseline_cls_ever, analysis_cls_ever)
+        masks += [no_cls_no_cls_mask, no_cls_cls_mask, cls_no_cls_mask, cls_cls_mask]
+        
+    # Determine the overriding mask.
+    lat_lon_shape = len(dataarrays[0].latitude), len(dataarrays[0].longitude)
+    mask = np.zeros_like(lat_lon_shape, dtype=np.bool) if mask is None else mask
+    
+    # Color the image with the masks.
+    color_array = np.zeros((*lat_lon_shape, 3)).astype(np.int16)
+    for i, mask in enumerate(masks):
+        color_array[mask] = colors[i]
+    
+    fig, ax = retrieve_or_create_fig_ax(fig, ax, figsize=figure_ratio(dataarrays[0], fixed_width = width))
+    
+    # Formatting title and labels.
+    title = "Class extents change" if len(dataarrays)==1 else "Class extents change baseline/analysis"
+    ax.set_title(title) 
+    
+    # Set the tick labels.
+    xarray_set_axes_labels(dataarrays[0], ax)
+    
+    # Create the legend.
+    class_legend_label = "a member of the class" if class_legend_label is None else class_legend_label
+    colors = [np.array(color)/255 for color in colors] # Colors must be in range [0,1] for color patches.
+    if len(dataarrays)==1:
+        labels = list(map(lambda str: str.format(class_legend_label), 
+                          ['Never {}', 'Sometimes {}', 'Always {}']))
+    else:
+        labels = list(map(lambda str: str.format(class_legend_label, class_legend_label), 
+                          ['No {} to No {}', 'No {} to {}', '{} to No {}', '{} to {}']))
+    color_patches = list(map(lambda color, label: mpatches.Patch(color=color, label=label), colors, labels)) 
+    ax.legend(handles=color_patches, loc='best')
+    
+    ax.imshow(color_array, *args, **kwargs)
+    
+    # Calculate the percentage of pixels that are permanent, changing, or never members.
+    pcts = [float((mask.sum() / (lat_lon_shape[0]*lat_lon_shape[1])).values) for mask in masks]
+    
+    return [fig,ax], pcts
+    
+    ## Threshold plotting ##
+
+def intersection_threshold_plot(first, second, th, mask = None, color_none='black', 
+                                color_first='green', color_second='red', 
+                                color_both='white', color_mask='gray', 
+                                width = 10, fig=None, ax=None, *args, **kwargs):
+    """
+    Given two dataarrays, create a threshold plot showing where zero, one, or both are within a threshold.
+    
+    Parameters
+    ----------
+    first, second: xarray.DataArray
+        The DataArrays to compare.
+    th: tuple
+        A 2-tuple of the minimum (inclusive) and maximum (exclusive) threshold values, respectively.
+    mask: numpy.ndarray
+        A NumPy array of the same shape as the dataarrays. The pixels for which it is `True` 
+        are colored`color_mask`.
+    color_none: list-like or str
+        A list-like of 3 elements - red, green, and blue values in range [0,255], 
+        or the name of a matplotlib color. Used to color regions where 
+        neither first nor second have values within the threshold. 
+        Default color is black.
+    color_first: list-like or str
+        A list-like of 3 elements - red, green, and blue values in range [0,255], 
+        or the name of a matplotlib color. Used to color regions where 
+        only the first has values within the threshold. 
+        Default color is green.
+    color_second: list-like or str
+        A list-like of 3 elements - red, green, and blue values in range [0,255], 
+        or the name of a matplotlib color. Used to color regions where 
+        only the second has values within the threshold. 
+        Default color is red.
+    color_both: list-like or str
+        A list-like of 3 elements - red, green, and blue values in range [0,255], 
+        or the name of a matplotlib color. Used to color regions where 
+        both the first and second have values within the threshold. 
+        Default color is white.
+    color_mask: list-like or str
+        A list-like of 3 elements - red, green, and blue values in range [0,255], 
+        or the name of a matplotlib color. Used to color regions where `mask == True`.
+        Overrides any other color a region may have. 
+        Default color is gray.
+    width: int
+        The width of the created ``matplotlib.figure.Figure``. 
+        The height will be set to maintain aspect ratio.
+    fig: matplotlib.figure.Figure
+        The figure to use for the plot. 
+        If `ax` is not supplied, the Axes object used will be the first.
+    ax: matplotlib.axes.Axes
+        The axes to use for the plot.
+    *args: list
+        Arguments passed to ``matplotlib.pyplot.imshow()``.
+    **kwargs: dict
+        Keyword arguments passed to ``matplotlib.pyplot.imshow()``.
+    """
+    # Handle conversion of matplotlib color names to lists of rgb values.
+    color_none, color_first, color_second, color_both, color_mask = \
+        list(map(convert_name_rgb_255, [color_none, color_first, color_second, color_both, color_mask]))
+    
+    # Determine the regions.
+    first_in = np.logical_and(th[0] <= first, first < th[1])
+    second_in = np.logical_and(th[0] <= second, second < th[1])
+    both_in = np.logical_and(first_in, second_in)
+    none_in = np.invert(both_in)
+    # Determine the overriding mask.
+    mask  = np.zeros(first.shape).astype(bool) if mask is None else mask
+    
+    # The colors for each pixel.
+    color_array = np.zeros((*first.shape, 3)).astype(np.int16)
+    
+    color_array[none_in] = color_none
+    color_array[first_in] =  color_first
+    color_array[second_in] = color_second
+    color_array[both_in] = color_both
+    color_array[mask] =  color_mask
+
+    fig, ax = retrieve_or_create_fig_ax(fig, ax, figsize=figure_ratio(first, fixed_width = width))
+    
+    plt.title("Threshold: {} < x < {}".format(th[0], th[1]))
+    
+    max_num_ticks = 10 # Max ticks per axis.
+    
+    lon = first.longitude.values
+    label_every = int(round(len(lon)/max_num_ticks))
+    lon_labels = ["{0:.4f}".format(lon_val) for lon_val in lon[::label_every]]
+    plt.xlabel('Longitude')
+    plt.xticks(range(len(lon))[::label_every], lon_labels, rotation='vertical')
+    
+    lat = first.latitude.values
+    label_every = int(round(len(lat)/max_num_ticks))
+    lat_labels = ["{0:.4f}".format(lat_val) for lat_val in lat[::label_every]]
+    plt.ylabel('Latitude')
+    plt.yticks(range(len(lat))[::label_every], lat_labels)
+    
+    plt.imshow(color_array, *args, **kwargs)
+    plt.show()
+
+    ## End threshold plotting ##
+
+### End discrete color plotting (exclusive)##
+
 ## Misc ##
 
-def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
+def xarray_set_axes_labels(data, ax, fontsize=10):
     """
-    Returns an appropriate Axes object given possible Figure or Axes objects.
-    If neither is supplied, a new figure will be created with associated axes.
+    Sets tick locations and labels for x and y axes on a `matplotlib.axes.Axes` object
+    such that the tick labels do not overlap. Also labels x axis as "Longitude" and y axis
+    as "Latitude".
+    
+    Parameters
+    ----------
+    data: xarray.Dataset or xarray.DataArray
+        The xarray Dataset or DataArray containing latitude and longitude coordinates.
+    ax: matplotlib.axes.Axes
+        The matplotlib Axes object to set tick locations and labels for.
+    fontsize: numeric
+        The fontsize of the tick labels. This determines the number of ticks used.
     """
-    if fig is None:
-        if ax is None:
-            fig, ax = plt.subplots(**fig_params)
+    label_every = max(1, int(round(fontsize)))
+    
+    lon = data.longitude.values
+    lon_labels = ["{0:.4f}".format(lon_val) for lon_val in lon[::label_every]]
+    ax.set_xlabel('Longitude')
+    ax.set_xticks(range(len(lon))[::label_every])
+    ax.set_xticklabels(lon_labels, rotation=45, fontsize=fontsize)
+
+    lat = data.latitude.values
+    lat_labels = ["{0:.4f}".format(lat_val) for lat_val in lat[::label_every]]
+    ax.set_ylabel('Latitude')
+    ax.set_yticks(range(len(lat))[::label_every])
+    ax.set_yticklabels(lat_labels, fontsize=fontsize)
+
+def figure_ratio(data, fixed_width = 10):
+    """
+    Sizes a figure based on either
+        1. A list-like of x and y dimensions, respectively
+        2. An xarray Dataset or DataArray containing latitude and longitude dimensions
+    """
+    width = fixed_width
+    if isinstance(data, xr.Dataset) or isinstance(data, xr.DataArray):
+        height = len(data.latitude) * (fixed_width / len(data.longitude))
     else:
-        ax = fig.axes[0]
-    return ax
+        height = data[1] * (fixed_width / data[0])
+    return (width, height)
+
+def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
+    """
+    Returns appropriate matplotlib Figure and Axes objects given Figure and/or Axes objects.
+    If neither is supplied, a new figure will be created with associated axes.
+    If only `fig` is supplied, `(fig,fig.axes[0])` is returned. That is, the first Axes object will be used (and created if necessary).
+    If `ax` is supplied, `(fig, ax)` is returned.
+    
+    Returns
+    -------
+    fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes
+        The figure and the axes of that figure.
+    """
+    if ax is None:
+        if fig is None:
+            fig, ax = plt.subplots(**fig_params)
+        else:
+            if len(fig.axes) == 0:
+                fig.add_axes([1,1,1,1])
+            ax = fig.axes[0]
+    return fig, ax
 
 def skip_plot(n_pts, plot_type, kwargs={}):
     """Returns a boolean denoting whether to skip plotting data given the number of points it contains."""
