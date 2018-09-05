@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
 from time import time
 import numpy as np
 
+from .plotter_utils import figure_ratio, xarray_set_axes_labels
 
 # Change the bands (RGB) here if you want other false color combinations
 def rgb(dataset, at_index = 0, bands = ['red', 'green', 'blue'], paint_on_mask = [],
@@ -13,7 +13,8 @@ def rgb(dataset, at_index = 0, bands = ['red', 'green', 'blue'], paint_on_mask =
     Parameters
     ----------
     dataset: xarray.Dataset
-        A Dataset containing latitude and longitude coordinates, in that order.
+        A Dataset containing at least latitude and longitude coordinates and optionally time.
+        The coordinate order should be time, latitude, and finally longitude.
         Must contain the data variables specified in the `bands` parameter.
     bands: list-like
         A list-like containing 3 names of data variables in `dataset` to use as the red, green, and blue
@@ -27,19 +28,15 @@ def rgb(dataset, at_index = 0, bands = ['red', 'green', 'blue'], paint_on_mask =
     width: int
         The width of the figure in inches.
     """
-    def aspect_ratio_helper(x,y, fixed_width = 20):
-        width = fixed_width
-        height = y * (fixed_width / x)
-        return (width, height)
+    min_brightness = 0.2
     
     ### < Dataset to RGB Format, needs float values between 0-1 
     rgb = np.stack([dataset[bands[0]],
                     dataset[bands[1]],
                     dataset[bands[2]]], axis = -1)
-    
     # Interpolate values to be in the range [0,1] for creating the image.
-    # The data max is used here rather than the platform max because we want bright pixels.
-    rgb = np.interp(rgb, (min_possible, np.nanmax(rgb)), [0,1]) 
+    rgb = np.interp(rgb, (np.nanmin(rgb), np.nanmax(rgb)), [0,1])
+    # TODO: Mask out shadows.
     ### > 
     
     ### < takes a T/F mask, apply a color to T areas  
@@ -47,19 +44,13 @@ def rgb(dataset, at_index = 0, bands = ['red', 'green', 'blue'], paint_on_mask =
         rgb[mask] = np.array(color)/ 255.0
     ### > 
     
-    fig, ax = plt.subplots(figsize = aspect_ratio_helper(*rgb.shape[:2], fixed_width = width))
+    fig, ax = plt.subplots(figsize = figure_ratio(rgb.shape[:2], fixed_width = width))
 
-    lat_formatter = FuncFormatter(lambda x, pos: round(dataset.latitude.values[pos] ,4) )
-    lon_formatter = FuncFormatter(lambda x, pos: round(dataset.longitude.values[pos],4) )
-
-    plt.ylabel("Latitude")
-    ax.yaxis.set_major_formatter(lat_formatter)
-    plt.xlabel("Longitude")
-    ax.xaxis.set_major_formatter(lon_formatter)
+    xarray_set_axes_labels(dataset, ax)
    
-    if 'time' in dataset:
-        plt.imshow((rgb[at_index]))
+    if 'time' in dataset.dims:
+        plt.imshow(rgb[at_index])
     else:
-        plt.imshow(rgb)  
+        plt.imshow(rgb)
     
     plt.show()
