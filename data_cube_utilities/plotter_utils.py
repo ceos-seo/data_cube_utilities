@@ -971,6 +971,41 @@ def intersection_threshold_plot(first, second, th, mask = None, color_none='blac
 
 ## Misc ##
 
+def xarray_imshow(data, width=10, fig=None, ax=None, vmin=None, vmax=None):
+    """
+    Shows a heatmap of an xarray DataArray with only latitude and longitude coordinates.
+    Different from `data.plot.imshow()` in that this sets axes ticks and labels - including
+    labeling "Latitude" and "Longitude" - and shows a colorbar.
+    
+    Parameters
+    ----------
+    data: xarray.DataArray
+        The xarray.DataArray containing only latitude and longitude coordinates.
+    fig: matplotlib.figure.Figure
+        The figure to use for the plot. 
+        If `ax` is not supplied, the Axes object used will be the first.
+    ax: matplotlib.axes.Axes
+        The axes to use for the plot.
+        
+    Returns
+    -------
+    fig, ax, cbar: matplotlib.figure.Figure, matplotlib.axes.Axes, matplotlib.colorbar.Colorbar
+        The figure, axes, and colorbar used.
+    """
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    
+    vmin = np.nanmin(data.values) if vmin is None else vmin
+    vmax = np.nanmax(data.values) if vmax is None else vmax
+    
+    fig, ax = retrieve_or_create_fig_ax(fig, ax, figsize=figure_ratio(data, fixed_width = width))
+    xarray_set_axes_labels(data, ax)
+    im = ax.imshow(data, vmin=vmin, vmax=vmax)
+    # Create colorbar
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="7.5%", pad=0.05)
+    cbar = plt.colorbar(im, ax=ax, cax=cax)
+    return fig, ax, cbar
+
 def xarray_set_axes_labels(data, ax, fontsize=10):
     """
     Sets tick locations and labels for x and y axes on a `matplotlib.axes.Axes` object
@@ -986,15 +1021,18 @@ def xarray_set_axes_labels(data, ax, fontsize=10):
     fontsize: numeric
         The fontsize of the tick labels. This determines the number of ticks used.
     """
-    label_every = max(1, int(round(fontsize)))
+    bbox = ax.get_window_extent()
+    width, height = bbox.width, bbox.height
     
     lon = data.longitude.values
+    label_every = max(1, int(round(10*len(lon)*fontsize/width)))
     lon_labels = ["{0:.4f}".format(lon_val) for lon_val in lon[::label_every]]
     ax.set_xlabel('Longitude')
     ax.set_xticks(range(len(lon))[::label_every])
     ax.set_xticklabels(lon_labels, rotation=45, fontsize=fontsize)
 
     lat = data.latitude.values
+    label_every = max(1, int(round(10*len(lat)*fontsize/height)))
     lat_labels = ["{0:.4f}".format(lat_val) for lat_val in lat[::label_every]]
     ax.set_ylabel('Latitude')
     ax.set_yticks(range(len(lat))[::label_every])
