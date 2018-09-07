@@ -249,7 +249,8 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
-def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)}, scale_params={}, fig=None, ax=None, max_times_per_plot=None, show_legend=True):
+def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)}, scale_params={}, fig=None, ax=None, 
+                            max_times_per_plot=None, show_legend=True, title=None):
     """
     Plot data variables in an xarray.Dataset together in one figure, with different plot types for 
     each (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to 
@@ -305,7 +306,15 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
         each group of this many times. The plots will be arranged in a row-major grid.
     show_legend: bool
         Whether or not to show the legend.
-        
+    title: str
+        The title of each subplot. Note that a date range enclosed in parenthesis will be postpended
+        whether this is specified or not.
+    
+    Returns
+    -------
+    fig: matplotlib.figure.Figure
+        The figure containing the plot grid.
+    
     Raises
     ------
     ValueError:
@@ -469,8 +478,11 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
         plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
         if show_legend:
             plt.legend(handles=data_arr_plots, labels=legend_labels, loc='best')
-        plt.title("Figure {}: Time Range {} to {}".format(fig_ind, date_strs[0], date_strs[-1]))
+        title_postpend = " ({} to {})".format(date_strs[0], date_strs[-1])
+        title_prepend = "Figure {}".format(fig_ind) if title is None else title
+        plt.title(title_prepend + title_postpend)
         plt.tight_layout()
+    return fig
     
 ## Curve fitting ##
 
@@ -642,7 +654,6 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
         for i, q in enumerate(_xarray):
             quarters.append(np.nanpercentile(_xarray, 25))
             three_quarters.append(np.nanpercentile(_xarray, 75))
-            #print(q.values.mean())
         
         ax = plt.gca()
         ax.grid(color='lightgray', linestyle='-', linewidth=1)
@@ -680,6 +691,12 @@ def convert_name_rgb_255(color):
     """
     return [255*rgb for rgb in mpl.colors.to_rgb(color)] if isinstance(color,str) else color
 
+def norm_color(color):
+    color = convert_name_rgb_255(color)
+    if len(color) == 3:
+        color = [rgb/255 for rgb in color]
+    return color
+
 ## End color utils ##
 
 ## Matplotlib colormap functions ##
@@ -690,7 +707,7 @@ def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
     
     Parameters
     ----------
-    data_range: list-like
+    data_range: list
         A 2-tuple of the minimum and maximum values the data may take.
     th: list
         Threshold values. Must be in the range of `data_range` - noninclusive.
@@ -698,18 +715,16 @@ def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
         Colors to use between thresholds, so `len(colors) == len(th)+1`.
         Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
     cmap_name: str
-        The name of the colormap for matplotlib.
+        The name of the created colormap for matplotlib.
         
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
     # Normalize threshold values based on the data range.
     th = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), th))
-    # Normalize color values.
-    for i, color in enumerate(colors):
-        if isinstance(color, tuple):
-            colors[i] = [rgb/255 for rgb in color]
+    colors = list(map(norm_color, colors))
     th = [0.0] + th + [1.0]
+    
     cdict = {}
     # These are fully-saturated red, green, and blue - not the matplotlib colors for 'red', 'green', and 'blue'.
     primary_colors = ['red', 'green', 'blue']
@@ -729,6 +744,55 @@ def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
         cdict[primary_color] = cdict_entry
     cmap = LinearSegmentedColormap(cmap_name, cdict)
     return cmap
+
+def create_gradient_color_map(data_range, colors, positions=None, cmap_name='my_cmap'):
+    """
+    Creates a gradient colormap with a LinearSegmentedColormap. Currently only creates linear gradients.
+    
+    Parameters
+    ----------
+    data_range: list-like
+        A 2-tuple of the minimum and maximum values the data may take.
+    colors: list of str or list of tuple
+        Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
+        The first and last colors are placed at the beginning and end of the colormap, respectively.
+    positions: list-like
+        The values which are colored with corresponding colors in `colors`, 
+        except the first and last colors, so `len(positions) == len(colors)-2`.
+        Positions must be in the range of `data_range` - noninclusive.
+        If no positions are provided, the colors are evenly spaced.
+    cmap_name: str
+        The name of the created colormap for matplotlib.
+        
+    Examples
+    --------
+    Creating a linear gradient colormap of red, green, and blue, with even spacing between them:
+        create_gradient_color_map(data_range=(0,1), positions=(0.5,), colors=('red', 'green', 'blue'))
+    Which can also be done without specifying `positions`:
+        create_gradient_color_map(data_range=(0,1), colors=('red', 'green', 'blue'))
+    """
+    # Normalize position values based on the data range.
+    if positions is None:
+        range_size = data_range[1] - data_range[0]
+        spacing = range_size / (len(colors) - 1)
+        positions = [spacing*i for i in range(1, len(colors)-1)]
+    else:
+        positions = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), positions))
+    
+    colors = list(map(norm_color, colors)) # Normalize color values for colormap creation.
+    positions = [0.0] + positions + [1.0]
+    
+    cdict = {}
+    # These are fully-saturated red, green, and blue - not the matplotlib colors for 'red', 'green', and 'blue'.
+    primary_colors = ['red', 'green', 'blue']
+    # Get the 3-tuples of rgb values for the colors.
+    color_rgbs = [(mpl.colors.to_rgb(color) if isinstance(color,str) else color) for color in colors]
+    cdict = {'red':[], 'green':[], 'blue':[]}
+    for pos, color in zip(positions, color_rgbs):
+        cdict['red'].append((pos, color[0], color[0]))
+        cdict['green'].append((pos, color[1], color[1]))
+        cdict['blue'].append((pos, color[2], color[2]))
+    return LinearSegmentedColormap(cmap_name, cdict)
 
 ## End matplotlib colormap functions ##
 
@@ -765,6 +829,9 @@ def binary_class_change_plot(dataarrays, mask=None, colors=None,
         If `dataarrays` contains two DataArrays, these are the colors for pixels that have zero
         or more than zero times in which they are members of the class between the time periods.
         Provide 4 color entires - (never,never),(never,some),(some,never),(some,some) class membership.
+    class_legend_label: str
+        The class label on the legend. For example, `class_legend_label='Water'` would yield legend labels
+        like "Never Water".
     width: int
         The width of the created ``matplotlib.figure.Figure``. 
         The height will be set to maintain aspect ratio.
@@ -799,15 +866,17 @@ def binary_class_change_plot(dataarrays, mask=None, colors=None,
     def get_none_chng_perm_masks(dataarray):
         """
         For a DataArray of binary classifications (0 or 1) with a 'time' dimension, 
-        get a list of masks indicating where the points are never, sometimes, or always 
-        a member of the class (1 indicates membership), returned in that order in a list.
+        get a list of masks indicating where the points are, in order, never, sometimes, or always 
+        a member of the class (1 indicates membership) of all non-NaN values for those points.
         """
         # Get the sum of classifications across time.
         sum_cls = dataarray.sum(dim='time')
+        # The number of acquistions in which this pixel was not nan.
+        num_times_not_nan = dataarray.count(dim='time') 
         # Find where pixels are permanent, changing, or never a member of the class.
         none_mask = sum_cls == 0
-        chng_mask = xr_and(0 < sum_cls, sum_cls < len(dataarray.time))
-        perm_mask = sum_cls == len(dataarray.time)
+        chng_mask = xr_and(0 < sum_cls, sum_cls < num_times_not_nan)
+        perm_mask = sum_cls == num_times_not_nan
         return [none_mask, chng_mask, perm_mask]
     
     # Assemble the color masks.
@@ -971,9 +1040,10 @@ def intersection_threshold_plot(first, second, th, mask = None, color_none='blac
 
 ## Misc ##
 
-def xarray_imshow(data, width=10, fig=None, ax=None, vmin=None, vmax=None):
+def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True, fig_kwargs={}, 
+                  imshow_kwargs={}, cbar_kwargs={}, nan_color='white'):
     """
-    Shows a heatmap of an xarray DataArray with only latitude and longitude coordinates.
+    Shows a heatmap of an xarray DataArray with only latitude and longitude dimensions.
     Different from `data.plot.imshow()` in that this sets axes ticks and labels - including
     labeling "Latitude" and "Longitude" - and shows a colorbar.
     
@@ -981,29 +1051,57 @@ def xarray_imshow(data, width=10, fig=None, ax=None, vmin=None, vmax=None):
     ----------
     data: xarray.DataArray
         The xarray.DataArray containing only latitude and longitude coordinates.
+    width: numeric
+        The width of the figure with proper aspect ratio. The height is determined by the width and lat/lon shape.
     fig: matplotlib.figure.Figure
         The figure to use for the plot. 
         If `ax` is not supplied, the Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
+    use_colorbar: bool
+        Whether or not to create a colorbar to the right of the axes.
+    fig_kwargs: dict
+        The dictionary of keyword arguments used to build the figure.
+    imshow_kwargs: dict
+        The dictionary of keyword arguments passed to `plt.imshow()`.
+    cbar_kwargs: dict
+        The dictionary of keyword arguments passed to `plt.colorbar()`.
+    nan_color: str or list-like
+        The color used for NaN regions. Can be a string name of a matplotlib color or 
+        a 3-tuple (list-like) of rgb values in range [0,255].
         
     Returns
     -------
     fig, ax, cbar: matplotlib.figure.Figure, matplotlib.axes.Axes, matplotlib.colorbar.Colorbar
-        The figure, axes, and colorbar used.
+        The figure, axes, and colorbar used. If `use_colorbar == False`, this will be `None`.
     """
     from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    nan_color = norm_color(nan_color) # Normalize color value for matplotlib.
     
-    vmin = np.nanmin(data.values) if vmin is None else vmin
-    vmax = np.nanmax(data.values) if vmax is None else vmax
+    fig_kwargs['figsize'] = fig_kwargs.get('figsize', figure_ratio(data, fixed_width = width))
+    fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_kwargs)
     
-    fig, ax = retrieve_or_create_fig_ax(fig, ax, figsize=figure_ratio(data, fixed_width = width))
+    if use_colorbar:
+        imshow_kwargs.setdefault('vmin', np.nanmin(data.values))
+        imshow_kwargs.setdefault('vmax', np.nanmax(data.values))
+
+    # Handle display of NaN values.
+    data_arr = data.values
+    masked_array = np.ma.array(data_arr, mask=np.isnan(data_arr))
+    cmap = imshow_kwargs.pop('cmap', plt.get_cmap('viridis'))
+    cmap.set_bad(nan_color)
+    im = ax.imshow(masked_array, interpolation='nearest', cmap=cmap)
+    
     xarray_set_axes_labels(data, ax)
-    im = ax.imshow(data, vmin=vmin, vmax=vmax)
+    
     # Create colorbar
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="7.5%", pad=0.05)
-    cbar = plt.colorbar(im, ax=ax, cax=cax)
+    if use_colorbar:
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="7.5%", pad=0.05)
+        cbar = plt.colorbar(im, ax=ax, cax=cax, **cbar_kwargs)
+    else:
+        cbar = None
     return fig, ax, cbar
 
 def xarray_set_axes_labels(data, ax, fontsize=10):
@@ -1040,7 +1138,7 @@ def xarray_set_axes_labels(data, ax, fontsize=10):
 
 def figure_ratio(data, fixed_width = 10):
     """
-    Sizes a figure based on either
+    Sizes a figure to maintain aspect ratio based on either:
         1. A list-like of x and y dimensions, respectively
         2. An xarray Dataset or DataArray containing latitude and longitude dimensions
     """
