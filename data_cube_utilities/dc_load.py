@@ -1,3 +1,4 @@
+import numpy as np
 import xarray as xr
 from .clean_mask import landsat_qa_clean_mask, landsat_clean_mask_invalid
 from xarray.ufuncs import logical_and as xr_and
@@ -75,3 +76,40 @@ def load_multiplatform(dc, platforms, products, load_params={}, masking_params={
         dataset = datasets_temp[list(datasets_temp.keys())[0]]
         clean_mask = clean_masks_temp[list(clean_masks_temp.keys())[0]]
     return dataset, clean_mask
+
+def get_overlapping_area(api, platforms, products):
+    """
+    Returns the minimum and maximum latitude and longitude of the overlapping area for a set of products.
+    
+    Parameters
+    ----------
+    api: DataAccessApi
+        An instance of `DataAccessApi` from `utils.data_cube_utilities`.
+    platforms, products: list-like
+        A list-like of platforms and products. Both must have the same length.
+        
+    Returns
+    -------
+    full_lat, full_lon: tuple
+        Two 2-tuples of the minimum and maximum latitude and longitude, respectively.
+    """
+    min_max_dates = np.empty((len(platforms), 2), dtype=object)
+    min_max_lat = np.empty((len(platforms), 2))
+    min_max_lon = np.empty((len(platforms), 2))
+    for i, (platform, product) in enumerate(zip(platforms, products)):
+        # Get the extents of the cube
+        descriptor = api.get_query_metadata(platform=platform, product=product)
+
+        # Save extents
+        min_max_dates[i] = descriptor['time_extents']
+        min_max_lat[i] = descriptor['lat_extents']
+        min_max_lon[i] = descriptor['lon_extents']
+
+    # Determine minimum and maximum longitudes that bound a common area among products
+    min_lon = np.max(min_max_lon[:,0]) # The greatest minimum longitude among products
+    max_lon = np.min(min_max_lon[:,1]) # The smallest maximum longitude among products
+    min_lat = np.max(min_max_lat[:,0])
+    max_lat = np.min(min_max_lat[:,1])
+    full_lon = (min_lon, max_lon)
+    full_lat = (min_lat, max_lat)
+    return full_lat, full_lon
