@@ -14,6 +14,7 @@ import matplotlib.mlab as mlab
 import matplotlib.ticker as ticker
 from matplotlib.ticker import FuncFormatter
 from matplotlib.colors import LinearSegmentedColormap
+import seaborn as sns
 from scipy import stats, exp
 from scipy.stats import norm
 from scipy.signal import gaussian
@@ -911,8 +912,8 @@ def binary_class_change_plot(dataarrays, mask=None, colors=None,
     fig, ax = retrieve_or_create_fig_ax(fig, ax, figsize=figure_ratio(dataarrays[0], fixed_width = width))
     
     # Formatting title and labels.
-    title = "Class extents change" if len(dataarrays)==1 else "Class extents change baseline/analysis"
-    ax.set_title(title) 
+    title = "Class extents change" if len(dataarrays)==1 else "Class extents change \nbaseline/analysis"
+    ax.set_title(title, fontsize=12 if len(dataarrays)==1 else 14)
     
     # Set the tick labels.
     xarray_set_axes_labels(dataarrays[0], ax)
@@ -1039,6 +1040,89 @@ def intersection_threshold_plot(first, second, th, mask = None, color_none='blac
 ### End discrete color plotting (exclusive)##
 
 ## Misc ##
+
+def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_labels=None, 
+                 show_row_labels=True, show_col_labels=True, show_cell_labels=True, 
+                 cmap=None, cell_val_fmt='2g', annot_kwargs={}, tick_fontsize=14, 
+                 x_axis_tick_kwargs=None, y_axis_tick_kwargs=None, 
+                 x_axis_ticks_position='default', y_axis_ticks_position='default', 
+                 fig=None, ax=None, heatmap_kwargs={}, fig_kwargs={}):
+    """
+    Prints a matrix as a heatmap.
+    Inspired by https://gist.github.com/shaypal5/94c53d765083101efc0240d776a23823.
+    
+    Arguments
+    ---------
+    cell_value_mtx: numpy.ndarray
+        A 2D NumPy array to be used as the cell values when coloring with the colormap.
+    cell_label_mtx: numpy.ndarray
+        A 2D NumPy array to be used as the cell labels.
+    row_labels, col_labels: list
+        A list of labels in the order they index the matrix rows and columns, respectively.
+    show_row_labels, show_col_labels: bool
+        Whether to show the row or column labels, respectively.
+    show_cell_labels: bool
+        Whether to show values as cell labels or not.
+    cmap: matplotlib.colors.Colormap
+        A matplotlib colormap used to color the cells based on `cell_value_mtx`.
+    cell_val_fmt: str
+        Formatting string for values in the matrix cells.
+    annot_kwargs: dict
+        Keyword arguments for ``ax.text`` for formatting cell annotation text.
+    tick_fontsize: int
+        The fontsize of tick labels. Overridden by `x_axis_tick_kwargs` and `y_axis_tick_kwargs`.
+    x_axis_tick_kwargs, y_axis_tick_kwargs: dict
+        Keyword arguments for x and y axis tick labels, respectively.
+        Specifically, keyword arguments for calls to `ax.[x_axis,y_axis].set_ticklabels()`
+        where `ax` is the `matplotlib.axes.Axes` object returned by `seaborn.heatmap()`.
+    x_axis_ticks_position, y_axis_ticks_position: str
+        The position of x and y axis ticks, respectively.
+        For x_axis_ticks_position, possible values are ['top', 'bottom', 'both', 'default', 'none'].
+        For y_axis_ticks_position, possible values are ['left', 'right', 'both', 'default', 'none'].
+        See https://matplotlib.org/api/axis_api.html for more information.
+    fig: matplotlib.figure.Figure
+        The figure to use for the plot.
+        If only `fig` is supplied, the Axes object used will be the first.
+    ax: matplotlib.axes.Axes
+        The axes to use for the plot.
+    heatmap_kwargs: dict
+        Dictionary of keyword arguments to `seaborn.heatmap()`. 
+        Overrides any other relevant parameters passed to this function.
+        Some notable parameters include 'vmin', 'vmax', and 'cbar_kws'.
+    fig_kwargs: dict
+        The dictionary of keyword arguments used to build the figure.
+    
+    Returns
+    -------
+    fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes
+        The figure and axes used for the plot.
+    """
+    cell_label_mtx = cell_value_mtx if cell_label_mtx is None else cell_label_mtx
+    row_labels = ['']*cell_value_mtx.shape[0] if not show_row_labels else row_labels
+    col_labels = ['']*cell_value_mtx.shape[1] if not show_col_labels else col_labels
+    
+    df = pd.DataFrame(cell_value_mtx, index=row_labels, columns=col_labels)
+    cell_labels = cell_label_mtx if show_cell_labels else None
+    fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_kwargs)
+    heatmap = sns.heatmap(df, cmap=cmap, annot=cell_labels, fmt=cell_val_fmt, 
+                          annot_kws=annot_kwargs, ax=ax, **heatmap_kwargs)
+    if not show_row_labels:
+        heatmap.set_yticks([]) # Ticks must be hidden explicitly.
+    else:
+        if y_axis_tick_kwargs is None:    
+            y_axis_tick_kwargs = dict(rotation=0, ha='right')
+        y_axis_tick_kwargs.setdefault('fontsize', tick_fontsize)
+        heatmap.yaxis.set_ticklabels(heatmap.yaxis.get_ticklabels(), **y_axis_tick_kwargs)
+        heatmap.yaxis.set_ticks_position(y_axis_ticks_position)
+    if not show_col_labels:
+        heatmap.set_xticks([])
+    else:
+        if x_axis_tick_kwargs is None:
+            x_axis_tick_kwargs = dict(rotation=45, ha='right')
+        x_axis_tick_kwargs.setdefault('fontsize', tick_fontsize)
+        heatmap.xaxis.set_ticklabels(heatmap.xaxis.get_ticklabels(), **x_axis_tick_kwargs)
+        heatmap.xaxis.set_ticks_position(x_axis_ticks_position)
+    return fig, ax
 
 def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True, fig_kwargs={}, 
                   imshow_kwargs={}, cbar_kwargs={}, nan_color='white'):
