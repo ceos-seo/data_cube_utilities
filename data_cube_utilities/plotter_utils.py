@@ -702,7 +702,7 @@ def norm_color(color):
 
 ## Matplotlib colormap functions ##
 
-def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
+def create_discrete_color_map(data_range, colors, th=None, cmap_name='my_cmap'):
     """
     Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
     
@@ -710,11 +710,12 @@ def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
     ----------
     data_range: list
         A 2-tuple of the minimum and maximum values the data may take.
-    th: list
-        Threshold values. Must be in the range of `data_range` - noninclusive.
     colors: list
-        Colors to use between thresholds, so `len(colors) == len(th)+1`.
+        Colors to use between thresholds.
         Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
+    th: list
+        Threshold values separating colors, so `len(colors) == len(th)+1`. 
+        Must be in the range of `data_range` - noninclusive.
     cmap_name: str
         The name of the created colormap for matplotlib.
         
@@ -722,6 +723,10 @@ def create_discrete_color_map(data_range, th, colors, cmap_name='my_cmap'):
         John Rattz (john.c.rattz@ama-inc.com)
     """
     # Normalize threshold values based on the data range.
+    th_spacing = (data_range[1] - data_range[0])/len(colors)
+    
+    if th is None:
+        th = np.linspace(data_range[0]+th_spacing, data_range[1]-th_spacing, len(colors)-1)
     th = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), th))
     colors = list(map(norm_color, colors))
     th = [0.0] + th + [1.0]
@@ -1088,7 +1093,7 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
     heatmap_kwargs: dict
         Dictionary of keyword arguments to `seaborn.heatmap()`. 
         Overrides any other relevant parameters passed to this function.
-        Some notable parameters include 'vmin', 'vmax', and 'cbar_kws'.
+        Some notable parameters include 'vmin', 'vmax', 'cbar', and 'cbar_kws'.
     fig_kwargs: dict
         The dictionary of keyword arguments used to build the figure.
     
@@ -1100,6 +1105,7 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
     cell_label_mtx = cell_value_mtx if cell_label_mtx is None else cell_label_mtx
     row_labels = ['']*cell_value_mtx.shape[0] if not show_row_labels else row_labels
     col_labels = ['']*cell_value_mtx.shape[1] if not show_col_labels else col_labels
+    heatmap_kwargs.setdefault('cbar', False)
     
     df = pd.DataFrame(cell_value_mtx, index=row_labels, columns=col_labels)
     cell_labels = cell_label_mtx if show_cell_labels else None
@@ -1114,6 +1120,7 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         y_axis_tick_kwargs.setdefault('fontsize', tick_fontsize)
         heatmap.yaxis.set_ticklabels(heatmap.yaxis.get_ticklabels(), **y_axis_tick_kwargs)
         heatmap.yaxis.set_ticks_position(y_axis_ticks_position)
+        heatmap.yaxis.tick_left() # Ticks may also appear on the right side otherwise.
     if not show_col_labels:
         heatmap.set_xticks([])
     else:
@@ -1124,8 +1131,10 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         heatmap.xaxis.set_ticks_position(x_axis_ticks_position)
     return fig, ax
 
-def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True, fig_kwargs={}, 
-                  imshow_kwargs={}, cbar_kwargs={}, nan_color='white'):
+def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True, 
+                  use_legend=False, legend_labels=None, fig_kwargs={}, 
+                  imshow_kwargs={}, x_label_kwargs={}, y_label_kwargs={}, 
+                  cbar_kwargs={}, nan_color='white', legend_kwargs={}):
     """
     Shows a heatmap of an xarray DataArray with only latitude and longitude dimensions.
     Different from `data.plot.imshow()` in that this sets axes ticks and labels - including
@@ -1144,20 +1153,33 @@ def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True, fig_kwar
         The axes to use for the plot.
     use_colorbar: bool
         Whether or not to create a colorbar to the right of the axes.
+    use_legend: bool
+        Whether or not to create a legend showing labels for unique values.
+        Only use if you are sure you have a low number of unique values.
+    legend_labels: dict
+        A mapping of values to legend labels - must be the same length as `numpy.unique(data.values)`.
     fig_kwargs: dict
         The dictionary of keyword arguments used to build the figure.
     imshow_kwargs: dict
         The dictionary of keyword arguments passed to `plt.imshow()`.
+        You can pass a colormap here with the key 'cmap'.
+    x_label_kwargs, y_label_kwargs: dict
+        Dictionaries of keyword arguments for 
+        `Axes.set_xlabel()` and `Axes.set_ylabel()`, respectively.
     cbar_kwargs: dict
         The dictionary of keyword arguments passed to `plt.colorbar()`.
     nan_color: str or list-like
         The color used for NaN regions. Can be a string name of a matplotlib color or 
         a 3-tuple (list-like) of rgb values in range [0,255].
+    legend_kwargs: dict
+        The dictionary of keyword arguments passed to `plt.legend()`.
         
     Returns
     -------
-    fig, ax, cbar: matplotlib.figure.Figure, matplotlib.axes.Axes, matplotlib.colorbar.Colorbar
-        The figure, axes, and colorbar used. If `use_colorbar == False`, this will be `None`.
+    fig, ax, im, cbar: matplotlib.figure.Figure, matplotlib.axes.Axes, 
+                       matplotlib.image.AxesImage,  matplotlib.colorbar.Colorbar
+        The figure and axes used as well as the image returned by `pyplot.imshow()` and the colorbar. 
+        If `use_colorbar == False`, `cbar` will be `None`.
     """
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -1177,22 +1199,36 @@ def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True, fig_kwar
     cmap.set_bad(nan_color)
     im = ax.imshow(masked_array, interpolation='nearest', cmap=cmap)
     
-    xarray_set_axes_labels(data, ax)
+    xarray_set_axes_labels(data, ax, x_label_kwargs, y_label_kwargs)
     
-    # Create colorbar
+    # Create a colorbar.
     if use_colorbar:
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="7.5%", pad=0.05)
         cbar = plt.colorbar(im, ax=ax, cax=cax, **cbar_kwargs)
     else:
         cbar = None
-    return fig, ax, cbar
+        
+    # Create a legend.
+    if use_legend:
+        unique_values = np.unique(data.values)
+        if legend_labels is None:
+            legend_labels = ["{}".format(value) for value in unique_values]
+        else:
+            legend_labels = [legend_labels[value] for value in unique_values]
+        colors = [im.cmap(im.norm(unique_values)) for unique_values in unique_values]
+        patches = [mpatches.Patch(color=colors[i], label=legend_labels[i]) 
+                   for i in range(len(legend_labels))]
+        legend_kwargs.setdefault('loc', 'best')
+        ax.legend(handles=patches, **legend_kwargs)
+    
+    return fig, ax, im, cbar
 
-def xarray_set_axes_labels(data, ax, fontsize=10):
+def xarray_set_axes_labels(data, ax, x_label_kwargs={}, y_label_kwargs={}, fontsize=10):
     """
     Sets tick locations and labels for x and y axes on a `matplotlib.axes.Axes` object
-    such that the tick labels do not overlap. Also labels x axis as "Longitude" and y axis
-    as "Latitude".
+    such that the tick labels do not overlap. By default, labels x-axis as "Longitude" 
+    and y-axis as "Latitude".
     
     Parameters
     ----------
@@ -1202,6 +1238,9 @@ def xarray_set_axes_labels(data, ax, fontsize=10):
         The matplotlib Axes object to set tick locations and labels for.
     fontsize: numeric
         The fontsize of the tick labels. This determines the number of ticks used.
+    x_label_kwargs, y_label_kwargs: dict
+        Dictionaries of keyword arguments for 
+        `Axes.set_xlabel()` and `Axes.set_ylabel()`, respectively.
     """
     bbox = ax.get_window_extent()
     width, height = bbox.width, bbox.height
@@ -1209,14 +1248,16 @@ def xarray_set_axes_labels(data, ax, fontsize=10):
     lon = data.longitude.values
     label_every = max(1, int(round(10*len(lon)*fontsize/width)))
     lon_labels = ["{0:.4f}".format(lon_val) for lon_val in lon[::label_every]]
-    ax.set_xlabel('Longitude')
+    x_label_kwargs.setdefault('xlabel', 'Longitude')
+    ax.set_xlabel(**x_label_kwargs)
     ax.set_xticks(range(len(lon))[::label_every])
     ax.set_xticklabels(lon_labels, rotation=45, fontsize=fontsize)
 
     lat = data.latitude.values
     label_every = max(1, int(round(10*len(lat)*fontsize/height)))
     lat_labels = ["{0:.4f}".format(lat_val) for lat_val in lat[::label_every]]
-    ax.set_ylabel('Latitude')
+    y_label_kwargs.setdefault('ylabel', 'Latitude')
+    ax.set_ylabel(**y_label_kwargs)
     ax.set_yticks(range(len(lat))[::label_every])
     ax.set_yticklabels(lat_labels, fontsize=fontsize)
 
