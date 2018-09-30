@@ -351,3 +351,10 @@ def _get_transform_from_xr(dataset):
 def chunks(l, n):
     for i in range(0, len(l), n):
         yield l[i:i + n]
+
+def ignore_warnings(func, *args, **kwargs):
+    """Runs a function while ignoring warnings"""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ret = func(*args, **kwargs)
+    return ret
