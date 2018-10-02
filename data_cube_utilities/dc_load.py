@@ -62,6 +62,7 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None):
     """
     assert len(datasets_temp) > 0, "No data was retrieved." # No data for any query.
     # If multiple non-empty datasets were retrieved, merge them and sort by time.
+    masks = None
     if len(datasets_temp) > 1:
         # Merge datasets.
         datasets_temp_list = list(datasets_temp.values())
@@ -72,18 +73,20 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None):
         clean_mask = xr.concat(clean_masks_temp_list, dim='time')
         clean_mask = xarray_sortby_coord(clean_mask, 'time')
         # Merge masks.
-        num_platforms = len(masks_per_platform.keys())
-        num_masks = len(list(masks_per_platform.values())[0])
-        np_platform_masks = np.empty((num_platforms, num_masks), dtype=object)
-        for i, mask_list in enumerate(masks_per_platform.values()):
-            np_platform_masks[i] = mask_list
-        masks = []
-        for j in range(num_masks):
-            masks.append(xr.concat(list(np_platform_masks[:,j]), dim='time'))
+        if masks_per_platform is not None:
+            num_platforms = len(masks_per_platform.keys())
+            num_masks = len(list(masks_per_platform.values())[0])
+            np_platform_masks = np.empty((num_platforms, num_masks), dtype=object)
+            for i, mask_list in enumerate(masks_per_platform.values()):
+                np_platform_masks[i] = mask_list
+            masks = []
+            for j in range(num_masks):
+                masks.append(xr.concat(list(np_platform_masks[:,j]), dim='time'))
     else: # Select the only dataset.
         dataset = datasets_temp[list(datasets_temp.keys())[0]]
         clean_mask = clean_masks_temp[list(clean_masks_temp.keys())[0]]
-        masks = masks_per_platform[list(masks_per_platform.keys())[0]]
+        if masks_per_platform is not None:
+            masks = masks_per_platform[list(masks_per_platform.keys())[0]]
     return dataset, clean_mask, masks
 
 def load_simple(dc, platform, product, load_params={}, masking_params={}, indiv_masks=None):
