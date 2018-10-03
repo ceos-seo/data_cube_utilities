@@ -36,7 +36,7 @@ def rgb(dataset,
     ### > 
     
     
-    fig, ax = plt.subplots(figsize = aspect_ratio_helper(*rgb.shape[1:3], fixed_width = width))
+    fig, ax = plt.subplots(figsize = aspect_ratio_helper(*rgb.shape[:2], fixed_width = width))
 
     lat_formatter = FuncFormatter(lambda x, pos: round(dataset.latitude.values[pos] ,4) )
     lon_formatter = FuncFormatter(lambda x, pos: round(dataset.longitude.values[pos],4) )
