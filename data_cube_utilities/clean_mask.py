@@ -1,6 +1,7 @@
 #Make a function for this since we will be doing this multiple times
 from utils.data_cube_utilities.dc_mosaic import (ls7_unpack_qa, ls8_unpack_qa, ls5_unpack_qa)
 import numpy as np
+from xarray.ufuncs import logical_or as xr_or
 
 def create_2D_mosaic_clean_mask(clean_mask):
     """
