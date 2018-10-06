@@ -12,7 +12,23 @@ def rgb(dataset,
         max_possible = 3500,
         width = 10
        ):
+    """
+    Creates a figure showing an area, using three specified bands as the rgb componenets.
 
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        A Dataset containing latitude and longitude coordinates, in that order.
+        Must contain the data variables specified in the `bands` parameter.
+    bands: list-like
+        A list-like containing 3 names of data variables in `dataset` to use as the red, green, and blue
+        bands, respectively.
+    max_possible: int
+        The maximum valid value for relevant bands according to the platform used to retrieve the data in `dataset`.
+        For example, for Landsat this is generally 10000.
+    width: int
+        The width of the figure in inches.
+    """
     def aspect_ratio_helper(x,y, fixed_width = 20):
         width = fixed_width
         height = y * (fixed_width / x)
@@ -34,8 +50,7 @@ def rgb(dataset,
     for mask, color in paint_on_mask:        
         rgb[mask] = np.array(color)/ 255.0
     ### > 
-    
-    
+
     fig, ax = plt.subplots(figsize = aspect_ratio_helper(*rgb.shape[:2], fixed_width = width))
 
     lat_formatter = FuncFormatter(lambda x, pos: round(dataset.latitude.values[pos] ,4) )

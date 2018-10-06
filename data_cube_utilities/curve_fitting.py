@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 def gauss(x,a,x0,sigma):
-    return a*exp(-(x-x0)**2/(2*sigma**2))
+    return a*np.exp(-(x-x0)**2/(2*sigma**2))
 
 def gaussian_fit(x, y, x_smooth=None, n_pts=200):
     """
