@@ -1,26 +1,15 @@
 import matplotlib.pyplot as plt
-from datetime import datetime
 import numpy as np
 import pandas as pd
-import datacube as dc
 import xarray as xr
-import utils.data_cube_utilities.data_access_api as dc_api 
-from rasterstats import zonal_stats
-from scipy import stats, exp
-from scipy.stats import norm
-import pylab
+from scipy.interpolate import interp1d
 import matplotlib as mpl
 from scipy.signal import gaussian
 from scipy.ndimage import filters
-from scipy.optimize import curve_fit
 from scipy.interpolate import CubicSpline
-from sklearn import linear_model
 from scipy.interpolate import spline
-import matplotlib.mlab as mlab
-import matplotlib.ticker as ticker
 from matplotlib.ticker import FuncFormatter
-import calendar, datetime, time
-import pytz
+import  time
 from matplotlib.colors import LinearSegmentedColormap
 from copy import copy
 from scipy import stats
@@ -29,9 +18,11 @@ import warnings
 from .dc_mosaic import ls7_unpack_qa
 from .curve_fitting import gaussian_fit, poly_fit
 from .scale import xr_scale, np_scale
-from .dc_utilities import ignore_warnings, perform_timeseries_analysis
+from .dc_utilities import ignore_warnings
 
-from scipy.interpolate import interp1d
+from .curve_fitting import gaussian_fit, poly_fit
+from .scale import xr_scale, np_scale
+from .dc_utilities import ignore_warnings
 
 def impute_missing_data_1D(data1D):
     """
@@ -69,7 +60,7 @@ def impute_missing_data_1D(data1D):
 ## Datetime functions ##
 
 def n64_to_epoch(timestamp):
-    ts = pd.to_datetime(str(timestamp)) 
+    ts = pd.to_datetime(str(timestamp))
     time_format = "%Y-%m-%d"
     ts = ts.strftime(time_format)
     epoch = int(time.mktime(time.strptime(ts, time_format)))
@@ -110,20 +101,20 @@ def full_linear_regression(ds):
     value.astype(int)
     time = np.array(time)
     time.astype(int)
-    return list(zip(time,value))  
+    return list(zip(time,value))
     
 def xarray_plot_data_vars_over_time(dataset, colors=['orange', 'blue']):
     """
     Plot a line plot of all data variables in an xarray.Dataset on a shared set of axes.
-    
+
     Parameters
     ----------
     dataset: xarray.Dataset
         The Dataset containing data variables to plot. The only dimension and coordinate must be 'time'.
     colors: list
-        A list of strings denoting colors for each data variable's points. 
+        A list of strings denoting colors for each data variable's points.
         For example, 'red' or 'blue' are acceptable.
-        
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
@@ -136,11 +127,11 @@ def xarray_plot_data_vars_over_time(dataset, colors=['orange', 'blue']):
         plt.plot(data_arr[nan_mask], marker='o', c=colors[i])
     times = dataset.time.values
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), times)))
-    plt.xticks(np.arange(len(date_strs[nan_mask])), date_strs[nan_mask], 
+    plt.xticks(np.arange(len(date_strs[nan_mask])), date_strs[nan_mask],
                rotation=45, ha='right', rotation_mode='anchor')
     plt.legend(data_var_names, loc='upper right')
     plt.show()
-    
+
 def xarray_scatterplot_data_vars(dataset, figure_kwargs={'figsize':(12,6)}, colors=['blue', 'orange'], markersize=5):
     """
     Plot a scatterplot of all data variables in an xarray.Dataset on a shared set of axes.
@@ -155,11 +146,11 @@ def xarray_scatterplot_data_vars(dataset, figure_kwargs={'figsize':(12,6)}, colo
     figure_kwargs: dict
         A dictionary of kwargs for matplotlib figure creation.
     colors: list
-        A list of strings denoting abbreviated colors for each data variable's points. 
+        A list of strings denoting abbreviated colors for each data variable's points.
         For example, 'r' is red and 'b' is blue.
     markersize: float
         The size of markers in the scatterplot.
-        
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
@@ -170,35 +161,35 @@ def xarray_scatterplot_data_vars(dataset, figure_kwargs={'figsize':(12,6)}, colo
     for i, data_arr in enumerate(dataset.data_vars.values()):
         if len(list(dataset.dims)) > 1:
             dims_to_check_for_nulls = [dim for dim in list(dataset.dims) if dim != 'time']
-            nan_mask = nan_mask & data_arr.notnull().any(dim=dims_to_check_for_nulls).values 
+            nan_mask = nan_mask & data_arr.notnull().any(dim=dims_to_check_for_nulls).values
         else:
             nan_mask = data_arr.notnull().values
         times = data_arr.to_dataframe().index.get_level_values('time').values
         plt.scatter(stats.rankdata(times, method='dense')-1, data_arr.values.flatten(), c=colors[i], s=markersize)
     unique_times = dataset.time.values
     date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), unique_times)))
-    plt.xticks(np.arange(len(date_strs))[nan_mask], date_strs[nan_mask], 
+    plt.xticks(np.arange(len(date_strs))[nan_mask], date_strs[nan_mask],
                rotation=45, ha='right', rotation_mode='anchor')
     plt.xlabel('time')
     plt.legend(data_var_names, loc='upper right')
     plt.show()
-    
+
 def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, colors=['orange', 'blue']):
     """
     For an xarray.Dataset, plot a boxplot of NDVI and line plot of WOFS across time.
-    
+
     Parameters
     ----------
     dataset: xarray.Dataset
-        A Dataset formatted as follows: 
+        A Dataset formatted as follows:
             coordinates: time, latitude, longitude.
             data variables: ndvi, wofs
     resolution: str
         Denotes the resolution of aggregation. Only options are None or 'weekly'.
     colors: list
-        A list of strings denoting colors for each data variable's points. 
+        A list of strings denoting colors for each data variable's points.
         For example, 'red' or 'blue' are acceptable.
-        
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
@@ -209,7 +200,7 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     fig, ax = plt.subplots(figsize=(9,6))
     ndvi_box_color, wofs_line_color = ('orange', 'blue')
     times = plotting_data[time_agg_str].values
-    
+
     # NDVI boxplot boxes
     # The data formatted for matplotlib.pyplot.boxplot().
     ndvi_formatted_data = xr.DataArray(np.full_like(plotting_data.ndvi.values, np.nan))
@@ -226,9 +217,9 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     epochs = np.array(list(map(n64_to_epoch, times_no_nan))) if time_agg_str == 'time' else None
     x_locs = epochs if time_agg_str == 'time' else times_no_nan
     box_width = 0.5*np.min(np.diff(x_locs))
-    bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
-                    positions=x_locs, patch_artist=True, boxprops=dict(facecolor=ndvi_box_color), 
-                    flierprops=dict(marker='o', markersize=0.25), 
+    bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data),
+                    positions=x_locs, patch_artist=True, boxprops=dict(facecolor=ndvi_box_color),
+                    flierprops=dict(marker='o', markersize=0.25),
                     manage_xticks=False) # `manage_xticks=False` to avoid excessive padding on the x-axis.
 
     # WOFS line
@@ -247,32 +238,32 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.legend(handles=[bp['boxes'][0],line[0]], labels=list(plotting_data.data_vars), loc='best')
     plt.tight_layout()
     plt.show()
-    
+
 def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)}, scale_params={}, fig=None, ax=None, max_times_per_plot=None, show_legend=True):
     """
-    Plot data variables in an xarray.Dataset together in one figure, with different plot types for each 
+    Plot data variables in an xarray.Dataset together in one figure, with different plot types for each
     (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to means or medians along time.
     Handles data binned with xarray.Dataset methods resample() and groupby(). That is, it handles data binned along time
     or across years (e.g. by week of year).
-    
+
     Parameters
     -----------
-    dataset: xarray.Dataset 
+    dataset: xarray.Dataset
         A Dataset containing some bands like NDVI or WOFS.
         The primary coordinate must be 'time'.
     plot_descs: dict
         Dictionary mapping names of DataArrays in the Dataset to plot to dictionaries mapping aggregation types (e.g. 'mean', 'median')
         to lists of dictionaries mapping plot types (e.g. 'line', 'box', 'scatter') to keyword arguments for plotting.
-        
+
         Aggregation happens within time slices and can be many-to-many or many-to-one. Some plot types require many-to-many aggregation, and some other plot types require many-to-one aggregation.
         Aggregation types can be any of ['mean', 'median', 'none'], with 'none' performing no aggregation.
-        
+
         Plot types can be any of ['scatter', 'line', 'gaussian', 'poly', 'cubic_spline', 'box'].
         The plot type 'poly' requires a 'degree' entry mapping to an integer in its dictionary of keyword arguments.
-        
+
         Here is an example:
         {'ndvi':       {'mean': [{'line': {'color': 'forestgreen', 'alpha':alpha}}],
-                        'none':  [{'box': {'boxprops': {'facecolor':'forestgreen', 'alpha':alpha}, 
+                        'none':  [{'box': {'boxprops': {'facecolor':'forestgreen', 'alpha':alpha},
                                                         'showfliers':False}}]}}
         This example will create a green line plot of the mean of the 'ndvi' band as well as a green box plot of the 'ndvi' band.
     fig_params: dict
@@ -281,8 +272,8 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
         of each plot - not the entire figure.
     scale_params: dict
         Currently not used.
-        Dictionary mapping names of DataArrays to scaling methods (e.g. {'ndvi': 'std', 'wofs':'norm'}). 
-        The options are ['std', 'norm']. The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
+        Dictionary mapping names of DataArrays to scaling methods (e.g. {'ndvi': 'std', 'wofs':'norm'}).
+        The options are ['std', 'norm']. The option 'std' standardizes. The option 'norm' normalizes (min-max scales).
         Note that of these options, only normalizing guarantees that the y values will be in a fixed range - namely [0,1].
     fig: matplotlib.figure.Figure
         The figure to use for the plot. The figure must have at least one Axes object.
@@ -292,16 +283,16 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
     ax: matplotlib.axes.Axes
         The axes to use for the plot. This is ignored if ``max_times_per_plot`` is less than the number of times.
     max_times_per_plot: int
-        The maximum number of times per plot. If specified, one plot will be generated for each group 
+        The maximum number of times per plot. If specified, one plot will be generated for each group
         of this many times. The plots will be arranged in a grid.
     show_legend: bool
         Whether or not to show the legend.
-        
+
     Raises
     ------
     ValueError:
         If an aggregation type is not possible for a plot type
-    
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
@@ -310,14 +301,14 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
     plot_types_handling_aggregation = ['scatter'] + plot_types_requiring_aggregation
     plot_types_not_handling_aggregation = ['box']
     all_plot_types = plot_types_requiring_aggregation + plot_types_handling_aggregation + plot_types_not_handling_aggregation
-    
+
     # Aggregation types that aggregate all values for a given time to one value.
-    many_to_one_agg_types = ['mean', 'median'] 
+    many_to_one_agg_types = ['mean', 'median']
     # Aggregation types that aggregate to many values or do not aggregate.
     many_to_many_agg_types = ['none']
     all_agg_types = many_to_one_agg_types + many_to_many_agg_types
-    
-    
+
+
     # Determine how the data was aggregated, if at all.
     possible_time_agg_strs = ['week', 'weekofyear', 'month']
     time_agg_str = 'time'
@@ -337,14 +328,14 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
     time_nan_mask = np.any(time_nan_mask, axis=1)
     times_not_all_nan = all_times[time_nan_mask]
     all_plotting_data = all_plotting_data.loc[{time_agg_str:times_not_all_nan}]
-    
+
     # Scale
     if isinstance(scale_params, str): # if scale_params denotes the scaling type for the whole Dataset, scale the Dataset.
         all_plotting_data = xr_scale(all_plotting_data, scaling=scale_params)
     elif len(scale_params) > 0: # else, it is a dictionary denoting how to scale each DataArray.
         for data_arr_name, scaling in scale_params.items():
             all_plotting_data[data_arr_name] = xr_scale(all_plotting_data[data_arr_name], scaling=scaling)
-    
+
     # Handle the potential for multiple plots.
     max_times_per_plot = len(times_not_all_nan) if max_times_per_plot is None else max_times_per_plot
     num_plots = int(np.ceil(len(times_not_all_nan)/max_times_per_plot))
@@ -353,7 +344,7 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
     if num_plots > 1:
         figsize = fig_params.pop('figsize')
         fig = plt.figure(figsize=figsize, **fig_params)
-    
+
     # Create each plot.
     for time_ind, fig_ind in zip(range(0, len(times_not_all_nan), max_times_per_plot), range(num_plots)):
         lower_time_bound_ind, upper_time_bound_ind = time_ind, min(time_ind+max_times_per_plot, len(times_not_all_nan))
@@ -367,7 +358,7 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
         plotting_data = all_plotting_data.loc[{time_agg_str:fig_times_not_all_nan}]
         epochs = np.array(list(map(n64_to_epoch, fig_times_not_all_nan))) if time_agg_str == 'time' else None
         x_locs = np_scale(epochs if time_agg_str == 'time' else fig_times_not_all_nan)
-        
+
         # Data variable plots within each plot.
         data_arr_plots = []
         legend_labels = []
@@ -383,7 +374,7 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
                         full_data_arr_plotting_data = plotting_data[data_arr_name].values
                         # Any times with all nan data are ignored in any plot type.
                         data_arr_nan_mask = np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
-            
+
                         # Skip plotting this data variable if it does not have enough data to plot.
                         if skip_plot(np.sum(data_arr_nan_mask), plot_type, plot_kwargs):
                             continue
@@ -392,7 +383,7 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
                         data_arr_plotting_data = full_data_arr_plotting_data[data_arr_nan_mask]
                         # Large scales for x_locs can break the curve fitting for some reason.
                         data_arr_x_locs = x_locs[data_arr_nan_mask]
-                        
+
                         # Some plot types require aggregation.
                         if plot_type in plot_types_requiring_aggregation:
                             if agg_type not in many_to_one_agg_types:
@@ -405,18 +396,18 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
                                 raise ValueError("For the '{}' DataArray: the plot type '{}' doesn't accept aggregation "
                                                  "(currently using '{}'). Please pass any of {} as the aggregation type "
                                                  "or change the plot type.".format(data_arr_name, plot_type, agg_type, many_to_many_agg_types))
-                        
+
                         if agg_type == 'mean':
                             y = ignore_warnings(np.nanmean, data_arr_plotting_data, axis=1)
                         elif agg_type == 'median':
                             y = ignore_warnings(np.nanmedian, data_arr_plotting_data, axis=1)
                         elif agg_type == 'none':
                             y = data_arr_plotting_data
-            
+
                         # Create specified plot types.
                         plot_type_str = "" # Used to label the legend.
                         if plot_type == 'scatter':
-                            # Ignore warning about taking the mean of an empty slice.        
+                            # Ignore warning about taking the mean of an empty slice.
                             data_arr_plots.append(ax.scatter(data_arr_x_locs, y, **plot_kwargs))
                             plot_type_str += 'scatterplot'
                         elif plot_type == 'line':
@@ -433,8 +424,8 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
                             plot_kwargs.setdefault('boxprops', dict(facecolor='orange'))
                             plot_kwargs.setdefault('flierprops', dict(marker='o', markersize=0.5))
                             plot_kwargs.setdefault('showfliers', False)
-                            bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data), 
-                                            positions=data_arr_x_locs, patch_artist=True, 
+                            bp = ax.boxplot(filtered_formatted_data, widths=[box_width]*len(filtered_formatted_data),
+                                            positions=data_arr_x_locs, patch_artist=True,
                                             manage_xticks=False, **plot_kwargs) # `manage_xticks=False` to avoid excessive padding on the x-axis.
                             data_arr_plots.append(bp['boxes'][0])
                             plot_type_str += 'boxplot'
@@ -451,7 +442,7 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
                             plot_type_str += 'cubic spline fit'
                         plot_type_str += ' of {}'.format(agg_type) if agg_type != 'none' else ''
                         legend_labels.append('{} of {}'.format(plot_type_str, data_arr_name))
-                            
+
 
         # Label the axes and create the legend.
         date_strs = np.array(list(map(lambda time: np_dt64_to_str(time), fig_times_not_all_nan))) if time_agg_str=='time' else\
@@ -462,13 +453,13 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
             plt.legend(handles=data_arr_plots, labels=legend_labels, loc='best')
         plt.title("Figure {}: Time Range {} to {}".format(fig_ind, date_strs[0], date_strs[-1]))
         plt.tight_layout()
-    
+
 ## Curve fitting ##
 
 def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_kwargs={}, fig=None, ax=None):
     """
     Plots a curve fit given x values, y values, a type of curve to plot, and parameters for that curve.
-    
+
     Parameters
     ----------
     x: np.ndarray
@@ -491,11 +482,11 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
     fig: matplotlib.figure.Figure
         The figure to use for the plot. The figure must have at least one Axes object.
         You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
-        The code ``fig = plt.figure()`` will not provide the Axes object. 
+        The code ``fig = plt.figure()`` will not provide the Axes object.
         The Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
-        
+
     Returns
     -------
     lines: matplotlib.lines.Line2D
@@ -504,7 +495,7 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
     # Avoid modifying the original arguments.
     fig_params = copy(fig_params)
     plot_kwargs = copy(plot_kwargs)
-    
+
     fig_params.setdefault('figsize', (12,6))
     plot_kwargs.setdefault('linestyle', '-')
 
@@ -523,14 +514,14 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
         cs = CubicSpline(x,y)
         y_smooth = cs(x_smooth)
     return ax.plot(x_smooth, y_smooth, **plot_kwargs)[0]
-    
+
 ## End curve fitting ##
 
 def plot_band(dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     """
     Plots several statistics over time - including mean, median, linear regression of the 
-    means, Gaussian smoothed curve of means, and the band enclosing the 25th and 75th percentiles. 
-    This is very similar to the output of the Comet Time Series Toolset (https://github.com/CosmiQ/CometTS). 
+    means, Gaussian smoothed curve of means, and the band enclosing the 25th and 75th percentiles.
+    This is very similar to the output of the Comet Time Series Toolset (https://github.com/CosmiQ/CometTS).
     
     Parameters
     ----------
@@ -548,7 +539,7 @@ def plot_band(dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     means  = dataset.mean(dim=['latitude','longitude'],  skipna = True).values
     medians = dataset.median(dim=['latitude','longitude'], skipna = True).values
     mask = ~np.isnan(means) & ~np.isnan(medians)
-    
+
     plt.figure(figsize=figsize)
     ax = plt.gca()
 
@@ -575,7 +566,7 @@ def plot_band(dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     ax.grid(color='lightgray', linestyle='-', linewidth=1)
     fillcolor='gray'
     fillalpha=0.4
-    plt.fill_between(x_locs, quarter, three_quarters,  interpolate=False, color=fillcolor, alpha=fillalpha, 
+    plt.fill_between(x_locs, quarter, three_quarters,  interpolate=False, color=fillcolor, alpha=fillalpha,
                      label="25th and 75th percentile band")
         
     #Medians
@@ -590,7 +581,7 @@ def plot_band(dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
 
     #Gaussian Curve
     plot_curvefit(x_locs[mask], means[mask], fit_type='gaussian', ax=ax,
-                  plot_kwargs=dict(linestyle='-', label="Gaussian smoothed of means", 
+                  plot_kwargs=dict(linestyle='-', label="Gaussian smoothed of means",
                                    alpha=1, color='limegreen', linewidth = 3.0))
     
     #Formatting
@@ -603,7 +594,7 @@ def plot_band(dataset, figsize=(20,15), fontsize=24, legend_fontsize=24):
     ax.set_xlabel('Time', fontsize=fontsize)
     ax.set_ylabel('Value', fontsize=fontsize)
     plt.show()
-    
+
 def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", plot_max = False, plot_min = False):
     times = dataset.time.values
     mpl.style.use('seaborn')
@@ -652,14 +643,14 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
         
         plt.plot(times, y, marker="o")
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.xticks(rotation=90)    
-    
+        plt.xticks(rotation=90)
+
 ## Matplotlib colormap functions ##
 
 def create_discrete_color_map(th, colors, data_range=[0,1], cmap_name='my_cmap'):
     """
     Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
-    
+
     Parameters
     ----------
     th: list
@@ -668,7 +659,7 @@ def create_discrete_color_map(th, colors, data_range=[0,1], cmap_name='my_cmap')
         Colors to use between thresholds, so `len(colors) == len(th)+1`.
         Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
     data_range: list-like
-        A list-like of the minimum and maximum values the data may take, respectively. Used to scale ``th``. 
+        A list-like of the minimum and maximum values the data may take, respectively. Used to scale ``th``.
         Defaults to [0,1], for which a value of 0.5 in ``th`` would be the midpoint of the possible range.
     cmap_name: str
         The name of the colormap for matplotlib.
@@ -701,7 +692,7 @@ def create_discrete_color_map(th, colors, data_range=[0,1], cmap_name='my_cmap')
     return cmap
 
 ## End matplotlib colormap functions ##
-        
+
 ## Misc ##
 
 def retrieve_or_create_ax(fig=None, ax=None, **fig_params):
@@ -742,12 +733,12 @@ def remove_non_unique_ordered_list_str(ordered_list):
     return ordered_list
 
 # For February, assume leap years are included.
-days_per_month = {1:31, 2:29, 3:31, 4:30, 5:31, 6:30, 
+days_per_month = {1:31, 2:29, 3:31, 4:30, 5:31, 6:30,
                   7:31, 8:31, 9:30, 10:31, 11:30, 12:31}
 
 def get_weeks_per_month(num_weeks):
     """
-    Including January, give 5 weeks to every third month - accounting for 
+    Including January, give 5 weeks to every third month - accounting for
     variation between 52 and 54 weeks in a year by adding weeks to the last 3 months.
     """
     last_months_num_weeks = None
@@ -759,7 +750,7 @@ def get_weeks_per_month(num_weeks):
         last_months_num_weeks = [5,5,5]
     return {month_int:num_weeks for (month_int,num_weeks) in zip(days_per_month.keys(), [5,4,4]*3+last_months_num_weeks)}
 
-month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 def month_ints_to_month_names(month_ints):

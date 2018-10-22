@@ -9,7 +9,7 @@ def rgb(dataset, at_index = 0, bands = ['red', 'green', 'blue'], paint_on_mask =
         min_possible = 0, max_possible = 10000, width = 10):
     """
     Creates a figure showing an area, using three specified bands as the rgb componenets.
-    
+
     Parameters
     ----------
     dataset: xarray.Dataset
@@ -35,17 +35,20 @@ def rgb(dataset, at_index = 0, bands = ['red', 'green', 'blue'], paint_on_mask =
     ### < Dataset to RGB Format, needs float values between 0-1 
     rgb = np.stack([dataset[bands[0]],
                     dataset[bands[1]],
-                    dataset[bands[2]]], axis = -1)
+                    dataset[bands[2]]], axis = -1).astype(np.int16)
     
-    # Interpolate values to be in the range [0,1] for creating the image.
-    # The data max is used here rather than the platform max because we want bright pixels.
-    rgb = np.interp(rgb, (min_possible, np.nanmax(rgb)), [0,1]) 
+    rgb[rgb<0] = 0
+    rgb[rgb > max_possible] = max_possible # Filter out saturation points at arbitrarily defined max_possible value
+    
+    rgb = rgb.astype(float)
+    rgb *= 1 / np.max(rgb)
     ### > 
     
     ### < takes a T/F mask, apply a color to T areas  
     for mask, color in paint_on_mask:        
         rgb[mask] = np.array(color)/ 255.0
     ### > 
+    
     
     fig, ax = plt.subplots(figsize = aspect_ratio_helper(*rgb.shape[:2], fixed_width = width))
 
