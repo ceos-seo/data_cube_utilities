@@ -3,6 +3,7 @@ import xarray as xr
 from .clean_mask import landsat_qa_clean_mask, landsat_clean_mask_invalid
 from xarray.ufuncs import logical_and as xr_and
 from .sort import xarray_sortby_coord
+from .aggregate import xr_scale_res
 
 def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
     """
@@ -31,7 +32,8 @@ def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
         merged.append(xarray_sortby_coord(dataset_temp, coord=sort_dim))
     return merged
 
-def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None):
+def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
+                   x_coord='longitude', y_coord='latitude'):
     """
     Merges dictionaries of platforms mapping to datasets, dataset clean masks,
     and lists of other masks into one dataset, one dataset clean mask, and one
@@ -40,13 +42,16 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None):
     Parameters
     ----------
     datasets_temp, clean_masks_temp, masks_per_platform: dict
-        Maps platforms to datasets to merge, dataset masks to merge,
-        and lists of masks to merge separately, respectively.
+        Dictionaries that map, respectively, platforms to `xarray.Dataset`
+        or `xarray.DataArray` objects to merge, `xarray.DataArray` masks
+        to merge, and lists of `xarray.DataArray` masks to merge separately.
         All entries must have a 'time' dimension.
+    x_coord, y_coord: str
+        Names of the x and y coordinates in the datasets in `datasets_temp`.
 
     Returns
     -------
-    dataset: xarray.Dataset
+    dataset: xarray.Dataset or xarray.DataArray
         The raw data requested. Can be cleaned with `dataset.where(clean_mask)`.
     clean_mask: xarray.DataArray
         The clean mask.
@@ -55,21 +60,32 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None):
 
     Raises
     ------
-    AssertionError: If no data was retrieved for any query (i.e. `len(datasets_temp) == 0`).
+    AssertionError: If no data was retrieved for any query
+                    (i.e. `len(datasets_temp) == 0`).
     
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    def xr_set_same_coords(datasets):
+        first_ds = datasets[0]
+        for i, ds in enumerate(datasets):
+            datasets[i] = \
+                ds.assign_coords(**{x_coord:first_ds[x_coord],
+                                    y_coord:first_ds[y_coord]})
+
     assert len(datasets_temp) > 0, "No data was retrieved." # No data for any query.
     # If multiple non-empty datasets were retrieved, merge them and sort by time.
     masks = None
     if len(datasets_temp) > 1:
         # Merge datasets.
         datasets_temp_list = list(datasets_temp.values())
+        # Set same x and y coords so `xr.concat()` concatenates as intended.
+        xr_set_same_coords(datasets_temp_list)
         dataset = xr.concat(datasets_temp_list, dim='time')
         dataset = xarray_sortby_coord(dataset, 'time')
         # Merge clean masks.
         clean_masks_temp_list = list(clean_masks_temp.values())
+        xr_set_same_coords(clean_masks_temp_list)
         clean_mask = xr.concat(clean_masks_temp_list, dim='time')
         clean_mask = xarray_sortby_coord(clean_mask, 'time')
         # Merge masks.
@@ -89,9 +105,11 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None):
             masks = masks_per_platform[list(masks_per_platform.keys())[0]]
     return dataset, clean_mask, masks
 
-def load_simple(dc, platform, product, load_params={}, masking_params={}, indiv_masks=None):
+def load_simple(dc, platform, product, frac_res=None, abs_res=None,
+                load_params={}, masking_params={}, indiv_masks=None):
     """
-    Simplifies loading from the Data Cube by retrieving a dataset along with its mask.
+    Simplifies loading from the Data Cube by retrieving a dataset along
+    with its mask.
 
     Parameters
     ----------
@@ -99,16 +117,22 @@ def load_simple(dc, platform, product, load_params={}, masking_params={}, indiv_
         The Datacube instance to load data with.
     platform, product: str
         Strings denoting the platform and product to retrieve data for.
+    frac_res: float
+        The fraction of the original resolution to scale to. Must be postive.
+        Note that this can be greater than 1.0, in which case the resolution
+        is upsampled.
+    abs_res: list-like
+        A list-like of the number of pixels for the x and y axes, respectively.
+        Overrides `frac_res` if specified.
     load_params: dict, optional
         A dictionary of parameters for `dc.load()`.
         Here are some common load parameters:
-        *lat, lon: list-like 2-tuples of minimum and maximum values for latitude and longitude, respectively.*
-        *time: list-like     A 2-tuple of the minimum and maximum times for acquisitions.*
-        *measurements: list-like The list of measurements to retrieve from the Datacube.*
-        For example, to load data with different time ranges for different platforms, we could do the following:
-        `{'LANDSAT_7': dict(common_load_params, **dict(time=ls7_date_range)), 
-          'LANDSAT_8': dict(common_load_params, **dict(time=ls8_date_range))}`, where `common_load_params` is 
-        a dictionary of load parameters common to both - most notably 'lat', 'lon', and 'measurements'.
+        *lat, lon: list-like 2-tuples of minimum and maximum values for
+                             latitude and longitude, respectively.*
+        *time: list-like     A 2-tuple of the minimum and maximum times
+                             for acquisitions.*
+        *measurements: list-like The list of measurements to retrieve
+                                 from the Datacube.*
     masking_params: dict, optional
         A dictionary of keyword arguments for corresponding masking functions.
         For example: {'cover_types':['cloud']} would retain only clouds for Landsat products, 
@@ -138,6 +162,9 @@ def load_simple(dc, platform, product, load_params={}, masking_params={}, indiv_
     current_load_params.update(load_params)
     dataset = dc.load(**current_load_params)
     assert len(dataset.dims) > 0, "No data was retrieved."
+    # Scale resolution if specified.
+    if frac_res is not None or abs_res is not None:
+        dataset = xr_scale_res(dataset, frac_res=frac_res, abs_res=abs_res)
     # Get the clean mask for the appropriate LANDSAT satellite platform.
     clean_mask = landsat_qa_clean_mask(dataset, platform, **masking_params)
     # Get the mask for removing data ouside the accepted range of LANDSAT 7 and 8.
@@ -151,10 +178,11 @@ def load_simple(dc, platform, product, load_params={}, masking_params={}, indiv_
             masks.append(landsat_qa_clean_mask(dataset, platform, cover_types=[mask]))
     return dataset, clean_mask, masks
 
-def load_multiplatform(dc, platforms, products, load_params={}, masking_params={}, indiv_masks=None):
+def load_multiplatform(dc, platforms, products, frac_res=None, abs_res=None,
+                       load_params={}, masking_params={}, indiv_masks=None):
     """
-    Load and merge data as well as clean masks, given a list of platforms and products.
-    Currently only tested on Landsat data.
+    Load and merge data as well as clean masks given a list of platforms
+    and products. Currently only tested on Landsat data.
     
     Parameters
     ----------
@@ -162,24 +190,42 @@ def load_multiplatform(dc, platforms, products, load_params={}, masking_params={
         The Datacube instance to load data with.
     platforms, products: list-like
         A list-like of platforms and products. Both must have the same length.
+    frac_res: float
+        The fraction of the original resolution to scale to. Must be postive.
+        Note that this can be greater than 1.0, in which case the resolution
+        is upsampled. The resolution used for all products will be the
+        minimum resolution for latitude and longitude among any of them.
+    abs_res: list-like
+        A list-like of the number of pixels for the x and y axes, respectively.
+        Overrides `frac_res` if specified.
     load_params: dict, optional
-        A dictionary of parameters for `dc.load()` or a dictionary of dictionaries of such parameters,
-        mapping platform names to parameter dictionaries (primarily useful for selecting different time ranges).
+        A dictionary of parameters for `dc.load()` or a dictionary of
+        dictionaries of such parameters, mapping platform names to parameter
+        dictionaries (primarily useful for selecting different time ranges).
         Here are some common load parameters:
-        *lat, lon: list-like 2-tuples of minimum and maximum values for latitude and longitude, respectively.*
-        *time: list-like     A 2-tuple of the minimum and maximum times for acquisitions or a list of such 2-tuples.*
-        *measurements: list-like The list of measurements to retrieve from the Datacube.*
-        For example, to load data with different time ranges for different platforms, we could do the following:
-        `{'LANDSAT_7': dict(common_load_params, **dict(time=ls7_date_range)), 
-          'LANDSAT_8': dict(common_load_params, **dict(time=ls8_date_range))}`, where `common_load_params` is 
-        a dictionary of load parameters common to both - most notably 'lat', 'lon', and 'measurements'.
+        *lat, lon: list-like 2-tuples of minimum and maximum values for
+                             latitude and longitude, respectively.*
+        *time: list-like     A pair of the minimum and maximum times
+                             for acquisitions or a list of such pairs.*
+        *measurements: list-like The list of measurements to retrieve from
+                                 the Datacube.*
+        For example, to load data with different time ranges for different
+        platforms, we could pass the following:
+        `{'LANDSAT_7': dict(**common_load_params, time=ls7_date_range),
+          'LANDSAT_8': dict(**common_load_params, time=ls8_date_range)}`,
+          where `common_load_params` is a dictionary of load parameters common
+          to both - most notably 'lat', 'lon', and 'measurements' - and the
+          'date_range' variables are .
     masking_params: dict, optional
-        A dictionary mapping platform names to a dictionary of keyword arguments for corresponding masking functions.
-        For example: {'LANDSAT_7': {'cover_types':['cloud']}, 'LANDSAT_8': {'cover_types': ['cloud']}} would retain
-        only clouds, because `landsat_qa_clean_mask()` is used for the Landsat family of platforms.
+        A dictionary mapping platform names to a dictionary of keyword
+        arguments for corresponding masking functions.
+        For example: {'LANDSAT_7': {'cover_types':['cloud']},
+                      'LANDSAT_8': {'firstcover_types': ['cloud']}}
+        would retain only clouds, because `landsat_qa_clean_mask()`  is used
+        to create clean masks for the Landsat family of platforms.
     indiv_masks: list
-        A list of masks to return (e.g. ['water']). 
-        These do not have to be the same used to create `clean_mask`.
+        A list of masks to return (e.g. ['water']). These do not have to be
+        the same used to create the returned clean mask.
     
     Returns
     -------
@@ -198,6 +244,29 @@ def load_multiplatform(dc, platforms, products, load_params={}, masking_params={
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    # Determine what resolution the data will be scaled to.
+    if frac_res is not None and abs_res is None:
+        prod_info = dc.list_products()
+        resolutions = prod_info[prod_info['name'].isin(products)]\
+                               ['resolution'].values
+        # Determine the minimum resolution, which is actually the maximum
+        # value resolution, since resolution is measured in degrees per pixel.
+        # The first resolution is for latitude (y) and is negative.
+        # The second resolution is for longitude (x) and is positive.
+        min_res = [0]*2
+        for res in resolutions:
+            min_res[0] = res[0] if res[0] < min_res[0] else min_res[0]
+            min_res[1] = res[1] if min_res[1] < res[1] else min_res[1]
+        # Take reciprocal to convert pixels per degree to degrees per pixel.
+        # Reverse to be in order (x, y).
+        min_res = [abs(frac_res*(1/res)) for res in min_res][::-1]
+
+        # Calculate the absolute resolution.
+        x, y = load_params.get('lon', None), load_params.get('lat', None)
+        x, y = load_params.get('longitude', x), load_params.get('latitude', y)
+        x_y_rng = abs(x[1] - x[0]), abs(y[1] - y[0])
+        abs_res = [round(res*rng) for res, rng in zip(min_res, x_y_rng)]
+
     datasets_temp = {} # Maps platforms to datasets to merge.
     clean_masks_temp = {} # Maps platforms to clean masks to merge.
     masks_per_platform = {} if indiv_masks is not None else None # Maps platforms to lists of masks.
@@ -223,8 +292,10 @@ def load_multiplatform(dc, platforms, products, load_params={}, masking_params={
                 time_range_load_params['time'] = time_range
                 try:
                     dataset_time_part, clean_mask_time_part, masks_time_part = \
-                        load_simple(dc, platform, product, time_range_load_params, 
-                                    masking_params, indiv_masks)
+                        load_simple(dc, platform, product, abs_res=abs_res,
+                                    load_params=time_range_load_params,
+                                    masking_params=masking_params,
+                                    indiv_masks=indiv_masks)
                     datasets_time_parts.append(dataset_time_part)
                     clean_masks_time_parts.append(clean_mask_time_part)
                     if indiv_masks is not None:
@@ -238,48 +309,72 @@ def load_multiplatform(dc, platforms, products, load_params={}, masking_params={
         else: # Handle `time` as a single time range.
             try:
                 datasets_temp[platform], clean_masks_temp[platform], masks = \
-                    load_simple(dc, platform, product, current_load_params, masking_params, indiv_masks)
+                    load_simple(dc, platform, product, abs_res=abs_res,
+                                load_params=current_load_params,
+                                masking_params=masking_params,
+                                indiv_masks=indiv_masks)
                 if indiv_masks is not None:
                     masks_per_platform[platform] = masks
             except (AssertionError):
                 continue
     return merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform)
 
+def get_product_extents(api, platform, product):
+    """
+    Returns the minimum and maximum latitude, longitude, and date range of a product.
+
+    Parameters
+    ----------
+    api: DataAccessApi
+        An instance of `DataAccessApi` to get query metadata from.
+    platform, product: str
+        Names of the platform and product to query extent information for.
+
+    Returns
+    -------
+    full_lat, full_lon: tuple
+        Two 2-tuples of the minimum and maximum latitude and longitude, respectively.
+    min_max_dates: tuple of datetime.datetime
+        A 2-tuple of the minimum and maximum time available.
+    """
+    # Get the extents of the cube
+    descriptor = api.get_query_metadata(platform=platform, product=product)
+    min_max_lat = descriptor['lat_extents']
+    min_max_lon = descriptor['lon_extents']
+    min_max_dates = descriptor['time_extents']
+    return min_max_lat, min_max_lon, min_max_dates
+
 def get_overlapping_area(api, platforms, products):
     """
-    Returns the minimum and maximum latitude and longitude of the overlapping area for a set of products.
+    Returns the minimum and maximum latitude, longitude, and date range of the overlapping
+    area for a set of products.
     
     Parameters
     ----------
     api: DataAccessApi
-        An instance of `DataAccessApi` from `utils.data_cube_utilities`.
-    platforms, products: list-like
-        A list-like of platforms and products. Both must have the same length.
+        An instance of `DataAccessApi` to get query metadata from.
+    platforms, products: list-like of str
+        A list-like of names of platforms and products to query extent information for.
+        These lists must have the same length.
         
     Returns
     -------
     full_lat, full_lon: tuple
         Two 2-tuples of the minimum and maximum latitude and longitude, respectively.
-    min_max_dates: tuple
-        A 2-tuple of the minimum and maximum time available to all products.
+    min_max_dates: numpy.ndarray of datetime.datetime
+        A 2D NumPy array with shape (2, len(products)), in which rows contain the minimum
+        and maximum time available for corresponding products.
     """
     min_max_dates = np.empty((len(platforms), 2), dtype=object)
     min_max_lat = np.empty((len(platforms), 2))
     min_max_lon = np.empty((len(platforms), 2))
     for i, (platform, product) in enumerate(zip(platforms, products)):
-        # Get the extents of the cube
-        descriptor = api.get_query_metadata(platform=platform, product=product)
-
-        # Save extents
-        min_max_dates[i] = descriptor['time_extents']
-        min_max_lat[i] = descriptor['lat_extents']
-        min_max_lon[i] = descriptor['lon_extents']
-
-    # Determine minimum and maximum longitudes that bound a common area among products
-    min_lon = np.max(min_max_lon[:,0]) # The greatest minimum longitude among products
-    max_lon = np.min(min_max_lon[:,1]) # The smallest maximum longitude among products
-    min_lat = np.max(min_max_lat[:,0])
-    max_lat = np.min(min_max_lat[:,1])
+        min_max_lat[i], min_max_lon[i], min_max_dates[i] = \
+            get_product_extents(api, platform, product)
+    # Determine minimum and maximum lat and lon extents that bound a common area among the
+    # products, which are the greatest minimums and smallest maximums.
+    min_lon, max_lon = np.max(min_max_lon[:,0]), np.min(min_max_lon[:,1])
+    min_lat, max_lat = np.max(min_max_lat[:,0]), np.min(min_max_lat[:,1])
     full_lon = (min_lon, max_lon)
     full_lat = (min_lat, max_lat)
     return full_lat, full_lon, min_max_dates
