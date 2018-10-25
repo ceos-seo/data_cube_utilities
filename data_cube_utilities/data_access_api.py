@@ -170,8 +170,8 @@ class DataAccessApi:
             product (string): The name of the product associated with the desired dataset.
             longitude (tuple): Tuple of min,max floats for longitude
             latitude (tuple): Tuple of min,max floats for latitutde
-            crs (string): Describes the coordinate system of params lat and long
             time (tuple): Tuple of start and end datetimes for requested data
+            **kwargs (dict): Keyword arguments for `self.get_dataset_by_extent()`.
 
         Returns:
             scene_metadata (dict): Dictionary containing a variety of data that can later be
@@ -179,7 +179,7 @@ class DataAccessApi:
         """
 
         dataset = self.get_dataset_by_extent(
-            platform=platform, product=product, longitude=longitude, latitude=latitude, time=time, dask_chunks={})
+            platform=platform, product=product, longitude=longitude, latitude=latitude, time=time, **kwargs)
 
         if not dataset:
             return {
