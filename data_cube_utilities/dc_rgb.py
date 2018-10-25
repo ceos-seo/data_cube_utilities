@@ -32,7 +32,7 @@ def rgb(dataset, at_index = 0, bands = ['red', 'green', 'blue'], paint_on_mask =
         If only `fig` is supplied, the Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
-        
+
     Returns
     -------
     fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes

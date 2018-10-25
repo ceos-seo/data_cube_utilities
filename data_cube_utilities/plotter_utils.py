@@ -1,7 +1,6 @@
 from datetime import datetime
 import numpy as np
 import pandas as pd
-import datacube as dc
 import xarray as xr
 from xarray.ufuncs import logical_and as xr_and
 from xarray.ufuncs import logical_or as xr_or
@@ -250,12 +249,12 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.tight_layout()
     plt.show()
     
-def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)}, scale_params={}, fig=None, ax=None, 
+def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)}, scale_params={}, fig=None, ax=None,
                             max_times_per_plot=None, show_legend=True, title=None):
     """
-    Plot data variables in an xarray.Dataset together in one figure, with different plot types for 
-    each (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to 
-    aggregations along time. Handles data binned with xarray.Dataset methods resample() and groupby(). 
+    Plot data variables in an xarray.Dataset together in one figure, with different plot types for
+    each (e.g. box-and-whisker plot, line plot, scatter plot), and optional curve fitting to
+    aggregations along time. Handles data binned with xarray.Dataset methods resample() and groupby().
     That is, it handles data binned along time (e.g. by week) or across years (e.g. by week of year).
     
     Parameters
@@ -264,58 +263,58 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
         A Dataset containing some bands like NDVI or WOFS.
         The primary coordinate must be 'time'.
     plot_descs: dict
-        Dictionary mapping names of DataArrays in the Dataset to plot to dictionaries mapping 
-        aggregation types (e.g. 'mean', 'median') to lists of dictionaries mapping plot types 
+        Dictionary mapping names of DataArrays in the Dataset to plot to dictionaries mapping
+        aggregation types (e.g. 'mean', 'median') to lists of dictionaries mapping plot types
         (e.g. 'line', 'box', 'scatter') to keyword arguments for plotting.
-        
-        Aggregation happens within time slices and can be many-to-many or many-to-one. 
-        Some plot types require many-to-many aggregation, and some other plot types require 
-        many-to-one aggregation. Aggregation types can be any of ['mean', 'median', 'none'], 
+
+        Aggregation happens within time slices and can be many-to-many or many-to-one.
+        Some plot types require many-to-many aggregation, and some other plot types require
+        many-to-one aggregation. Aggregation types can be any of ['mean', 'median', 'none'],
         with 'none' performing no aggregation.
         
         Plot types can be any of ['scatter', 'line', 'gaussian', 'poly', 'cubic_spline', 'box'].
-        The plot type 'poly' requires a 'degree' entry mapping to an integer in its dictionary 
+        The plot type 'poly' requires a 'degree' entry mapping to an integer in its dictionary
         of keyword arguments.
         
         Here is an example:
         {'ndvi':       {'mean': [{'line': {'color': 'forestgreen', 'alpha':alpha}}],
                         'none':  [{'box': {'boxprops': {'facecolor':'forestgreen', 'alpha':alpha}, 
                                                         'showfliers':False}}]}}
-        This example will create a green line plot of the mean of the 'ndvi' band as well as a 
+        This example will create a green line plot of the mean of the 'ndvi' band as well as a
         green box plot of the 'ndvi' band.
     fig_params: dict
-        Figure parameters dictionary (e.g. {'figsize':(12,6)}). Used to create a Figure 
-        ``if fig is None and ax is None``. Note that in the case of multiple plots being created 
-        (see ``max_times_per_plot`` below), figsize will be the size of each plot - 
+        Figure parameters dictionary (e.g. {'figsize':(12,6)}). Used to create a Figure
+        ``if fig is None and ax is None``. Note that in the case of multiple plots being created
+        (see ``max_times_per_plot`` below), figsize will be the size of each plot -
         not the entire figure.
     scale_params: dict
         Currently not used.
-        Dictionary mapping names of DataArrays to scaling methods 
-        (e.g. {'ndvi': 'std', 'wofs':'norm'}). The options are ['std', 'norm']. 
-        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
-        Note that of these options, only normalizing guarantees that the y values will be 
+        Dictionary mapping names of DataArrays to scaling methods
+        (e.g. {'ndvi': 'std', 'wofs':'norm'}). The options are ['std', 'norm'].
+        The option 'std' standardizes. The option 'norm' normalizes (min-max scales).
+        Note that of these options, only normalizing guarantees that the y values will be
         in a fixed range - namely [0,1].
     fig: matplotlib.figure.Figure
-        The figure to use for the plot. 
-        If only `fig` is supplied, the Axes object used will be the first. 
+        The figure to use for the plot.
+        If only `fig` is supplied, the Axes object used will be the first.
         This argument is ignored if ``max_times_per_plot`` is less than the number of times.
     ax: matplotlib.axes.Axes
-        The axes to use for the plot. 
+        The axes to use for the plot.
         This argument is ignored if ``max_times_per_plot`` is less than the number of times.
     max_times_per_plot: int
-        The maximum number of times per plot. If specified, one plot will be generated for 
+        The maximum number of times per plot. If specified, one plot will be generated for
         each group of this many times. The plots will be arranged in a row-major grid.
     show_legend: bool
         Whether or not to show the legend.
     title: str
         The title of each subplot. Note that a date range enclosed in parenthesis will be postpended
         whether this is specified or not.
-    
+
     Returns
     -------
     fig: matplotlib.figure.Figure
         The figure containing the plot grid.
-    
+
     Raises
     ------
     ValueError:
@@ -484,7 +483,7 @@ def xarray_time_series_plot(dataset, plot_descs, fig_params={'figsize':(18,12)},
         plt.title(title_prepend + title_postpend)
         plt.tight_layout()
     return fig
-    
+
 ## Curve fitting ##
 
 def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_kwargs={}, fig=None, ax=None):
@@ -522,7 +521,7 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
     -------
     lines: matplotlib.lines.Line2D
         Can be used as a handle for a matplotlib legend (i.e. plt.legend(handles=...)) among other things.
-        
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
@@ -679,10 +678,10 @@ def plot_pixel_qa_value(dataset, platform, values_to_plot, bands = "pixel_qa", p
         plt.xticks(rotation=90)    
 
 ## Color utils ##
-    
+
 def convert_name_rgb_255(color):
     """
-    Converts a name of a matplotlib color to a list of rgb values in the range [0,255]. 
+    Converts a name of a matplotlib color to a list of rgb values in the range [0,255].
     Else, returns the original argument.
 
     Parameters
@@ -714,23 +713,23 @@ def create_discrete_color_map(data_range, colors, th=None, cmap_name='my_cmap'):
         Colors to use between thresholds.
         Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
     th: list
-        Threshold values separating colors, so `len(colors) == len(th)+1`. 
+        Threshold values separating colors, so `len(colors) == len(th)+1`.
         Must be in the range of `data_range` - noninclusive.
     cmap_name: str
         The name of the created colormap for matplotlib.
-        
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
     # Normalize threshold values based on the data range.
     th_spacing = (data_range[1] - data_range[0])/len(colors)
-    
+
     if th is None:
         th = np.linspace(data_range[0]+th_spacing, data_range[1]-th_spacing, len(colors)-1)
     th = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), th))
     colors = list(map(norm_color, colors))
     th = [0.0] + th + [1.0]
-    
+
     cdict = {}
     # These are fully-saturated red, green, and blue - not the matplotlib colors for 'red', 'green', and 'blue'.
     primary_colors = ['red', 'green', 'blue']
@@ -754,7 +753,7 @@ def create_discrete_color_map(data_range, colors, th=None, cmap_name='my_cmap'):
 def create_gradient_color_map(data_range, colors, positions=None, cmap_name='my_cmap'):
     """
     Creates a gradient colormap with a LinearSegmentedColormap. Currently only creates linear gradients.
-    
+
     Parameters
     ----------
     data_range: list-like
@@ -763,13 +762,13 @@ def create_gradient_color_map(data_range, colors, positions=None, cmap_name='my_
         Colors can be string names of matplotlib colors or 3-tuples of rgb values in range [0,255].
         The first and last colors are placed at the beginning and end of the colormap, respectively.
     positions: list-like
-        The values which are colored with corresponding colors in `colors`, 
+        The values which are colored with corresponding colors in `colors`,
         except the first and last colors, so `len(positions) == len(colors)-2`.
         Positions must be in the range of `data_range` - noninclusive.
         If no positions are provided, the colors are evenly spaced.
     cmap_name: str
         The name of the created colormap for matplotlib.
-        
+
     Examples
     --------
     Creating a linear gradient colormap of red, green, and blue, with even spacing between them:
@@ -784,10 +783,10 @@ def create_gradient_color_map(data_range, colors, positions=None, cmap_name='my_
         positions = [spacing*i for i in range(1, len(colors)-1)]
     else:
         positions = list(map(lambda val: (val - data_range[0])/(data_range[1] - data_range[0]), positions))
-    
+
     colors = list(map(norm_color, colors)) # Normalize color values for colormap creation.
     positions = [0.0] + positions + [1.0]
-    
+
     cdict = {}
     # These are fully-saturated red, green, and blue - not the matplotlib colors for 'red', 'green', and 'blue'.
     primary_colors = ['red', 'green', 'blue']
@@ -804,8 +803,8 @@ def create_gradient_color_map(data_range, colors, positions=None, cmap_name='my_
 
 ### Discrete color plotting (exclusive) ###
 
-def binary_class_change_plot(dataarrays, mask=None, colors=None, 
-                             class_legend_label=None, width=10, 
+def binary_class_change_plot(dataarrays, mask=None, colors=None,
+                             class_legend_label=None, width=10,
                              fig=None, ax=None, *args, **kwargs):
     """
     Creates a figure showing one of the following, depending on the format of arguments:
@@ -813,25 +812,25 @@ def binary_class_change_plot(dataarrays, mask=None, colors=None,
            Pixels are colored based on never, sometimes, or always being a member of the class.
            In this case, there are 3 regions - never, sometimes, and always.
         2. The change in the extents of a binary pixel classification in a region over time between
-           two time periods. Pixels are colored based on a change in having zero or more than zero 
+           two time periods. Pixels are colored based on a change in having zero or more than zero
            times in which they are members of the class between the time periods.
            In this case, there are 4 regions - (never,never),(never,some),(some,never),(some,some).
-    
+
     Parameters
     ----------
     dataarrays: list-like of xarray.DataArray
-        A list-like of one or two DataArrays of classification values 
+        A list-like of one or two DataArrays of classification values
         to plot, which must be either 0 or 1.
     mask: numpy.ndarray
-        A NumPy array of the same shape as the dataarrays. 
+        A NumPy array of the same shape as the dataarrays.
         The pixels for which it is `True` are colored `color_mask`.
     colors: list-like:
-        A list-like of list-likes of 3 elements - red, green, and blue values in range [0,255], 
+        A list-like of list-likes of 3 elements - red, green, and blue values in range [0,255],
         or the name of a matplotlib color.
-        
-        If `dataarrays` contains one DataArray, these are the colors for pixels. 
+
+        If `dataarrays` contains one DataArray, these are the colors for pixels.
         Provide 3 color entries - for never, sometimes, and always class membership.
-        
+
         If `dataarrays` contains two DataArrays, these are the colors for pixels that have zero
         or more than zero times in which they are members of the class between the time periods.
         Provide 4 color entires - (never,never),(never,some),(some,never),(some,some) class membership.
@@ -839,10 +838,10 @@ def binary_class_change_plot(dataarrays, mask=None, colors=None,
         The class label on the legend. For example, `class_legend_label='Water'` would yield legend labels
         like "Never Water".
     width: int
-        The width of the created ``matplotlib.figure.Figure``. 
+        The width of the created ``matplotlib.figure.Figure``.
         The height will be set to maintain aspect ratio.
     fig: matplotlib.figure.Figure
-        The figure to use for the plot. 
+        The figure to use for the plot.
         If `ax` is not supplied, the Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
@@ -850,41 +849,41 @@ def binary_class_change_plot(dataarrays, mask=None, colors=None,
         Arguments passed to ``matplotlib.pyplot.imshow()``.
     **kwargs: dict
         Keyword arguments passed to ``matplotlib.pyplot.imshow()``.
-        
+
     Returns
     -------
-    (fig,ax), pcts: 
-        A 2-tuple of the figure and axes followed by a list of either 3 or 4 percents of 
+    (fig,ax), pcts:
+        A 2-tuple of the figure and axes followed by a list of either 3 or 4 percents of
         pixel membership, depending on whether `dataarray` contains one or two DataArrays.
 
-        If `dataarrays` contains one DataArray, there are 3 percents for never, sometimes, 
+        If `dataarrays` contains one DataArray, there are 3 percents for never, sometimes,
         and always class membership.
 
-        If `dataarrays` contains two DataArrays, there are 4 percents for 
+        If `dataarrays` contains two DataArrays, there are 4 percents for
         (never,never),(never,some),(some,never),(some,some) class membership.
-    
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
     # Handle conversion of matplotlib color names to lists of rgb values (range [0,255] for plt.imshow()).
     colors = list(map(convert_name_rgb_255, colors))
-    
+
     def get_none_chng_perm_masks(dataarray):
         """
-        For a DataArray of binary classifications (0 or 1) with a 'time' dimension, 
-        get a list of masks indicating where the points are, in order, never, sometimes, or always 
+        For a DataArray of binary classifications (0 or 1) with a 'time' dimension,
+        get a list of masks indicating where the points are, in order, never, sometimes, or always
         a member of the class (1 indicates membership) of all non-NaN values for those points.
         """
         # Get the sum of classifications across time.
         sum_cls = dataarray.sum(dim='time')
         # The number of acquistions in which this pixel was not nan.
-        num_times_not_nan = dataarray.count(dim='time') 
+        num_times_not_nan = dataarray.count(dim='time')
         # Find where pixels are permanent, changing, or never a member of the class.
         none_mask = sum_cls == 0
         chng_mask = xr_and(0 < sum_cls, sum_cls < num_times_not_nan)
         perm_mask = sum_cls == num_times_not_nan
         return [none_mask, chng_mask, perm_mask]
-    
+
     # Assemble the color masks.
     masks = []
     if len(dataarrays) == 1: # Determine extent change in one time period.
@@ -897,60 +896,60 @@ def binary_class_change_plot(dataarrays, mask=None, colors=None,
         # Find where points are never a member of the class or a member at one or more times.
         baseline_cls_ever = xr_or(baseline_chng_mask, baseline_perm_mask)
         analysis_cls_ever = xr_or(analysis_chng_mask, analysis_perm_mask)
-        # Find where points change between never being a member of the class 
+        # Find where points change between never being a member of the class
         # and being a member at one or more times between the two periods.
         no_cls_no_cls_mask = xr_and(baseline_none_mask, analysis_none_mask)
         no_cls_cls_mask = xr_and(baseline_none_mask, analysis_cls_ever)
         cls_no_cls_mask = xr_and(baseline_cls_ever, analysis_none_mask)
         cls_cls_mask = xr_and(baseline_cls_ever, analysis_cls_ever)
         masks += [no_cls_no_cls_mask, no_cls_cls_mask, cls_no_cls_mask, cls_cls_mask]
-        
+
     # Determine the overriding mask.
     lat_lon_shape = len(dataarrays[0].latitude), len(dataarrays[0].longitude)
     mask = np.zeros_like(lat_lon_shape, dtype=np.bool) if mask is None else mask
-    
+
     # Color the image with the masks.
     color_array = np.zeros((*lat_lon_shape, 3)).astype(np.int16)
     for i, mask in enumerate(masks):
         color_array[mask] = colors[i]
-    
+
     fig, ax = retrieve_or_create_fig_ax(fig, ax, figsize=figure_ratio(dataarrays[0], fixed_width = width))
-    
+
     # Formatting title and labels.
     title = "Class extents change" if len(dataarrays)==1 else "Class extents change \nbaseline/analysis"
     ax.set_title(title, fontsize=12 if len(dataarrays)==1 else 14)
-    
+
     # Set the tick labels.
     xarray_set_axes_labels(dataarrays[0], ax)
-    
+
     # Create the legend.
     class_legend_label = "a member of the class" if class_legend_label is None else class_legend_label
     colors = [np.array(color)/255 for color in colors] # Colors must be in range [0,1] for color patches.
     if len(dataarrays)==1:
-        labels = list(map(lambda str: str.format(class_legend_label), 
+        labels = list(map(lambda str: str.format(class_legend_label),
                           ['Never {}', 'Sometimes {}', 'Always {}']))
     else:
-        labels = list(map(lambda str: str.format(class_legend_label, class_legend_label), 
+        labels = list(map(lambda str: str.format(class_legend_label, class_legend_label),
                           ['No {} to No {}', 'No {} to {}', '{} to No {}', '{} to {}']))
-    color_patches = list(map(lambda color, label: mpatches.Patch(color=color, label=label), colors, labels)) 
+    color_patches = list(map(lambda color, label: mpatches.Patch(color=color, label=label), colors, labels))
     ax.legend(handles=color_patches, loc='best')
-    
+
     ax.imshow(color_array, *args, **kwargs)
-    
+
     # Calculate the percentage of pixels that are permanent, changing, or never members.
     pcts = [float((mask.sum() / (lat_lon_shape[0]*lat_lon_shape[1])).values) for mask in masks]
-    
+
     return [fig,ax], pcts
-    
+
     ## Threshold plotting ##
 
-def intersection_threshold_plot(first, second, th, mask = None, color_none='black', 
-                                color_first='green', color_second='red', 
-                                color_both='white', color_mask='gray', 
+def intersection_threshold_plot(first, second, th, mask = None, color_none='black',
+                                color_first='green', color_second='red',
+                                color_both='white', color_mask='gray',
                                 width = 10, fig=None, ax=None, *args, **kwargs):
     """
     Given two dataarrays, create a threshold plot showing where zero, one, or both are within a threshold.
-    
+
     Parameters
     ----------
     first, second: xarray.DataArray
@@ -958,38 +957,38 @@ def intersection_threshold_plot(first, second, th, mask = None, color_none='blac
     th: tuple
         A 2-tuple of the minimum (inclusive) and maximum (exclusive) threshold values, respectively.
     mask: numpy.ndarray
-        A NumPy array of the same shape as the dataarrays. The pixels for which it is `True` 
+        A NumPy array of the same shape as the dataarrays. The pixels for which it is `True`
         are colored`color_mask`.
     color_none: list-like or str
-        A list-like of 3 elements - red, green, and blue values in range [0,255], 
-        or the name of a matplotlib color. Used to color regions where 
-        neither first nor second have values within the threshold. 
+        A list-like of 3 elements - red, green, and blue values in range [0,255],
+        or the name of a matplotlib color. Used to color regions where
+        neither first nor second have values within the threshold.
         Default color is black.
     color_first: list-like or str
-        A list-like of 3 elements - red, green, and blue values in range [0,255], 
-        or the name of a matplotlib color. Used to color regions where 
-        only the first has values within the threshold. 
+        A list-like of 3 elements - red, green, and blue values in range [0,255],
+        or the name of a matplotlib color. Used to color regions where
+        only the first has values within the threshold.
         Default color is green.
     color_second: list-like or str
-        A list-like of 3 elements - red, green, and blue values in range [0,255], 
-        or the name of a matplotlib color. Used to color regions where 
-        only the second has values within the threshold. 
+        A list-like of 3 elements - red, green, and blue values in range [0,255],
+        or the name of a matplotlib color. Used to color regions where
+        only the second has values within the threshold.
         Default color is red.
     color_both: list-like or str
-        A list-like of 3 elements - red, green, and blue values in range [0,255], 
-        or the name of a matplotlib color. Used to color regions where 
-        both the first and second have values within the threshold. 
+        A list-like of 3 elements - red, green, and blue values in range [0,255],
+        or the name of a matplotlib color. Used to color regions where
+        both the first and second have values within the threshold.
         Default color is white.
     color_mask: list-like or str
-        A list-like of 3 elements - red, green, and blue values in range [0,255], 
+        A list-like of 3 elements - red, green, and blue values in range [0,255],
         or the name of a matplotlib color. Used to color regions where `mask == True`.
-        Overrides any other color a region may have. 
+        Overrides any other color a region may have.
         Default color is gray.
     width: int
-        The width of the created ``matplotlib.figure.Figure``. 
+        The width of the created ``matplotlib.figure.Figure``.
         The height will be set to maintain aspect ratio.
     fig: matplotlib.figure.Figure
-        The figure to use for the plot. 
+        The figure to use for the plot.
         If `ax` is not supplied, the Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
@@ -1001,7 +1000,7 @@ def intersection_threshold_plot(first, second, th, mask = None, color_none='blac
     # Handle conversion of matplotlib color names to lists of rgb values.
     color_none, color_first, color_second, color_both, color_mask = \
         list(map(convert_name_rgb_255, [color_none, color_first, color_second, color_both, color_mask]))
-    
+
     # Determine the regions.
     first_in = np.logical_and(th[0] <= first, first < th[1])
     second_in = np.logical_and(th[0] <= second, second < th[1])
@@ -1009,10 +1008,10 @@ def intersection_threshold_plot(first, second, th, mask = None, color_none='blac
     none_in = np.invert(both_in)
     # Determine the overriding mask.
     mask  = np.zeros(first.shape).astype(bool) if mask is None else mask
-    
+
     # The colors for each pixel.
     color_array = np.zeros((*first.shape, 3)).astype(np.int16)
-    
+
     color_array[none_in] = color_none
     color_array[first_in] =  color_first
     color_array[second_in] = color_second
@@ -1020,23 +1019,23 @@ def intersection_threshold_plot(first, second, th, mask = None, color_none='blac
     color_array[mask] =  color_mask
 
     fig, ax = retrieve_or_create_fig_ax(fig, ax, figsize=figure_ratio(first, fixed_width = width))
-    
+
     plt.title("Threshold: {} < x < {}".format(th[0], th[1]))
-    
+
     max_num_ticks = 10 # Max ticks per axis.
-    
+
     lon = first.longitude.values
     label_every = int(round(len(lon)/max_num_ticks))
     lon_labels = ["{0:.4f}".format(lon_val) for lon_val in lon[::label_every]]
     plt.xlabel('Longitude')
     plt.xticks(range(len(lon))[::label_every], lon_labels, rotation='vertical')
-    
+
     lat = first.latitude.values
     label_every = int(round(len(lat)/max_num_ticks))
     lat_labels = ["{0:.4f}".format(lat_val) for lat_val in lat[::label_every]]
     plt.ylabel('Latitude')
     plt.yticks(range(len(lat))[::label_every], lat_labels)
-    
+
     plt.imshow(color_array, *args, **kwargs)
     plt.show()
 
@@ -1046,16 +1045,16 @@ def intersection_threshold_plot(first, second, th, mask = None, color_none='blac
 
 ## Misc ##
 
-def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_labels=None, 
-                 show_row_labels=True, show_col_labels=True, show_cell_labels=True, 
-                 cmap=None, cell_val_fmt='2g', annot_kwargs={}, tick_fontsize=14, 
-                 x_axis_tick_kwargs=None, y_axis_tick_kwargs=None, 
-                 x_axis_ticks_position='default', y_axis_ticks_position='default', 
+def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_labels=None,
+                 show_row_labels=True, show_col_labels=True, show_cell_labels=True,
+                 cmap=None, cell_val_fmt='2g', annot_kwargs={}, tick_fontsize=14,
+                 x_axis_tick_kwargs=None, y_axis_tick_kwargs=None,
+                 x_axis_ticks_position='default', y_axis_ticks_position='default',
                  fig=None, ax=None, heatmap_kwargs={}, fig_kwargs={}):
     """
     Prints a matrix as a heatmap.
     Inspired by https://gist.github.com/shaypal5/94c53d765083101efc0240d776a23823.
-    
+
     Arguments
     ---------
     cell_value_mtx: numpy.ndarray
@@ -1091,12 +1090,12 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
     heatmap_kwargs: dict
-        Dictionary of keyword arguments to `seaborn.heatmap()`. 
+        Dictionary of keyword arguments to `seaborn.heatmap()`.
         Overrides any other relevant parameters passed to this function.
         Some notable parameters include 'vmin', 'vmax', 'cbar', and 'cbar_kws'.
     fig_kwargs: dict
         The dictionary of keyword arguments used to build the figure.
-    
+
     Returns
     -------
     fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes
@@ -1106,16 +1105,16 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
     row_labels = ['']*cell_value_mtx.shape[0] if not show_row_labels else row_labels
     col_labels = ['']*cell_value_mtx.shape[1] if not show_col_labels else col_labels
     heatmap_kwargs.setdefault('cbar', False)
-    
+
     df = pd.DataFrame(cell_value_mtx, index=row_labels, columns=col_labels)
     cell_labels = cell_label_mtx if show_cell_labels else None
     fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_kwargs)
-    heatmap = sns.heatmap(df, cmap=cmap, annot=cell_labels, fmt=cell_val_fmt, 
+    heatmap = sns.heatmap(df, cmap=cmap, annot=cell_labels, fmt=cell_val_fmt,
                           annot_kws=annot_kwargs, ax=ax, **heatmap_kwargs)
     if not show_row_labels:
         heatmap.set_yticks([]) # Ticks must be hidden explicitly.
     else:
-        if y_axis_tick_kwargs is None:    
+        if y_axis_tick_kwargs is None:
             y_axis_tick_kwargs = dict(rotation=0, ha='right')
         y_axis_tick_kwargs.setdefault('fontsize', tick_fontsize)
         heatmap.yaxis.set_ticklabels(heatmap.yaxis.get_ticklabels(), **y_axis_tick_kwargs)
@@ -1131,15 +1130,15 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         heatmap.xaxis.set_ticks_position(x_axis_ticks_position)
     return fig, ax
 
-def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True, 
-                  use_legend=False, legend_labels=None, fig_kwargs={}, 
-                  imshow_kwargs={}, x_label_kwargs={}, y_label_kwargs={}, 
+def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True,
+                  use_legend=False, legend_labels=None, fig_kwargs={},
+                  imshow_kwargs={}, x_label_kwargs={}, y_label_kwargs={},
                   cbar_kwargs={}, nan_color='white', legend_kwargs={}):
     """
     Shows a heatmap of an xarray DataArray with only latitude and longitude dimensions.
     Different from `data.plot.imshow()` in that this sets axes ticks and labels - including
     labeling "Latitude" and "Longitude" - and shows a colorbar.
-    
+
     Parameters
     ----------
     data: xarray.DataArray
@@ -1147,7 +1146,7 @@ def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True,
     width: numeric
         The width of the figure with proper aspect ratio. The height is determined by the width and lat/lon shape.
     fig: matplotlib.figure.Figure
-        The figure to use for the plot. 
+        The figure to use for the plot.
         If `ax` is not supplied, the Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
@@ -1164,30 +1163,30 @@ def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True,
         The dictionary of keyword arguments passed to `plt.imshow()`.
         You can pass a colormap here with the key 'cmap'.
     x_label_kwargs, y_label_kwargs: dict
-        Dictionaries of keyword arguments for 
+        Dictionaries of keyword arguments for
         `Axes.set_xlabel()` and `Axes.set_ylabel()`, respectively.
     cbar_kwargs: dict
         The dictionary of keyword arguments passed to `plt.colorbar()`.
     nan_color: str or list-like
-        The color used for NaN regions. Can be a string name of a matplotlib color or 
+        The color used for NaN regions. Can be a string name of a matplotlib color or
         a 3-tuple (list-like) of rgb values in range [0,255].
     legend_kwargs: dict
         The dictionary of keyword arguments passed to `plt.legend()`.
-        
+
     Returns
     -------
-    fig, ax, im, cbar: matplotlib.figure.Figure, matplotlib.axes.Axes, 
+    fig, ax, im, cbar: matplotlib.figure.Figure, matplotlib.axes.Axes,
                        matplotlib.image.AxesImage,  matplotlib.colorbar.Colorbar
-        The figure and axes used as well as the image returned by `pyplot.imshow()` and the colorbar. 
+        The figure and axes used as well as the image returned by `pyplot.imshow()` and the colorbar.
         If `use_colorbar == False`, `cbar` will be `None`.
     """
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     nan_color = norm_color(nan_color) # Normalize color value for matplotlib.
-    
+
     fig_kwargs['figsize'] = fig_kwargs.get('figsize', figure_ratio(data, fixed_width = width))
     fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_kwargs)
-    
+
     if use_colorbar:
         imshow_kwargs.setdefault('vmin', np.nanmin(data.values))
         imshow_kwargs.setdefault('vmax', np.nanmax(data.values))
@@ -1198,9 +1197,9 @@ def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True,
     cmap = imshow_kwargs.pop('cmap', plt.get_cmap('viridis'))
     cmap.set_bad(nan_color)
     im = ax.imshow(masked_array, interpolation='nearest', cmap=cmap)
-    
+
     xarray_set_axes_labels(data, ax, x_label_kwargs, y_label_kwargs)
-    
+
     # Create a colorbar.
     if use_colorbar:
         divider = make_axes_locatable(ax)
@@ -1208,7 +1207,7 @@ def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True,
         cbar = plt.colorbar(im, ax=ax, cax=cax, **cbar_kwargs)
     else:
         cbar = None
-        
+
     # Create a legend.
     if use_legend:
         unique_values = np.unique(data.values)
@@ -1217,19 +1216,19 @@ def xarray_imshow(data, width=10, fig=None, ax=None, use_colorbar=True,
         else:
             legend_labels = [legend_labels[value] for value in unique_values]
         colors = [im.cmap(im.norm(unique_values)) for unique_values in unique_values]
-        patches = [mpatches.Patch(color=colors[i], label=legend_labels[i]) 
+        patches = [mpatches.Patch(color=colors[i], label=legend_labels[i])
                    for i in range(len(legend_labels))]
         legend_kwargs.setdefault('loc', 'best')
         ax.legend(handles=patches, **legend_kwargs)
-    
+
     return fig, ax, im, cbar
 
 def xarray_set_axes_labels(data, ax, x_label_kwargs={}, y_label_kwargs={}, fontsize=10):
     """
     Sets tick locations and labels for x and y axes on a `matplotlib.axes.Axes` object
-    such that the tick labels do not overlap. By default, labels x-axis as "Longitude" 
+    such that the tick labels do not overlap. By default, labels x-axis as "Longitude"
     and y-axis as "Latitude".
-    
+
     Parameters
     ----------
     data: xarray.Dataset or xarray.DataArray
@@ -1239,12 +1238,12 @@ def xarray_set_axes_labels(data, ax, x_label_kwargs={}, y_label_kwargs={}, fonts
     fontsize: numeric
         The fontsize of the tick labels. This determines the number of ticks used.
     x_label_kwargs, y_label_kwargs: dict
-        Dictionaries of keyword arguments for 
+        Dictionaries of keyword arguments for
         `Axes.set_xlabel()` and `Axes.set_ylabel()`, respectively.
     """
     bbox = ax.get_window_extent()
     width, height = bbox.width, bbox.height
-    
+
     lon = data.longitude.values
     label_every = max(1, int(round(10*len(lon)*fontsize/width)))
     lon_labels = ["{0:.4f}".format(lon_val) for lon_val in lon[::label_every]]
@@ -1280,7 +1279,7 @@ def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
     If neither is supplied, a new figure will be created with associated axes.
     If only `fig` is supplied, `(fig,fig.axes[0])` is returned. That is, the first Axes object will be used (and created if necessary).
     If `ax` is supplied, `(fig, ax)` is returned.
-    
+
     Returns
     -------
     fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes

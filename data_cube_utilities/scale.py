@@ -1,7 +1,7 @@
 import xarray as xr
 import numpy as np
 
-def xr_scale(data, data_vars=None, min_max=None, scaling='norm'):
+def xr_scale(data, data_vars=None, min_max=None, scaling='norm', copy=False):
     """
     Scales an xarray Dataset or DataArray with standard scaling or norm scaling.
     
@@ -17,8 +17,10 @@ def xr_scale(data, data_vars=None, min_max=None, scaling='norm'):
     scaling: str
         The options are ['std', 'norm']. 
         The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
+    copy: bool
+        Whether or not to copy `data` before scaling.
     """
-    data = data.copy()
+    data = data.copy() if copy else data
     if isinstance(data, xr.Dataset):
         data_arr_names = list(data.data_vars) if data_vars is None else data_vars
         for data_arr_name in data_arr_names:
@@ -28,27 +30,28 @@ def xr_scale(data, data_vars=None, min_max=None, scaling='norm'):
         data.values = np_scale(data.values, min_max=min_max, scaling=scaling)
     return data
     
-def np_scale(arr, pop_arr=None, pop_min_max=None, mean_std=None, min_max=None, scaling='norm'):
+def np_scale(arr, pop_arr=None, pop_min_max=None, pop_mean_std=None, min_max=None, scaling='norm'):
     """
-    Scales a NumPy array with standard scaling or norm scaling.
+    Scales a NumPy array with standard scaling or norm scaling, default to norm scaling.
     
     Parameters
     ----------
     arr: numpy.ndarray
         The NumPy array to scale.
-    pop_arr: numpy.ndarray
-        The NumPy array to treat as the population. 
-        If specified, all members of arr must be within pop_arr or min_max must be specified.
-    pop_min_max: tuple
-        A 2-tuple of the population minimum and maximum, in that order. 
-        Supercedes pop_arr when normalizing.
-    mean_std: tuple
-        A 2-tuple of the population mean and standard deviation, in that order. 
-        Supercedes pop_arr when standard scaling.
-    min_max: tuple
-        A 2-tuple which specifies the desired range of the final output - the minimum and the maximum, in that order.
-        If all values are the same, all values will become min_max[0].
-    scaling: str
+    pop_arr: numpy.ndarray, optional
+        The NumPy array to treat as the population.
+        If specified, all members of `arr` must be within the range of `pop_arr`
+        or `min_max` must be specified.
+    pop_min_max: list-like, optional
+        The population minimum and maximum, in that order.
+        Supercedes `pop_arr` when normalizing.
+    pop_mean_std: list-like, optional
+        The population mean and standard deviation, in that order.
+        Supercedes `pop_arr` when standard scaling.
+    min_max: list-like, optional
+        The desired minimum and maximum of the final output, in that order.
+        If all values are the same, all values will become `min_max[0]`.
+    scaling: str, optional
         The options are ['std', 'norm']. 
         The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
     """
