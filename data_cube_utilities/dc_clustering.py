@@ -18,7 +18,7 @@ def get_frequency_counts(classification):
     
     Returns
     -------
-    freqs: np.ndarray
+    freqs: np.ndarray of np.float64
         A 2D NumPy array containing entries of the format 
         [class_number, count, frequency] ordered by class number.
     """
@@ -34,12 +34,11 @@ def clustering_pre_processing(dataset_in, bands):
     array_from = []
     for band in bands:
         array_from.append(dataset_in[band].values.flatten())
-
-    np_array = np.array(array_from)
-    np_array = np.swapaxes(np_array, 0, 1)
-
+        
+    features = np.array(array_from)
+    features = np.swapaxes(features, 0, 1)
     np.set_printoptions(suppress=True)
-    return array_from, np_array
+    return features
 
 def clustering_post_processing(classified, dataset_in, bands):
     classified_data = OrderedDict()
@@ -51,14 +50,30 @@ def clustering_post_processing(classified, dataset_in, bands):
                              dataset_in.coords)
     return dataset_out
 
-def kmeans_cluster_dataset(dataset_in, bands=['red', 'green', 'blue', 'swir1', 'swir2', 'nir'], n_clusters=4):
-    array_from, np_array = clustering_pre_processing(dataset_in, bands)
+def kmeans_cluster_dataset(dataset_in, bands, n_clusters=4):
+    """
+    Clusters a dataset with Kmeans clustering.
+    
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A Dataset containing the bands listed in `bands`.
+    bands: list of str
+        A list of names of the bands in `dataset_in` to cluster with.
+        
+    Returns
+    -------
+    clustered: xarray.Dataset
+        A Dataset of the same shape as `dataset_in`, containing a single data variable 
+        called "classification", which are the numeric class labels in range [0, n_clusters-1].
+    """
+    features = clustering_pre_processing(dataset_in, bands)
     """
     classified = AgglomerativeClustering(n_clusters=n_clusters).fit(np_array)
     classified = Birch(n_clusters=n_clusters).fit(np_array)
     classified = DBSCAN(eps=0.005, min_samples=5, n_jobs=-1).fit(np_array)
     """    
-    classified = KMeans(n_clusters=n_clusters, n_jobs=-1).fit(np_array)
+    classified = KMeans(n_clusters=n_clusters, n_jobs=-1).fit(features)
     return clustering_post_processing(classified, dataset_in, bands)
 
 def birch_cluster_dataset(dataset_in, bands=['red', 'green', 'blue', 'swir1', 'swir2', 'nir'], n_clusters=4):

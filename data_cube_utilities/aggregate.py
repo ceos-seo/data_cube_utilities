@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils.data_cube_utilities.ama_utils.dc_time import \
+from utils.data_cube_utilities.dc_time import \
     _n64_datetime_to_scalar, _scalar_to_n64_datetime
 
 def get_bin_intervals(data, num_bins):

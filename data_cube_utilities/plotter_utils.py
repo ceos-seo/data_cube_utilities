@@ -1012,7 +1012,7 @@ def binary_class_change_plot(dataarrays, x_coord='longitude', y_coord='latitude'
     # Color the image with the masks.
     color_array = np.zeros((*y_x_shape, 3)).astype(np.int16)
     for i, mask in enumerate(masks):
-        color_array[mask] = colors[i]
+        color_array[mask.values] = colors[i]
 
     fig_kwargs['figsize'] = fig_kwargs.get('figsize', figure_ratio(dataarrays[0], x_coord, y_coord,
                                                                    fixed_width=width))
