@@ -211,7 +211,7 @@ def nan_to_num(data, number):
 def clear_attrs(dataset):
     """Clear out all attributes on an xarray dataset to write to disk."""
     dataset.attrs = collections.OrderedDict()
-    for band in dataset:
+    for band in dataset.data_vars:
         dataset[band].attrs = collections.OrderedDict()
 
 
