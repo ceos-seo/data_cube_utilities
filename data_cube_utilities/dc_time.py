@@ -1,5 +1,11 @@
 import numpy as np
 
+def dt_to_str(date, fmt='%Y-%m-%d'):
+    """
+    Converts a datetime object to a string.
+    """
+    return date.strftime(fmt)
+
 def _n64_to_datetime(n64):
     """
     Converts Numpy 64 bit timestamps to datetime objects. Units in seconds
