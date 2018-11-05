@@ -338,7 +338,7 @@ def get_product_extents(api, platform, product):
         A 2-tuple of the minimum and maximum time available.
     """
     # Get the extents of the cube
-    descriptor = api.get_query_metadata(platform=platform, product=product)
+    descriptor = api.get_query_metadata(platform=platform, product=product, measurements=[])
     min_max_lat = descriptor['lat_extents']
     min_max_lon = descriptor['lon_extents']
     min_max_dates = descriptor['time_extents']
@@ -362,7 +362,7 @@ def get_overlapping_area(api, platforms, products):
     full_lat, full_lon: tuple
         Two 2-tuples of the minimum and maximum latitude and longitude, respectively.
     min_max_dates: numpy.ndarray of datetime.datetime
-        A 2D NumPy array with shape (2, len(products)), in which rows contain the minimum
+        A 2D NumPy array with shape (len(products), 2), in which rows contain the minimum
         and maximum time available for corresponding products.
     """
     min_max_dates = np.empty((len(platforms), 2), dtype=object)
