@@ -42,7 +42,6 @@ def __stem_figure(list1,
     p = figure(plot_width  = 900,
                plot_height = 200,
                tools       = "xpan, reset, save, xzoom_in, xzoom_out",
-               logo        = None,
                x_axis_type = x_axis_format,
                title= "Coordinate Comparison: {}".format(kwargs['dimension']))
         

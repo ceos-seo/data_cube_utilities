@@ -20,7 +20,7 @@ def xr_scale(data, data_vars=None, min_max=None, scaling='norm', copy=False):
     copy: bool
         Whether or not to copy `data` before scaling.
     """
-    data = data.copy() if copy else data         
+    data = data.copy() if copy else data
     if isinstance(data, xr.Dataset):
         data_arr_names = list(data.data_vars) if data_vars is None else data_vars
         for data_arr_name in data_arr_names:
@@ -39,14 +39,14 @@ def np_scale(arr, pop_arr=None, pop_min_max=None, pop_mean_std=None, min_max=Non
     arr: numpy.ndarray
         The NumPy array to scale.
     pop_arr: numpy.ndarray, optional
-        The NumPy array to treat as the population. 
-        If specified, all members of `arr` must be within the range of `pop_arr` 
+        The NumPy array to treat as the population.
+        If specified, all members of `arr` must be within the range of `pop_arr`
         or `min_max` must be specified.
     pop_min_max: list-like, optional
-        The population minimum and maximum, in that order. 
+        The population minimum and maximum, in that order.
         Supercedes `pop_arr` when normalizing.
     pop_mean_std: list-like, optional
-        The population mean and standard deviation, in that order. 
+        The population mean and standard deviation, in that order.
         Supercedes `pop_arr` when standard scaling.
     min_max: list-like, optional
         The desired minimum and maximum of the final output, in that order.

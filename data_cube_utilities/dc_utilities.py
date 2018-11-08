@@ -33,6 +33,17 @@ import functools
 import operator
 import warnings
 
+def reverse_array_dict(dictionary):
+    """
+    Returns a reversed version a dictionary of keys to list-like objects. Each value in each list-like
+    becomes a key in the returned dictionary mapping to its key in the provided dictionary.
+    """
+    return_dict = {}
+    for label, values in dictionary.items():
+        for value in values:
+            return_dict[value] = label
+    return return_dict
+
 def list_prod(lst):
     """Takes the product of elements in a list."""
     return functools.reduce(operator.mul, lst)
@@ -200,7 +211,7 @@ def nan_to_num(data, number):
 def clear_attrs(dataset):
     """Clear out all attributes on an xarray dataset to write to disk."""
     dataset.attrs = collections.OrderedDict()
-    for band in dataset:
+    for band in dataset.data_vars:
         dataset[band].attrs = collections.OrderedDict()
 
 

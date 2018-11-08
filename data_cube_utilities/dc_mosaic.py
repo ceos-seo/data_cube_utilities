@@ -343,18 +343,18 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
 
 def unpack_bits(land_cover_endcoding, data_array, cover_type):
     """
-    Description:
-        Unpack bits for end of ls7 and ls8 functions
-    -----
-    Input:
-        land_cover_encoding(dict hash table) land cover endcoding provided by ls7 or ls8
+	Description:
+		Unpack bits for end of ls7 and ls8 functions 
+	-----
+	Input:
+		land_cover_encoding(dict hash table) land cover endcoding provided by ls7 or ls8
         data_array( xarray DataArray)
         cover_type(String) type of cover
-    Output:
+	Output:
         unpacked DataArray
 	"""
-    boolean_mask = np.isin(data_array.values, land_cover_endcoding[cover_type])
-    return xr.DataArray(boolean_mask.astype(np.int8),
+    boolean_mask = np.isin(data_array.values, land_cover_endcoding[cover_type]) 
+    return xr.DataArray(boolean_mask.astype(bool),
                         coords = data_array.coords,
                         dims = data_array.dims,
                         name = cover_type + "_mask",
@@ -444,20 +444,13 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
         clean_mask = create_default_clean_mask(dataset_in)
     assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
-    #     print("dataset_in:", dataset_in)
-    #     print("sum dataset_in:", dataset_in.sum())
-    # log_strs = kwargs.get('log_strs', None)
     # Save dtypes because masking with Dataset.where() converts to float64.
     band_list = list(dataset_in.data_vars)
     dataset_in_dtypes = {}
     for band in band_list:
         dataset_in_dtypes[band] = dataset_in[band].dtype
     # Mask out clouds and scan lines.
-    dataset_in = dataset_in.where((dataset_in != -9999) & clean_mask)
-    # if log_strs is not None:
-    #     log_strs.append("sum of dataset_in no_data:" + str(dataset_in.where(dataset_in==no_data).sum()))
-    #     print("filtered dataset_in:", dataset_in)
-    #     print("sum filtered dataset_in:", dataset_in.sum())
+    dataset_in = dataset_in.where((dataset_in != no_data) & clean_mask)
 
     arrays = [dataset_in[band] for band in band_list]
     stacked_data = np.stack(arrays)
@@ -473,23 +466,12 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     # For each pixel (lat/lon combination), find the geomedian or geomedoid across time.
     for x in range(reshaped_stack.shape[2]):
         try:
-            # if log_strs is not None:
-            #     log_strs.append("reshaped_stack[:, :, {}]" + str(reshaped_stack[:, :, x]))
             hdmedians_result[:, x] = hd.nangeomedian(
                 reshaped_stack[:, :, x], axis=1) if operation == "median" else hd.nanmedoid(
                 reshaped_stack[:, :, x], axis=1)
         except ValueError as e:
-            # if log_strs is not None:
-                # log_strs.append("ValueError! args:" + str(e.args))
-                # log_strs.append("~np.isnan(reshaped_stack[:, :, x]): " + str(~np.isnan(reshaped_stack[:, :, x])))
-                # log_strs.append("~np.isnan(reshaped_stack[:, :, x]).any(axis=1): " + str(~np.isnan(reshaped_stack[:, :, x]).any(axis=1)))
-                # log_strs.append("ngood:" + str(np.count_nonzero(~np.isnan(reshaped_stack[:, :, x]).any(axis=1))))
             # If all bands have nan values across time, the geomedians are nans.
             hdmedians_result[:, x] = np.full((bands_shape), np.nan)
-            # nan_pixel_stack = reshaped_stack[:, :, x]
-            # nan_pixel_stack[np.isnan(nan_pixel_stack)] = no_data
-            # hdmedians_result[:, x] = np.full((bands_shape), no_data) if operation == "median" else hd.nanmedoid(
-            #     no_data_pixel_stack, axis=1)
     output_dict = {
         value: (('latitude', 'longitude'), hdmedians_result[index, :].reshape(lat_shape, lon_shape))
         for index, value in enumerate(band_list)
@@ -497,30 +479,7 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     dataset_out = xr.Dataset(output_dict,
                              coords={'latitude': dataset_in['latitude'],
                                      'longitude': dataset_in['longitude']})
-    # if log_strs is not None:
-    #     log_strs.append("dataset_in:" + str(dataset_in))
-    #     log_strs.append("sum of dataset_in no_data:" + str(dataset_in.where(dataset_in == no_data).sum()))
-    #     log_strs.append("before conversions - dataset_out:" + str(dataset_out))
-    #     log_strs.append("before conversions - sum of dataset_out no_data:" + str(dataset_out.where(dataset_out == no_data).sum()))
-    # utilities.nan_to_num(dataset_out, no_data)
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
-    # if dtype is not None:
-    #     # Integer types can't represent nan.
-    #     if np.issubdtype(dtype, np.integer): # This also works for Python int type.
-    #         utilities.nan_to_num(dataset_out, no_data)
-    #     convert_to_dtype(dataset_out, dtype)
-    # else:  # Restore dtypes to state before masking.
-    #     for band in band_list:
-    #         # print("dataset_in_dtypes[band]:", dataset_in_dtypes[band])
-    #         band_dtype = dataset_in_dtypes[band]
-    #         if np.issubdtype(band_dtype, np.integer):
-    #             utilities.nan_to_num(dataset_out[band], no_data)
-    #         dataset_out[band] = dataset_out[band].astype(band_dtype)
-    #     print("dataset_out:", dataset_out)
-    # if log_strs is not None:
-    #     log_strs.append("dataset_in_dtypes:" + str(dataset_in_dtypes))
-    #     log_strs.append("after conversions - dataset_out:" + str(dataset_out))
-    #     log_strs.append("after conversions - sum of dataset_out no_data:" + str(dataset_out.where(dataset_out == no_data).sum()))
     return dataset_out
 
 def restore_or_convert_dtypes(dtype_for_all, band_list, dataset_in_dtypes, dataset_out, no_data):

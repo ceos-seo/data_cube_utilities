@@ -2,7 +2,7 @@ from .dc_water_classifier import wofs_classify
 import xarray as xr
 import numpy as np
 
-def NDVI(dataset):#, normalize=True):
+def NDVI(dataset, normalize=False):
     """
     Computes the Normalized Difference Vegetation Index for an `xarray.Dataset`.
     Values should be in the range [-1,1] for valid LANDSAT data (nir and red are positive).
@@ -21,9 +21,8 @@ def NDVI(dataset):#, normalize=True):
         the same order.
     """
     ndvi = (dataset.nir - dataset.red) / (dataset.nir + dataset.red)
-    # if normalize:
-    #     ndvi_min, ndvi_max = ndvi.min(), ndvi.max()
-    #     ndvi = (ndvi - ndvi_min)/(ndvi_max - ndvi_min)
+    if normalize:
+        ndvi = (ndvi - ndvi.min())/(ndvi.max() - ndvi.min())
     return ndvi
 
 def compute_ndvi_anomaly(baseline_data,

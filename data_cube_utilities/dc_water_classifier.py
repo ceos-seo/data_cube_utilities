@@ -36,30 +36,49 @@ from datetime import datetime
 # Author: KMF
 # Creation date: 2016-06-13
 
-def NDWI(dataset, normalize=False):
+def NDWI(data, normalize=False, band_pair=0):
     """
-    Computes the Normalized Difference Water Index for an `xarray.Dataset`.
-    Values should be in the range [-1,1] for valid LANDSAT data (nir and swir1 are positive).
+    Computes various versions of the Normalized Difference Water Index for an `xarray.Dataset`.
+    Values should be in the range [-1,1] for valid LANDSAT data (the bands are positive).
 
     Parameters
     ----------
-    dataset: xarray.Dataset
-        An `xarray.Dataset` that must contain 'nir' and 'red' `DataArrays`.
+    data: xarray.Dataset or numpy.ndarray
+        An `xarray.Dataset` containing the bands specified by `band_pair` or
+        a 2D NumPy array with two columns - the band pair.
     normalize: bool
         Whether or not to normalize to the range [0,1].
+    band_pair: int
+        The band pair to use.
+        Band pair 0 uses 'nir' and 'swir1': (nir - swir1)/(nir + swir1).
+        Band pair 1 uses 'green' and 'nir': (green - nir)/(green + nir).
 
     Returns
     -------
-    ndvi: xarray.DataArray
+    ndwi: xarray.DataArray
         An `xarray.DataArray` with the same shape as `dataset` - the same coordinates in
         the same order.
     """
-    ndwi = (dataset.nir - dataset.swir1) / (dataset.nir + dataset.swir1)
-    if normalize:
-        ndwi = (ndwi - ndwi.min())/(ndwi.max() - ndwi.min())
+    bands = [None] * 2
+    if band_pair == 0:
+        bands = ['nir', 'swir1']
+    elif band_pair == 1:
+        bands = ['green', 'nir']
+    else:
+        raise AssertionError('The band_pair parameter must be in [0,1]')
+
+    if isinstance(data, xr.Dataset):
+        ndwi = (data[bands[0]] - data[bands[1]]) / (data[bands[0]] + data[bands[1]])
+        if normalize:
+            ndwi = (ndwi - ndwi.min())/(ndwi.max() - ndwi.min())
+    else:
+        ndwi = data[:,0] - data[:,1]
+        if normalize:
+            ndwi = (ndwi - np.nanmin(ndwi))/(np.nanmax(ndwi) - np.nanmin(ndwi))
     return ndwi
 
-def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enforce_float64=False):
+def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='latitude',
+                  time_coord='time', no_data=-9999, mosaic=False, enforce_float64=False):
     """
     Description:
       Performs WOfS algorithm on given dataset.
@@ -74,6 +93,8 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
       dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube; should contain
         coordinates: time, latitude, longitude
         variables: blue, green, red, nir, swir1, swir2
+    x_coord, y_coord, time_coord: (str) - Names of DataArrays in `dataset_in` to use as x, y,
+        and time coordinates.
     Optional Inputs:
       clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
         if user does not provide a clean mask, all values will be considered clean
@@ -265,32 +286,30 @@ def wofs_classify(dataset_in, clean_mask=None, no_data=-9999, mosaic=False, enfo
     classified_clean[clean_mask] = classified[clean_mask]  # Contains data for clear pixels
 
     # Create xarray of data
-    latitude = dataset_in.latitude
-    longitude = dataset_in.longitude
+    x_coords = dataset_in[x_coord]
+    y_coords = dataset_in[y_coord]
 
     time = None
     coords = None
     dims = None
 
     if mosaic:
-        coords = [latitude, longitude]
-        dims = ['latitude', 'longitude']
+        coords = [y_coords, x_coords]
+        dims = [y_coord, x_coord]
     else:
-        time = dataset_in.time
-        coords = [time, latitude, longitude]
-        dims = ['time', 'latitude', 'longitude']
+        time_coords = dataset_in[time_coord]
+        coords = [time_coords, y_coords, x_coords]
+        dims = [time_coord, y_coord, x_coord]
 
     data_array = xr.DataArray(classified_clean, coords=coords, dims=dims)
 
     if mosaic:
-        dataset_out = xr.Dataset({'wofs': data_array}, coords={'latitude': latitude, 'longitude': longitude})
+        dataset_out = xr.Dataset({'wofs': data_array},
+                                 coords={y_coord: y_coords, x_coord: x_coords})
     else:
         dataset_out = xr.Dataset(
-            {
-                'wofs': data_array
-            }, coords={'time': time,
-                       'latitude': latitude,
-                       'longitude': longitude})
+            {'wofs': data_array},
+            coords={time_coord: time_coords, y_coord: y_coords, x_coord: x_coords})
 
     return dataset_out
 
