@@ -1574,7 +1574,8 @@ def figure_ratio(data, x_coord='longitude', y_coord='latitude',
     """
     Returns a list of the width and height that match constraints on height 
     and width for a figure while maintaining aspect ratio if possible.
-    Also handles a grid of plots of identically sized cells.
+    Also can be used to size a figure of a grid of plots of identically sized cells.
+    Specifically, the width and height are scaled by `num_cols` and `num_rows`.
         
     Parameters
     ----------
@@ -1610,7 +1611,7 @@ def figure_ratio(data, x_coord='longitude', y_coord='latitude',
         if height > fixed_height:
             width *= fixed_height/height
             height = fixed_height
-    return [width, height]
+    return [width*num_cols, height*num_rows]
 
 def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
     """
