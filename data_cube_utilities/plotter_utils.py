@@ -827,14 +827,18 @@ def create_discrete_color_map(data_range=None, colors=None, cmap=None,
             else: # Use `pts` as a list-like of points to put thresholds between.
                 assert data_range[0] <= min(pts) and max(pts) <= data_range[1], \
                     "The values in `pts` must be within `data_range`, inclusive."
-                # Choose imaginary lower and upper bounds of the data to scale `pts` with
-                # so that the first and last color regions are sized appropriately.
-                data_range_fmt = [None]*2 if data_range_fmt is None else data_range_fmt
-                data_range_fmt[0] = pts[0] - (pts[1] - pts[0])/2
-                data_range_fmt[1] = pts[-1] + (pts[-1] - pts[-2])/2
-                pts = np.interp(pts, data_range_fmt, data_range)#(0,1))
-                #                 pts = list(map(lambda pt: norm_range(pt, data_range_fmt), pts))
-                th = [pts[ind-1] + (pts[ind] - pts[ind-1])/2 for ind in range(1, len(pts))]
+                assert len(pts) > 0, "The parameter `pts` is a list, but it has no elements. "\
+                                     "Please ensure it has one or more numeric elements."
+                if len(pts) == 1:
+                    th = []
+                elif len(pts) > 1:
+                    # Choose imaginary lower and upper bounds of the data to scale `pts` with
+                    # so that the first and last color regions are sized appropriately.
+                    data_range_fmt = [None]*2 if data_range_fmt is None else data_range_fmt
+                    data_range_fmt[0] = pts[0] - (pts[1] - pts[0])/2
+                    data_range_fmt[1] = pts[-1] + (pts[-1] - pts[-2])/2
+                    pts = np.interp(pts, data_range_fmt, data_range)#(0,1))
+                    th = [pts[ind-1] + (pts[ind] - pts[ind-1])/2 for ind in range(1, len(pts))]
         else:
             assert colors is not None, \
                 "If neither `th` nor `pts` are specified, `colors` must be specified."
@@ -1303,10 +1307,10 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
                   cbar_kwargs=None, nan_color='white', legend_kwargs=None,
                   ax_tick_label_kwargs=None, x_tick_label_kwargs=None, 
                   y_tick_label_kwargs=None, title=None, title_kwargs=None,
-                  ax_lbl_font_scaling=(8, np.inf, 2), 
-                  ax_tick_lbl_font_scaling=(8, np.inf, 1.5),
-                  title_font_scaling=(8, np.inf, 1.5),
-                  legend_font_scaling=(8, np.inf, 1.5)):
+                  ax_lbl_font_scaling=(9, np.inf, 3), 
+                  ax_tick_lbl_font_scaling=(9, np.inf, 2.25),
+                  title_font_scaling=(9, np.inf, 3.5),
+                  legend_font_scaling=(9, np.inf, 2.25)):
     """
     Shows a heatmap of an xarray DataArray with only latitude and longitude dimensions.
     Unlike `data.plot.imshow()`, this sets axes ticks and labels - including
@@ -1370,10 +1374,11 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
         rate at which they scale with the figure dimensions. So each contains 
         3 numeric values. These variables are for, respectively, axis label 
         font scaling, axis tick label font scaling, title font scaling, and 
-        legend font scaling. The axis label, tick label, and title font sizes 
-        scale on the average of the width and height of the axes. The legend 
-        font size also scales on the width and height of the axes, but the 
-        number of legend elements and the maximum legend element length are also factored.
+        legend font scaling. The axis label and tick label font sizes 
+        scale on the average of the width and height of the axes. The title 
+        font size scales on the width of the axes. The legend font size 
+        scales on the width and height of the axes, but the number of legend 
+        elements and the maximum legend element length are also factored.
         
     Returns
     -------
@@ -1404,7 +1409,7 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
     
     # Axis label kwargs
     ax_lbl_fnt_sz = max(ax_lbl_font_scaling[0], 
-                        min(ax_lbl_font_scaling[2]*(axsize[0]+axsize[1])/2,#(x_lbl_fnt_sz+y_lbl_fnt_sz)/2, 
+                        min(ax_lbl_font_scaling[2]*(axsize[0]+axsize[1])/2,
                             ax_lbl_font_scaling[1]))
     x_label_kwargs = {} if x_label_kwargs is None else x_label_kwargs.copy()
     x_label_kwargs.setdefault("fontsize", ax_lbl_fnt_sz)
@@ -1429,6 +1434,10 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
     masked_array = np.ma.array(data_arr, mask=np.isnan(data_arr))
     cmap = imshow_kwargs.setdefault('cmap', plt.get_cmap('viridis'))
     cmap.set_bad(nan_color)
+    # Handle kwargs for `imshow()` if a colorbar is to be plotted.
+    if use_colorbar:
+        imshow_kwargs.setdefault('vmin', 0)
+        imshow_kwargs.setdefault('vmax', 1)
     im = ax.imshow(masked_array, **imshow_kwargs)
     
     # Set axis labels and tick labels.
@@ -1440,7 +1449,7 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
     # Set the title.
     if title is not None:
         title_fnt_sz = max(title_font_scaling[0], 
-                           min(title_font_scaling[2]*((axsize[0]+axsize[1])/2+3),#-len(title)/12
+                           min(title_font_scaling[2]*axsize[0],
                                title_font_scaling[1]))
         title_kwargs = {} if title_kwargs is None else title_kwargs.copy()
         title_kwargs.setdefault('fontdict', dict(fontsize=title_fnt_sz))
@@ -1531,11 +1540,6 @@ def xarray_set_axes_labels(data, ax, x_coord='longitude', y_coord='latitude',
     y_tick_label_kwargs = {} if y_tick_label_kwargs is None else \
                           y_tick_label_kwargs.copy()
     
-#     x_label_kwargs, y_label_kwargs = \
-#         x_label_kwargs.copy(), y_label_kwargs.copy()
-#     x_tick_label_kwargs, y_tick_label_kwargs = \
-#         x_tick_label_kwargs.copy(), y_tick_label_kwargs.copy()
-    
     width, height = get_ax_size(ax.figure, ax)
     
     # Labels
@@ -1603,13 +1607,10 @@ def figure_ratio(data, x_coord='longitude', y_coord='latitude',
         height = fixed_height; width = height/aspect_ratio
     # If both `fixed_width` and `fixed_height` are specified, treat as maximums.
     if (fixed_width is not None) and (fixed_height is not None):
-        if width > fixed_width:
-            height *= fixed_width/width
-            width = fixed_width
         if height > fixed_height:
             width *= fixed_height/height
             height = fixed_height
-    return [width*num_cols, height*num_rows]
+    return [width, height]
 
 def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
     """
