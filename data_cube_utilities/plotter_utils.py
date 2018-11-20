@@ -5,6 +5,7 @@ import datacube as dc
 import xarray as xr
 from xarray.ufuncs import logical_and as xr_and
 from xarray.ufuncs import logical_or as xr_or
+from xarray.ufuncs import logical_not as xr_not
 from rasterstats import zonal_stats
 import pylab
 import matplotlib as mpl
@@ -1005,11 +1006,14 @@ def binary_class_change_plot(dataarrays, mask=None, x_coord='longitude', y_coord
         A 2-tuple of the figure and axes followed by a list of either 3 or 4 percents of 
         pixel membership, depending on whether `dataarray` contains one or two DataArrays.
 
-        If `dataarrays` contains one DataArray, there are 3 percents for never, sometimes, 
-        and always class membership.
+        If `dataarrays` contains one DataArray, there are 4 percents for never, sometimes, 
+        and always class membership, followed by the percent of pixels for which not enough
+        data was available to put them in any of the preceding categories.
 
-        If `dataarrays` contains two DataArrays, there are 4 percents for 
-        (never,never),(never,some),(some,never),(some,some) class membership.
+        If `dataarrays` contains two DataArrays, there are 5 percents for 
+        (never,never),(never,some),(some,never),(some,some) class membership, followed by 
+        the percent of pixels for which not enough data was available to put them in any 
+        of the preceding categories.
     
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
@@ -1033,9 +1037,9 @@ def binary_class_change_plot(dataarrays, mask=None, x_coord='longitude', y_coord
         # The number of acquistions that were not nan for each point.
         num_times_not_nan = dataarray.count(dim=time_dim) 
         # Find where pixels are permanent, changing, or never a member of the class.
-        none_mask = sum_cls == 0
-        chng_mask = xr_and(0 < sum_cls, sum_cls < num_times_not_nan)
-        perm_mask = sum_cls == num_times_not_nan
+        none_mask = xr_and(sum_cls == 0, num_times_not_nan > 0)
+        chng_mask = xr_and(xr_and(0 < sum_cls, sum_cls < num_times_not_nan), num_times_not_nan > 0)
+        perm_mask = xr_and(sum_cls == num_times_not_nan, num_times_not_nan > 0)
         return [none_mask, chng_mask, perm_mask]
     
     # Assemble the color masks.
@@ -1063,7 +1067,7 @@ def binary_class_change_plot(dataarrays, mask=None, x_coord='longitude', y_coord
     mask = np.zeros(y_x_shape, dtype=np.bool) if mask is None else mask
     
     # Color the image with the masks.
-    color_array = np.zeros((*y_x_shape, 3)).astype(np.int16)
+    color_array = np.full((*y_x_shape, 3), 255).astype(np.int16)#np.zeros((*y_x_shape, 3)).astype(np.int16)
     for i, mask in enumerate(masks):
         color_array[mask.values] = colors[i]
     
@@ -1097,8 +1101,13 @@ def binary_class_change_plot(dataarrays, mask=None, x_coord='longitude', y_coord
     
     ax.imshow(color_array, **imshow_kwargs)
     
-    # Calculate the percentage of pixels that are permanent, changing, or never members.
+    # Calculate the percentage of pixels that are permanent members, changing members, 
+    # never members, or don't have enough data to definitely be in any of those categories.
     pcts = [float((mask.sum() / (y_x_shape[0]*y_x_shape[1])).values) for mask in masks]
+    pct_insufficient_data = xr_not(masks[0])
+    for i in range(1, len(masks)):
+        pct_insufficient_data = xr_and(pct_insufficient_data, xr_not(masks[i]))
+    pcts.append((pct_insufficient_data.sum() / (y_x_shape[0]*y_x_shape[1])).values)
     
     return [fig,ax], pcts
     
@@ -1306,15 +1315,11 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
                   imshow_kwargs=None, x_label_kwargs=None, y_label_kwargs=None, 
                   cbar_kwargs=None, nan_color='white', legend_kwargs=None,
                   ax_tick_label_kwargs=None, x_tick_label_kwargs=None, 
-                  y_tick_label_kwargs=None, title=None, title_kwargs=None,
-                  ax_lbl_font_scaling=(9, np.inf, 3), 
-                  ax_tick_lbl_font_scaling=(9, np.inf, 2.25),
-                  title_font_scaling=(9, np.inf, 3.5),
-                  legend_font_scaling=(9, np.inf, 2.25)):
+                  y_tick_label_kwargs=None, title=None, title_kwargs=None):#,
     """
     Shows a heatmap of an xarray DataArray with only latitude and longitude dimensions.
-    Unlike `data.plot.imshow()`, this sets axes ticks and labels - including
-    labeling "Latitude" and "Longitude". It also simplifies creating a colorbar and legend.
+    Unlike matplotlib `imshow()` or `data.plot.imshow()`, this sets axes ticks and labels. 
+    It also simplifies creating a colorbar and legend.
     
     Parameters
     ----------
@@ -1366,19 +1371,6 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
         The title of the figure.
     title_kwargs: dict
         The dictionary of keyword arguments passed to `ax.set_title()`.
-    ax_lbl_font_scaling, 
-    ax_tick_lbl_font_scaling, 
-    title_font_scaling,
-    legend_font_scaling: list-like of float
-        Some list-likes of the minimum font size, maximum font size, and the
-        rate at which they scale with the figure dimensions. So each contains 
-        3 numeric values. These variables are for, respectively, axis label 
-        font scaling, axis tick label font scaling, title font scaling, and 
-        legend font scaling. The axis label and tick label font sizes 
-        scale on the average of the width and height of the axes. The title 
-        font size scales on the width of the axes. The legend font size 
-        scales on the width and height of the axes, but the number of legend 
-        elements and the maximum legend element length are also factored.
         
     Returns
     -------
@@ -1408,26 +1400,16 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
     axsize = get_ax_size(fig,ax) # Scale fonts on axis size, not figure size.
     
     # Axis label kwargs
-    ax_lbl_fnt_sz = max(ax_lbl_font_scaling[0], 
-                        min(ax_lbl_font_scaling[2]*(axsize[0]+axsize[1])/2,
-                            ax_lbl_font_scaling[1]))
     x_label_kwargs = {} if x_label_kwargs is None else x_label_kwargs.copy()
-    x_label_kwargs.setdefault("fontsize", ax_lbl_fnt_sz)
     y_label_kwargs = {} if y_label_kwargs is None else y_label_kwargs.copy()
-    y_label_kwargs.setdefault("fontsize", ax_lbl_fnt_sz)
     
     # Axis tick label kwargs
     ax_tick_label_kwargs = {} if ax_tick_label_kwargs is None else \
                            ax_tick_label_kwargs.copy()
-    ax_tick_lbl_fnt_sz = max(ax_tick_lbl_font_scaling[0], 
-                             min(ax_tick_lbl_font_scaling[2]*(axsize[0]+axsize[1])/2, 
-                                 ax_tick_lbl_font_scaling[1]))
     x_tick_label_kwargs = {} if x_tick_label_kwargs is None else \
                           x_tick_label_kwargs
-    x_tick_label_kwargs.setdefault('fontsize', ax_tick_lbl_fnt_sz)
     y_tick_label_kwargs = {} if y_tick_label_kwargs is None else \
                           y_tick_label_kwargs
-    y_tick_label_kwargs.setdefault('fontsize', ax_tick_lbl_fnt_sz)
 
     # Handle display of NaN values.
     data_arr = data.values
@@ -1448,11 +1430,7 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
     
     # Set the title.
     if title is not None:
-        title_fnt_sz = max(title_font_scaling[0], 
-                           min(title_font_scaling[2]*axsize[0],
-                               title_font_scaling[1]))
         title_kwargs = {} if title_kwargs is None else title_kwargs.copy()
-        title_kwargs.setdefault('fontdict', dict(fontsize=title_fnt_sz))
         ax.set_title(title, **title_kwargs)
     
     # Create a colorbar.
@@ -1483,15 +1461,6 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
         patches = [mpatches.Patch(color=colors[i], label=legend_labels[i]) 
                    for i in range(len(legend_labels))]
         
-        # Determine the font size of the legend.
-        legend_num_elems = len(legend_labels)
-        legend_max_len = len(max(legend_labels, key=len))
-        legend_hz_sz = legend_font_scaling[2] * (axsize[0] - legend_max_len/9 + 3)
-        legend_vt_sz = legend_font_scaling[2] * (axsize[1] - legend_num_elems/9 + 3)
-        legend_fnt_sz = \
-            max(legend_font_scaling[0], 
-                min(min(legend_hz_sz, legend_vt_sz), legend_font_scaling[1]))
-        legend_kwargs.setdefault("fontsize", legend_fnt_sz)
         legend_kwargs.setdefault('loc', 'best')
         legend_kwargs['handles'] = patches
         ax.legend(**legend_kwargs)
