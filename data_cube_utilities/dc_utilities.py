@@ -262,33 +262,54 @@ def add_timestamp_data_to_xr(dataset):
                 'time': dataset.time})
 
 
-def write_geotiff_from_xr(tif_path, dataset, bands, no_data=-9999, crs="EPSG:4326"):
+def write_geotiff_from_xr(tif_path, data, x_coord='longitude', y_coord='latitude',
+                          bands=None, no_data=-9999, crs="EPSG:4326"):
     """Write a geotiff from an xarray dataset.
 
-    Args:
-        tif_path: path for the tif to be written to.
-        dataset: xarray dataset
-        bands: list of strings representing the bands in the order they should be written
-        no_data: nodata value for the dataset
-        crs: requested crs.
-
+    Parameters
+    ----------
+    tif_path: string
+        The path to write the GeoTIFF file to. You should include the file extension.
+    x_coord, y_coord: string
+        The string names of the x and y dimensions.
+    data: xarray.Dataset or xarray.DataArray
+    bands: list of string
+        The bands to write - in the order they should be written.
+        Ignored if `data` is an `xarray.DataArray`.
+    no_data: int
+        The nodata value.
+    crs: string
+        The CRS of the output.
     """
-    assert isinstance(bands, list), "Bands must a list of strings"
-    assert len(bands) > 0 and isinstance(bands[0], str), "You must supply at least one band."
+    if isinstance(data, xr.DataArray):
+        height, width = data.sizes[y_coord], data.sizes[x_coord]
+        count, dtype = 1, data.dtype
+    else:
+        if bands is None:
+            bands = list(data.data_vars.keys())
+        else:
+            assrt_msg_begin = "The `data` parameter is an `xarray.Dataset`. "
+            assert isinstance(bands, list), assrt_msg_begin + "Bands must be a list of strings."
+            assert len(bands) > 0 and isinstance(bands[0], str), assrt_msg_begin + "You must supply at least one band."
+        height, width = data.dims[y_coord], data.dims[x_coord]
+        count, dtype = len(bands), data[bands[0]].dtype
     with rasterio.open(
             tif_path,
             'w',
             driver='GTiff',
-            height=dataset.dims['latitude'],
-            width=dataset.dims['longitude'],
-            count=len(bands),
-            dtype=dataset[bands[0]].dtype,#str(dataset[bands[0]].dtype),
+            height=height,
+            width=width,
+            count=count,
+            dtype=dtype,
             crs=crs,
-            transform=_get_transform_from_xr(dataset),
+            transform=_get_transform_from_xr(data),
             nodata=no_data) as dst:
-        for index, band in enumerate(bands):
-            dst.write(dataset[band].values, index + 1)
-        dst.close()
+        if isinstance(data, xr.DataArray):
+            dst.write(data.values, 1)
+        else:
+            for index, band in enumerate(bands):
+                dst.write(data[band].values, index + 1)
+    dst.close()
 
 
 def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False,
@@ -365,13 +386,14 @@ def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fil
 
     os.remove(tif_path)
 
-def _get_transform_from_xr(dataset):
-    """Create a geotransform from an xarray dataset.
+def _get_transform_from_xr(data, x_coord='longitude', y_coord='latitude'):
+    """Create a geotransform from an xarray.Dataset or xarray.DataArray.
     """
 
     from rasterio.transform import from_bounds
-    geotransform = from_bounds(dataset.longitude[0], dataset.latitude[-1], dataset.longitude[-1], dataset.latitude[0],
-                               len(dataset.longitude), len(dataset.latitude))
+    geotransform = from_bounds(data[x_coord][0], data[y_coord][-1],
+                               data[x_coord][-1], data[y_coord][0],
+                               len(data[x_coord]), len(data[y_coord]))
     return geotransform
 
 
