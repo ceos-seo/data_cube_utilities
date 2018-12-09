@@ -262,8 +262,8 @@ def add_timestamp_data_to_xr(dataset):
                 'time': dataset.time})
 
 
-def write_geotiff_from_xr(tif_path, data, x_coord='longitude', y_coord='latitude',
-                          bands=None, no_data=-9999, crs="EPSG:4326"):
+def write_geotiff_from_xr(tif_path, data, bands=None, no_data=-9999, crs="EPSG:4326",
+                          x_coord='longitude', y_coord='latitude'):
     """Write a geotiff from an xarray dataset.
 
     Parameters
