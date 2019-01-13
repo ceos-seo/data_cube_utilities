@@ -2,30 +2,37 @@ from .dc_water_classifier import wofs_classify
 import xarray as xr
 import numpy as np
 
-def EVI(ds, G=2.5, C1=6, C2=7.5, L=1):
+def EVI(ds, no_data=-9999):
     """
     Computes the Enhanced Vegetation Index for an `xarray.Dataset`.
     The formula is G * (NIR - RED) / (NIR + C1*RED - C2*BLUE + L).
-    Values should be in the range [-1,1] for valid LANDSAT data.
+    Returned values should be in the range [-1,1] for valid LANDSAT data.
+
+    EVI is superior to NDVI in accuracy because it is less dependent on the solar
+    incidence angle, atmospheric conditions (e.g. particles and clouds), shadows, and
+    soil appearance.
 
     Parameters
     ----------
     ds: xarray.Dataset
         An `xarray.Dataset` that must contain 'nir', 'red', and 'blue' `DataArrays`.
-    G, C1, C2, L: float
-        Coefficients in the EVI calculation.
-        G is the gain factor - a constant scaling factor.
-        C1 and C2 pertain to aerosols in clouds.
-        L adjusts for canopy background and soil appearance. It particularly pertains to
-        the nir and red bands, which are transmitted non-linearly through a canopy.
+    no_data: int
+        The no data value.
 
     Returns
     -------
-    ndvi: xarray.DataArray
+    evi: xarray.DataArray
         An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
         the same order.
     """
-    return G * (ds.nir - ds.red) / (ds.nir + C1 * ds.red - C2 * ds.blue + L)
+    # G is the gain factor - a constant scaling factor.
+    # C1 and C2 pertain to aerosols in clouds.
+    # L adjusts for canopy background and soil appearance. It particularly pertains to
+    # the nir and red bands, which are transmitted non-linearly through a canopy.
+    G = 2.5; C1 = 6; C2 = 7.5; L = 1
+    evi = G * (ds.nir - ds.red) / (ds.nir + C1 * ds.red - C2 * ds.blue + L)
+    evi.values[evi.values < -1] = no_data; evi.values[1 < evi.values] = no_data
+    return evi
 
 def NDVI(ds):
     """
