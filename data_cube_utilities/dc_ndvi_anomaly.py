@@ -16,8 +16,6 @@ def EVI(ds):
     ----------
     ds: xarray.Dataset
         An `xarray.Dataset` that must contain 'nir', 'red', and 'blue' `DataArrays`.
-    no_data: int
-        The no data value.
 
     Returns
     -------
@@ -30,8 +28,7 @@ def EVI(ds):
     # L adjusts for canopy background and soil appearance. It particularly pertains to
     # the nir and red bands, which are transmitted non-linearly through a canopy.
     G = 2.5; C1 = 6; C2 = 7.5; L = 1
-    evi = G * (ds.nir - ds.red) / (ds.nir + C1 * ds.red - C2 * ds.blue + L)
-    return evi
+    return G * (ds.nir - ds.red) / (ds.nir + C1 * ds.red - C2 * ds.blue + L)
 
 def NDVI(ds):
     """
