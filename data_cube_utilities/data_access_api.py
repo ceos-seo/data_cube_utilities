@@ -24,6 +24,7 @@ import datacube
 from datacube.api import GridWorkflow
 import xarray as xr
 import numpy as np
+import datetime
 from datetime import date
 
 
@@ -260,7 +261,10 @@ class DataAccessApi:
             if not dataset:
                 continue
 
-            dates += dataset.time.values.astype('M8[ms]').tolist()
+            #dates += dataset.time.values.astype('M8[ms]').tolist()
+            dates += [ datetime.datetime.utcfromtimestamp(
+                (dt - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's') )
+                for dt in dataset.time.values ]
 
         return dates
 
