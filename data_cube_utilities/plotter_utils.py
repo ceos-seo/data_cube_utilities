@@ -29,7 +29,7 @@ from scipy import stats
 import warnings
 
 from .dc_mosaic import ls7_unpack_qa
-from .curve_fitting import gaussian_fit, poly_fit
+from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit
 from .scale import xr_scale, np_scale
 from .dc_utilities import ignore_warnings, perform_timeseries_analysis
 
@@ -249,11 +249,12 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     plt.legend(handles=[bp['boxes'][0],line[0]], labels=list(plotting_data.data_vars), loc='best')
     plt.tight_layout()
     plt.show()
-    
+
+
 def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
-                            y_coord='latitude', fig_params=None, 
-                            scale_params=None, fig=None, ax=None, 
-                            max_times_per_plot=None, show_legend=True, 
+                            y_coord='latitude', fig_params=None,
+                            scale_params=None, fig=None, ax=None,
+                            max_times_per_plot=None, show_legend=True,
                             title=None):
     """
     Plot data variables in an xarray.Dataset together in one figure, with different 
@@ -261,98 +262,102 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     optional curve fitting to aggregations along time. Handles data binned with 
     xarray.Dataset methods resample() and groupby(). That is, it handles data 
     binned along time (e.g. by week) or across years (e.g. by week of year).
-    
+
     Parameters
     -----------
-    dataset: xarray.Dataset 
+    dataset: xarray.Dataset
         A Dataset containing some bands like NDVI or WOFS.
         The primary coordinate must be 'time'.
     plot_descs: dict
-        Dictionary mapping names of DataArrays in the Dataset to plot to 
-        dictionaries mapping aggregation types (e.g. 'mean', 'median') to 
-        lists of dictionaries mapping plot types 
+        Dictionary mapping names of DataArrays in the Dataset to plot to
+        dictionaries mapping aggregation types (e.g. 'mean', 'median') to
+        lists of dictionaries mapping plot types
         (e.g. 'line', 'box', 'scatter') to keyword arguments for plotting.
-        
-        Aggregation happens within time slices and can be many-to-many or many-to-one. 
-        Some plot types require many-to-many aggregation, and some other plot types 
-        require 
-        many-to-one aggregation. Aggregation types can be any of 
+
+        Aggregation happens within time slices and can be many-to-many or many-to-one.
+        Some plot types require many-to-many aggregation (e.g. 'none'), and some other plot types
+        require many-to-one aggregation (e.g. 'mean' or 'median']). Aggregation types can be any of
         ['mean', 'median', 'none'], with 'none' performing no aggregation.
-        
-        Plot types can be any of 
-        ['scatter', 'line', 'gaussian', 'poly', 'cubic_spline', 'box'].
-        The plot type 'poly' requires a 'degree' entry mapping to an integer in its 
-        dictionary of keyword arguments.
-        
+
+        Plot types can be any of
+        ['scatter', 'line', 'box', 'gaussian', 'gaussian_filter', 'poly', 'cubic_spline'].
+        Here are the required arguments, with format {plot_type: {arg_name: (data_type[, description]}}:
+        {'poly':
+            {'degree': (int, "the degree of the polynomial to fit.")}}
+        Here are the optional arguments, with format {plot_type: {arg_name: (data_type[, description]}}:
+        {'box': # See matplotlib.axes.Axes.boxplot() for more information.
+            {'boxprops': dict, 'flierprops': dict, 'showfliers': bool},
+         'gaussian_filter': # See gaussian_filter_fit() in ./curve_fitting.py for more information.
+             {'sigma': numeric}}
+
         Here is an example:
         {'ndvi':{'mean':[{'line':{'color':'forestgreen', 'alpha':alpha}}],
                  'none':[{'box':{'boxprops':{'facecolor':'forestgreen','alpha':alpha},
                                  'showfliers':False}}]}}
-        This example will create a green line plot of the mean of the 'ndvi' band 
+        This example will create a green line plot of the mean of the 'ndvi' band
         as well as a green box plot of the 'ndvi' band.
     x_coord, y_coord: str
-        Names of the x and y coordinates in `dataset` 
-        to use as tick and axis labels.
+        Names of the x and y coordinates in `dataset` to use as tick and axis labels.
     fig_params: dict
-        Figure parameters dictionary (e.g. {'figsize':(12,6)}). Used to create a Figure 
-        ``if fig is None and ax is None``. Note that in the case of multiple plots 
-        being created (see ``max_times_per_plot`` below), figsize will be the size 
+        Figure parameters dictionary (e.g. {'figsize':(12,6)}). Used to create a Figure
+        ``if fig is None and ax is None``. Note that in the case of multiple plots
+        being created (see ``max_times_per_plot`` below), figsize will be the size
         of each plot - not the entire figure.
     scale_params: dict
         Currently not used.
-        Dictionary mapping names of DataArrays to scaling methods 
-        (e.g. {'ndvi': 'std', 'wofs':'norm'}). The options are ['std', 'norm']. 
-        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
-        Note that of these options, only normalizing guarantees that the y values will be 
+        Dictionary mapping names of DataArrays to scaling methods
+        (e.g. {'ndvi': 'std', 'wofs':'norm'}). The options are ['std', 'norm'].
+        The option 'std' standardizes. The option 'norm' normalizes (min-max scales).
+        Note that of these options, only normalizing guarantees that the y values will be
         in a fixed range - namely [0,1].
     fig: matplotlib.figure.Figure
-        The figure to use for the plot. 
-        If only `fig` is supplied, the Axes object used will be the first. This 
+        The figure to use for the plot.
+        If only `fig` is supplied, the Axes object used will be the first. This
         argument is ignored if ``max_times_per_plot`` is less than the number of times.
     ax: matplotlib.axes.Axes
-        The axes to use for the plot. This argument is ignored if 
+        The axes to use for the plot. This argument is ignored if
         ``max_times_per_plot`` is less than the number of times.
     max_times_per_plot: int
-        The maximum number of times per plot. If specified, one plot will be generated for 
+        The maximum number of times per plot. If specified, one plot will be generated for
         each group of this many times. The plots will be arranged in a row-major grid.
     show_legend: bool
         Whether or not to show the legend.
     title: str
-        The title of each subplot. Note that a date range enclosed in parenthesis 
+        The title of each subplot. Note that a date range enclosed in parenthesis
         will be postpended whether this is specified or not.
-    
+
     Returns
     -------
     fig: matplotlib.figure.Figure
         The figure containing the plot grid.
-    
+
     Raises
     ------
     ValueError:
         If an aggregation type is not possible for a plot type
-    
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
     # Set default values for mutable data.
     fig_params = {} if fig_params is None else fig_params
-    fig_params.setdefault('figsize', (18,12))
+    fig_params.setdefault('figsize', (18, 12))
     scale_params = {} if scale_params is None else scale_params
-    
-    # Lists of plot types that can and cannot accept many-to-one aggregation 
+
+    # Lists of plot types that can and cannot accept many-to-one aggregation
     # for each time slice.
-    plot_types_requiring_aggregation = ['line', 'gaussian', 'poly', 'cubic_spline']
+    plot_types_requiring_aggregation = ['line', 'gaussian', 'gaussian_filter', 'poly', 'cubic_spline']
     plot_types_handling_aggregation = ['scatter'] + plot_types_requiring_aggregation
     plot_types_not_handling_aggregation = ['box']
-    all_plot_types = plot_types_requiring_aggregation + plot_types_handling_aggregation\
+    all_plot_types = plot_types_requiring_aggregation + plot_types_handling_aggregation \
                      + plot_types_not_handling_aggregation
-    
+
     # Aggregation types that aggregate all values for a given time to one value.
-    many_to_one_agg_types = ['mean', 'median'] 
+    many_to_one_agg_types = ['mean', 'median']
     # Aggregation types that aggregate to many values or do not aggregate.
     many_to_many_agg_types = ['none']
     all_agg_types = many_to_one_agg_types + many_to_many_agg_types
-    
+
     # Determine how the data was aggregated, if at all.
     possible_time_agg_strs = ['week', 'weekofyear', 'month']
     time_agg_str = 'time'
@@ -361,62 +366,61 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
             time_agg_str = possible_time_agg_str
             break
     # Make the data 2D - time and a stack of all other dimensions.
-    non_time_dims = list(set(dataset.dims)-{time_agg_str})
+    non_time_dims = list(set(dataset.dims) - {time_agg_str})
     all_plotting_bands = list(plot_descs.keys())
     all_plotting_data = dataset[all_plotting_bands].stack(stacked_data=non_time_dims)
     all_times = all_plotting_data[time_agg_str].values
     # Mask out times for which no data variable to plot has any non-NaN data.
-    nan_mask_data_vars = list(all_plotting_data[all_plotting_bands]\
+    nan_mask_data_vars = list(all_plotting_data[all_plotting_bands] \
                               .notnull().data_vars.values())
     for i, data_var in enumerate(nan_mask_data_vars):
         time_nan_mask = data_var.values if i == 0 else time_nan_mask | data_var.values
     time_nan_mask = np.any(time_nan_mask, axis=1)
     times_not_all_nan = all_times[time_nan_mask]
-    all_plotting_data = all_plotting_data.loc[{time_agg_str:times_not_all_nan}]
-    
+    all_plotting_data = all_plotting_data.loc[{time_agg_str: times_not_all_nan}]
+
     # Scale
     # if scale_params denotes the scaling type for the whole Dataset, scale the Dataset.
-    if isinstance(scale_params, str): 
+    if isinstance(scale_params, str):
         all_plotting_data = xr_scale(all_plotting_data, scaling=scale_params)
     # else, it is a dictionary denoting how to scale each DataArray.
-    elif len(scale_params) > 0: 
+    elif len(scale_params) > 0:
         for data_arr_name, scaling in scale_params.items():
             all_plotting_data[data_arr_name] = \
                 xr_scale(all_plotting_data[data_arr_name], scaling=scaling)
-    
+
     # Handle the potential for multiple plots.
     max_times_per_plot = len(times_not_all_nan) if max_times_per_plot is None else \
-                         max_times_per_plot
-    num_plots = int(np.ceil(len(times_not_all_nan)/max_times_per_plot))
+        max_times_per_plot
+    num_plots = int(np.ceil(len(times_not_all_nan) / max_times_per_plot))
     subset_num_cols = 2
     subset_num_rows = int(np.ceil(num_plots / subset_num_cols))
     if num_plots > 1:
-#         figsize = fig_params.pop('figsize')
         base_figsize = fig_params.pop('figsize', \
-                                      figure_ratio(dataset, x_coord, y_coord, 
+                                      figure_ratio(dataset, x_coord, y_coord,
                                                    fixed_width=10))
-        figsize = [base*num for base,num in 
-                   zip(base_figsize, (subset_num_cols,subset_num_rows))]
+        figsize = [base * num for base, num in
+                   zip(base_figsize, (subset_num_cols, subset_num_rows))]
         fig = plt.figure(figsize=figsize, **fig_params)
-    
+
     # Create each plot.
-    for time_ind, fig_ind in zip(range(0, len(times_not_all_nan), max_times_per_plot), 
+    for time_ind, fig_ind in zip(range(0, len(times_not_all_nan), max_times_per_plot),
                                  range(num_plots)):
         lower_time_bound_ind, upper_time_bound_ind = \
-            time_ind, min(time_ind+max_times_per_plot, len(times_not_all_nan))
-        time_extents = times_not_all_nan[[lower_time_bound_ind, upper_time_bound_ind-1]]
+            time_ind, min(time_ind + max_times_per_plot, len(times_not_all_nan))
+        time_extents = times_not_all_nan[[lower_time_bound_ind, upper_time_bound_ind - 1]]
         # Retrieve or create the axes if necessary.
         if len(times_not_all_nan) <= max_times_per_plot:
             fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_params)
         else:
             ax = fig.add_subplot(subset_num_rows, subset_num_cols, fig_ind + 1)
-        fig_times_not_all_nan =\
+        fig_times_not_all_nan = \
             times_not_all_nan[lower_time_bound_ind:upper_time_bound_ind]
-        plotting_data = all_plotting_data.loc[{time_agg_str:fig_times_not_all_nan}]
+        plotting_data = all_plotting_data.loc[{time_agg_str: fig_times_not_all_nan}]
         epochs = np.array(list(map(n64_to_epoch, fig_times_not_all_nan))) \
-                 if time_agg_str == 'time' else None
+            if time_agg_str == 'time' else None
         x_locs = np_scale(epochs if time_agg_str == 'time' else fig_times_not_all_nan)
-        
+
         # Data variable plots within each plot.
         data_arr_plots = []
         legend_labels = []
@@ -428,14 +432,14 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                 for plot_dict in plot_dicts:
                     for plot_type, plot_kwargs in plot_dict.items():
                         assert plot_type in all_plot_types, \
-                            r"For the '{}' DataArray: plot_type '{}' not recognized"\
-                            .format(data_arr_name, plot_type)
+                            r"For the '{}' DataArray: plot_type '{}' not recognized" \
+                                .format(data_arr_name, plot_type)
                         full_data_arr_plotting_data = plotting_data[data_arr_name].values
                         # Any times with all nan data are ignored in any plot type.
                         data_arr_nan_mask = \
                             np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
-            
-                        # Skip plotting this data variable if it does not have 
+
+                        # Skip plotting this data variable if it does not have
                         # enough data to plot.
                         if skip_plot(np.sum(data_arr_nan_mask), plot_type, plot_kwargs):
                             continue
@@ -443,28 +447,29 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                         # Remove times with all nan data.
                         data_arr_plotting_data = \
                             full_data_arr_plotting_data[data_arr_nan_mask]
-                        # Large scales for x_locs can break the curve fitting 
+                        # Large scales for x_locs can break the curve fitting
                         # for some reason.
                         data_arr_x_locs = x_locs[data_arr_nan_mask]
-                        
+
                         # Some plot types require aggregation.
                         if plot_type in plot_types_requiring_aggregation:
                             if agg_type not in many_to_one_agg_types:
                                 raise ValueError("For the '{}' DataArray: the plot type "
-                                    "'{}' requires aggregation (currently using '{}'). "
-                                    "Please pass any of {} as the aggregation type "
-                                    "or change the plot type.".format(data_arr_name,\
-                                    plot_type, agg_type, many_to_one_agg_types))
+                                                 "'{}' requires aggregation (currently using '{}'). "
+                                                 "Please pass any of {} as the aggregation type "
+                                                 "or change the plot type.".format(data_arr_name, \
+                                                                                   plot_type, agg_type,
+                                                                                   many_to_one_agg_types))
                         # Some plot types cannot accept many-to-one aggregation.
                         if plot_type not in plot_types_handling_aggregation:
                             if agg_type not in many_to_many_agg_types:
                                 raise ValueError("For the '{}' DataArray: "
-                                    "the plot type '{}' doesn't accept aggregation "
-                                    "(currently using '{}'). Please pass any of {} as "
-                                    "the aggregation type or change the plot type."
-                                    .format(data_arr_name, plot_type, agg_type, 
-                                            many_to_many_agg_types))
-                        
+                                                 "the plot type '{}' doesn't accept aggregation "
+                                                 "(currently using '{}'). Please pass any of {} as "
+                                                 "the aggregation type or change the plot type."
+                                                 .format(data_arr_name, plot_type, agg_type,
+                                                         many_to_many_agg_types))
+
                         if agg_type == 'mean':
                             y = ignore_warnings(np.nanmean, \
                                                 data_arr_plotting_data, axis=1)
@@ -473,70 +478,75 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                                                 data_arr_plotting_data, axis=1)
                         elif agg_type == 'none':
                             y = data_arr_plotting_data
-            
+
                         # Create specified plot types.
-                        plot_type_str = "" # Used to label the legend.
+                        plot_type_str = ""  # Used to label the legend.
                         if plot_type == 'scatter':
-                            data_arr_plots.append(ax.scatter(data_arr_x_locs, y, 
+                            data_arr_plots.append(ax.scatter(data_arr_x_locs, y,
                                                              **plot_kwargs))
                             plot_type_str += 'scatterplot'
                         elif plot_type == 'line':
-                            data_arr_plots.append(ax.plot(data_arr_x_locs, y, 
+                            data_arr_plots.append(ax.plot(data_arr_x_locs, y,
                                                           **plot_kwargs)[0])
                             plot_type_str += 'lineplot'
                         elif plot_type == 'box':
                             boxplot_nan_mask = ~np.isnan(y)
                             # Data formatted for matplotlib.pyplot.boxplot().
-                            filtered_formatted_data = [] 
+                            filtered_formatted_data = []
                             for i, (d, m) in enumerate(zip(y, boxplot_nan_mask)):
                                 if len(d[m] != 0):
                                     filtered_formatted_data.append(d[m])
-                            box_width = 0.5*np.min(np.diff(data_arr_x_locs)) \
-                                        if len(data_arr_x_locs) > 1 else 0.5
+                            box_width = 0.5 * np.min(np.diff(data_arr_x_locs)) \
+                                if len(data_arr_x_locs) > 1 else 0.5
                             # Provide default arguments.
                             plot_kwargs.setdefault('boxprops', dict(facecolor='orange'))
-                            plot_kwargs.setdefault('flierprops', dict(marker='o',\
+                            plot_kwargs.setdefault('flierprops', dict(marker='o', \
                                                                       markersize=0.5))
                             plot_kwargs.setdefault('showfliers', False)
                             # `manage_xticks=False` to avoid excessive padding on x-axis.
                             bp = ax.boxplot(filtered_formatted_data,
-                                    widths=[box_width]*len(filtered_formatted_data),
-                                    positions=data_arr_x_locs, patch_artist=True, 
-                                    manage_xticks=False, **plot_kwargs) 
+                                            widths=[box_width] * len(filtered_formatted_data),
+                                            positions=data_arr_x_locs, patch_artist=True,
+                                            manage_xticks=False, **plot_kwargs)
                             data_arr_plots.append(bp['boxes'][0])
                             plot_type_str += 'boxplot'
                         elif plot_type == 'gaussian':
                             data_arr_plots.append(
-                                plot_curvefit(data_arr_x_locs, y, fit_type=plot_type, 
+                                plot_curvefit(data_arr_x_locs, y, fit_type=plot_type,
                                               plot_kwargs=plot_kwargs, ax=ax))
                             plot_type_str += 'gaussian fit'
+                        elif plot_type == 'gaussian_filter':
+                            data_arr_plots.append(
+                                plot_curvefit(data_arr_x_locs, y, fit_type=plot_type,
+                                              plot_kwargs=plot_kwargs, ax=ax))
+                            plot_type_str += 'gaussian filter fit'
                         elif plot_type == 'poly':
                             assert 'degree' in plot_kwargs, \
-                                r"For the '{}' DataArray: When using 'poly' as "\
-                                "the fit type, the fit kwargs must have 'degree'"\
+                                r"For the '{}' DataArray: When using 'poly' as " \
+                                "the fit type, the fit kwargs must have 'degree'" \
                                 "specified.".format(data_arr_name)
                             data_arr_plots.append(
-                                plot_curvefit(data_arr_x_locs, y, fit_type=plot_type, 
+                                plot_curvefit(data_arr_x_locs, y, fit_type=plot_type,
                                               plot_kwargs=plot_kwargs, ax=ax))
-                            plot_type_str += 'degree {} polynomial fit'\
-                                             .format(plot_kwargs['degree'])
+                            plot_type_str += 'degree {} polynomial fit' \
+                                .format(plot_kwargs['degree'])
                         elif plot_type == 'cubic_spline':
                             data_arr_plots.append(
-                                plot_curvefit(data_arr_x_locs, y, fit_type=plot_type, 
+                                plot_curvefit(data_arr_x_locs, y, fit_type=plot_type,
                                               plot_kwargs=plot_kwargs, ax=ax))
                             plot_type_str += 'cubic spline fit'
                         plot_type_str += ' of {}'.format(agg_type) \
-                                         if agg_type != 'none' else ''
-                        legend_labels.append('{} of {}'\
+                            if agg_type != 'none' else ''
+                        legend_labels.append('{} of {}' \
                                              .format(plot_type_str, data_arr_name))
 
         # Label the axes and create the legend.
         date_strs = \
-            np.array(list(map(lambda time: np_dt64_to_str(time), fig_times_not_all_nan)))\
-                     if time_agg_str=='time' else\
-                     naive_months_ticks_by_week(fig_times_not_all_nan) \
-                     if time_agg_str in ['week', 'weekofyear'] else\
-                        month_ints_to_month_names(fig_times_not_all_nan)
+            np.array(list(map(lambda time: np_dt64_to_str(time), fig_times_not_all_nan))) \
+                if time_agg_str == 'time' else \
+                naive_months_ticks_by_week(fig_times_not_all_nan) \
+                    if time_agg_str in ['week', 'weekofyear'] else \
+                    month_ints_to_month_names(fig_times_not_all_nan)
         plt.xticks(x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
         if show_legend:
             plt.legend(handles=data_arr_plots, labels=legend_labels, loc='best')
@@ -551,7 +561,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
 def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_kwargs={}, fig=None, ax=None):
     """
     Plots a curve fit given x values, y values, a type of curve to plot, and parameters for that curve.
-    
+
     Parameters
     ----------
     x: np.ndarray
@@ -559,8 +569,10 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
     y: np.ndarray
         A 1D NumPy array. The y values to fit to.
     fit_type: str
-        The type of curve to fit. One of ['poly', 'gaussian', 'cubic_spline'].
-        The option 'poly' plots a polynomial fit. The option 'gaussian' plots a Gaussian fit.
+        The type of curve to fit. One of ['gaussian', 'gaussian_filter', 'poly', 'cubic_spline'].
+        The option 'gaussian' plots a Gaussian fit.
+        The option 'gaussian_filter' plots a Gaussian filter fit.
+        The option 'poly' plots a polynomial fit.
         The option 'cubic_spline' plots a cubic spline fit.
     x_smooth: list-like
         The exact x values to interpolate for. Supercedes `n_pts`.
@@ -574,23 +586,23 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
     fig: matplotlib.figure.Figure
         The figure to use for the plot. The figure must have at least one Axes object.
         You can use the code ``fig,ax = plt.subplots()`` to create a figure with an associated Axes object.
-        The code ``fig = plt.figure()`` will not provide the Axes object. 
+        The code ``fig = plt.figure()`` will not provide the Axes object.
         The Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
-        
+
     Returns
     -------
     lines: matplotlib.lines.Line2D
         Can be used as a handle for a matplotlib legend (i.e. plt.legend(handles=...)) among other things.
-        
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
     # Avoid modifying the original arguments.
     fig_params, plot_kwargs = fig_params.copy(), plot_kwargs.copy()
-    
-    fig_params.setdefault('figsize', (12,6))
+
+    fig_params.setdefault('figsize', (12, 6))
     plot_kwargs.setdefault('linestyle', '-')
 
     # Retrieve or create the axes if necessary.
@@ -599,13 +611,16 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=200, fig_params={}, plot_
         x_smooth = np.linspace(x.min(), x.max(), n_pts)
     if fit_type == 'gaussian':
         y_smooth = gaussian_fit(x, y, x_smooth)
+    elif fit_type == 'gaussian_filter':
+        sigma = plot_kwargs.pop('sigma', None)
+        y_smooth = gaussian_filter_fit(x, y, x_smooth, sigma=sigma)
     elif fit_type == 'poly':
         assert 'degree' in plot_kwargs.keys(), "When plotting a polynomal fit, there must be" \
-                                              "a 'degree' entry in the plot_kwargs parameter."
+                                               "a 'degree' entry in the plot_kwargs parameter."
         degree = plot_kwargs.pop('degree')
         y_smooth = poly_fit(x, y, degree, x_smooth)
     elif fit_type == 'cubic_spline':
-        cs = CubicSpline(x,y)
+        cs = CubicSpline(x, y)
         y_smooth = cs(x_smooth)
     return ax.plot(x_smooth, y_smooth, **plot_kwargs)[0]
     
@@ -1605,7 +1620,8 @@ def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
 
 def skip_plot(n_pts, plot_type, kwargs={}):
     """Returns a boolean denoting whether to skip plotting data given the number of points it contains."""
-    min_pts_dict = {'scatter': 1, 'box': 1, 'gaussian': 3, 'poly': 1, 'cubic_spline': 3, 'line':2}
+    min_pts_dict = {'scatter': 1, 'box': 1, 'gaussian': 3, 'gaussian_filter': 2,
+                    'poly': 1, 'cubic_spline': 3, 'line':2}
     min_pts = min_pts_dict[plot_type]
     if plot_type == 'poly':
         assert 'degree' in kwargs.keys(), "When plotting a polynomal fit, there must be" \
@@ -1646,7 +1662,9 @@ def get_weeks_per_month(num_weeks):
         last_months_num_weeks = [5,5,5]
     return {month_int:num_weeks for (month_int,num_weeks) in zip(days_per_month.keys(), [5,4,4]*3+last_months_num_weeks)}
 
-month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+num_weeks_per_month = np.tile([5,4],6)
+last_week_int_per_month = np.cumsum(num_weeks_per_month)
+month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 def month_ints_to_month_names(month_ints):
@@ -1655,21 +1673,12 @@ def month_ints_to_month_names(month_ints):
     """
     return [month_names[i-1] for i in month_ints]
 
+def week_int_to_month_name(week_int):
+    month_ind = np.argmax(week_int <= last_week_int_per_month)
+    return month_names[month_ind]
+
 def week_ints_to_month_names(week_ints):
-    """
-    Converts ordinal numbers for weeks (in range [1,54]) to their months' 3-letter names.
-    """
-    weeks_per_month = get_weeks_per_month(max(week_ints))
-    week_month_strs = []
-    for week_int in week_ints:
-        month_int = -1
-        for current_month_int, current_month_weeks in weeks_per_month.items():
-            week_int -= current_month_weeks
-            if week_int <= 0:
-                month_int = current_month_int
-                break
-        week_month_strs.append(month_names[month_int-1])
-    return week_month_strs
+    return [week_int_to_month_name(week_int) for week_int in week_ints]
 
 def naive_months_ticks_by_week(week_ints=None):
     """
@@ -1678,8 +1687,6 @@ def naive_months_ticks_by_week(week_ints=None):
     This is only intended to be used for labeling axes in plotting.
     """
     month_ticks_by_week = []
-    if week_ints is None: # Give month ticks for all weeks.
-        month_ticks_by_week = week_ints_to_month_names(list(range(54)))
-    else:
-        month_ticks_by_week = remove_non_unique_ordered_list_str(week_ints_to_month_names(week_ints))
+    week_ints = list(range(1, 55)) if week_ints is None else week_ints
+    month_ticks_by_week = remove_non_unique_ordered_list_str(week_ints_to_month_names(week_ints))
     return month_ticks_by_week
