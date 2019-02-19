@@ -1067,7 +1067,7 @@ def binary_class_change_plot(dataarrays, mask=None, x_coord='longitude', y_coord
     mask = np.zeros(y_x_shape, dtype=np.bool) if mask is None else mask
     
     # Color the image with the masks.
-    color_array = np.full((*y_x_shape, 3), 255).astype(np.int16)#np.zeros((*y_x_shape, 3)).astype(np.int16)
+    color_array = np.full((*y_x_shape, 3), 255).astype(np.int16)
     for i, mask in enumerate(masks):
         color_array[mask.values] = colors[i]
     

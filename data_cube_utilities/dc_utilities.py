@@ -270,8 +270,6 @@ def write_geotiff_from_xr(tif_path, data, bands=None, no_data=-9999, crs="EPSG:4
     ----------
     tif_path: string
         The path to write the GeoTIFF file to. You should include the file extension.
-    x_coord, y_coord: string
-        The string names of the x and y dimensions.
     data: xarray.Dataset or xarray.DataArray
     bands: list of string
         The bands to write - in the order they should be written.
@@ -280,6 +278,8 @@ def write_geotiff_from_xr(tif_path, data, bands=None, no_data=-9999, crs="EPSG:4
         The nodata value.
     crs: string
         The CRS of the output.
+    x_coord, y_coord: string
+        The string names of the x and y dimensions.
     """
     if isinstance(data, xr.DataArray):
         height, width = data.sizes[y_coord], data.sizes[x_coord]
