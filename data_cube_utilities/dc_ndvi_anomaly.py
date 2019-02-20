@@ -2,28 +2,52 @@ from .dc_water_classifier import wofs_classify
 import xarray as xr
 import numpy as np
 
-def NDVI(dataset, normalize=False):
+def EVI(ds):
+    """
+    Computes the Enhanced Vegetation Index for an `xarray.Dataset`.
+    The formula is G * (NIR - RED) / (NIR + C1*RED - C2*BLUE + L).
+    Returned values should be in the range [-1,1] for Landsat MODIS data.
+
+    EVI is superior to NDVI in accuracy because it is less dependent on the solar
+    incidence angle, atmospheric conditions (e.g. particles and clouds), shadows, and
+    soil appearance.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        An `xarray.Dataset` that must contain 'nir', 'red', and 'blue' `DataArrays`.
+
+    Returns
+    -------
+    evi: xarray.DataArray
+        An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
+        the same order.
+    """
+    # G is the gain factor - a constant scaling factor.
+    # C1 and C2 pertain to aerosols in clouds.
+    # L adjusts for canopy background and soil appearance. It particularly pertains to
+    # the nir and red bands, which are transmitted non-linearly through a canopy.
+    G = 2.5; C1 = 6; C2 = 7.5; L = 1
+    return G * (ds.nir - ds.red) / (ds.nir + C1 * ds.red - C2 * ds.blue + L)
+
+def NDVI(ds):
     """
     Computes the Normalized Difference Vegetation Index for an `xarray.Dataset`.
+    The formula is (NIR - RED) / (NIR + RED).
     Values should be in the range [-1,1] for valid LANDSAT data (nir and red are positive).
     
     Parameters
     ----------
-    dataset: xarray.Dataset
+    ds: xarray.Dataset
         An `xarray.Dataset` that must contain 'nir' and 'red' `DataArrays`.
-    normalize: bool
-        Whether or not to normalize to the range [0,1].
     
     Returns
     -------
     ndvi: xarray.DataArray
-        An `xarray.DataArray` with the same shape as `dataset` - the same coordinates in 
+        An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
         the same order.
     """
-    ndvi = (dataset.nir - dataset.red) / (dataset.nir + dataset.red)
-    if normalize:
-        ndvi = (ndvi - ndvi.min())/(ndvi.max() - ndvi.min())
-    return ndvi
+    return (ds.nir - ds.red) / (ds.nir + ds.red)
 
 def compute_ndvi_anomaly(baseline_data,
                          scene_data,
