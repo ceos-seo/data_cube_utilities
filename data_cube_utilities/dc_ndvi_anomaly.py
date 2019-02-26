@@ -2,10 +2,12 @@ from .dc_water_classifier import wofs_classify
 import xarray as xr
 import numpy as np
 
-def EVI(ds):
+
+def EVI(ds, G=2.5, C1=6, C2=7.5, L=1):
     """
-    Computes the Enhanced Vegetation Index for an `xarray.Dataset`.
+    Computes the 3-band Enhanced Vegetation Index for an `xarray.Dataset`.
     The formula is G * (NIR - RED) / (NIR + C1*RED - C2*BLUE + L).
+    Usually, G = 2.5, C1 = 6, C2 = 7.5, and L = 1.
     Returned values should be in the range [-1,1] for Landsat MODIS data.
 
     EVI is superior to NDVI in accuracy because it is less dependent on the solar
@@ -16,6 +18,11 @@ def EVI(ds):
     ----------
     ds: xarray.Dataset
         An `xarray.Dataset` that must contain 'nir', 'red', and 'blue' `DataArrays`.
+    G, C1, C2, L: float
+        G is the gain factor - a constant scaling factor.
+        C1 and C2 pertain to aerosols in clouds.
+        L adjusts for canopy background and soil appearance. It particularly pertains to
+        the nir and red bands, which are transmitted non-linearly through a canopy.
 
     Returns
     -------
@@ -23,12 +30,38 @@ def EVI(ds):
         An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
         the same order.
     """
-    # G is the gain factor - a constant scaling factor.
-    # C1 and C2 pertain to aerosols in clouds.
-    # L adjusts for canopy background and soil appearance. It particularly pertains to
-    # the nir and red bands, which are transmitted non-linearly through a canopy.
-    G = 2.5; C1 = 6; C2 = 7.5; L = 1
     return G * (ds.nir - ds.red) / (ds.nir + C1 * ds.red - C2 * ds.blue + L)
+
+
+def EVI2(ds, G=2.5, C=2.4, L=1):
+    """
+    Computes the 2-band Enhanced Vegetation Index for an `xarray.Dataset`.
+    The formula is G*((NIR-RED)/(NIR+C*Red+L)).
+    Usually, G = 2.5, C = 2.4, and L = 1.
+    Returned values should be in the range [-1,1] for Landsat MODIS data.
+
+    EVI2 does not require a blue band like EVI, which means less data is required to use it.
+    Additionally, the blue band used in EVI can have a low signal-to-noise ratio 
+    in earth observation imagery. When atmospheric effects are insignificant (e.g. on clear days),
+    EVI2 should closely match EVI.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        An `xarray.Dataset` that must contain 'nir', and 'red' `DataArrays`.
+    G, C, L: float
+        G is the gain factor - a constant scaling factor.
+        C pertains to aerosols in clouds.
+        L adjusts for canopy background and soil appearance. It particularly pertains to
+        the nir and red bands, which are transmitted non-linearly through a canopy.
+
+    Returns
+    -------
+    evi2: xarray.DataArray
+        An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
+        the same order.
+    """
+    return G * (ds.nir - ds.red) / (ds.nir + C * ds.red + L)
 
 def NDVI(ds):
     """
