@@ -13,7 +13,7 @@ def get_frequency_counts(classification):
     """
     Get the raw and fractional class frequency counts for an `xarray.Dataset`.
     Intended to be used with outputs from the `*_cluster_dataset()` functions.
-g
+
     Parameters
     ----------
     classification: xarray.DataArray
