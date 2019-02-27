@@ -3,7 +3,7 @@ import xarray as xr
 import numpy as np
 
 
-def EVI(ds, G=2.5, C1=6, C2=7.5, L=1):
+def EVI(ds, G=2.5, C1=6, C2=7.5, L=1, normalize=True):
     """
     Computes the 3-band Enhanced Vegetation Index for an `xarray.Dataset`.
     The formula is G * (NIR - RED) / (NIR + C1*RED - C2*BLUE + L).
@@ -23,6 +23,8 @@ def EVI(ds, G=2.5, C1=6, C2=7.5, L=1):
         C1 and C2 pertain to aerosols in clouds.
         L adjusts for canopy background and soil appearance. It particularly pertains to
         the nir and red bands, which are transmitted non-linearly through a canopy.
+    normalize: boolean
+        Whether to normalize to the range [-1,1] - the range of most common spectral indices.
 
     Returns
     -------
@@ -30,10 +32,18 @@ def EVI(ds, G=2.5, C1=6, C2=7.5, L=1):
         An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
         the same order.
     """
-    return G * (ds.nir - ds.red) / (ds.nir + C1 * ds.red - C2 * ds.blue + L)
+    evi = G * (ds.nir - ds.red) / (ds.nir + C1 * ds.red - C2 * ds.blue + L)
+    # Clamp values to the range [-1,2.5].
+    evi.values[evi.values < -1] = -1
+    evi.values[2.5 < evi.values] = 2.5
+    if normalize:
+        # Scale values in the  range [0,2.5] to the range [0,1].
+        pos_vals_mask = 0 < evi.values
+        evi.values[pos_vals_mask] = np.interp(evi.values[pos_vals_mask], (0, 2.5), (0,1))
+    return evi
 
 
-def EVI2(ds, G=2.5, C=2.4, L=1):
+def EVI2(ds, G=2.5, C=2.4, L=1, normalize=True):
     """
     Computes the 2-band Enhanced Vegetation Index for an `xarray.Dataset`.
     The formula is G*((NIR-RED)/(NIR+C*Red+L)).
@@ -41,7 +51,7 @@ def EVI2(ds, G=2.5, C=2.4, L=1):
     Returned values should be in the range [-1,1] for Landsat MODIS data.
 
     EVI2 does not require a blue band like EVI, which means less data is required to use it.
-    Additionally, the blue band used in EVI can have a low signal-to-noise ratio 
+    Additionally, the blue band used in EVI can have a low signal-to-noise ratio
     in earth observation imagery. When atmospheric effects are insignificant (e.g. on clear days),
     EVI2 should closely match EVI.
 
@@ -54,14 +64,24 @@ def EVI2(ds, G=2.5, C=2.4, L=1):
         C pertains to aerosols in clouds.
         L adjusts for canopy background and soil appearance. It particularly pertains to
         the nir and red bands, which are transmitted non-linearly through a canopy.
+    normalize: boolean
+        Whether to normalize to the range [-1,1] - the range of most common spectral indices.
 
     Returns
     -------
-    evi2: xarray.DataArray
+    evi: xarray.DataArray
         An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
         the same order.
     """
-    return G * (ds.nir - ds.red) / (ds.nir + C * ds.red + L)
+    evi = G * (ds.nir - ds.red) / (ds.nir + C * ds.red + L)
+    # Clamp values to the range [-1,2.5].
+    evi.values[evi.values < -1] = -1
+    evi.values[2.5 < evi.values] = 2.5
+    if normalize:
+        # Scale values in the  range [0,2.5] to the range [0,1].
+        pos_vals_mask = 0 < evi.values
+        evi.values[pos_vals_mask] = np.interp(evi.values[pos_vals_mask], (0, 2.5), (0,1))
+    return evi
 
 def NDVI(ds):
     """
