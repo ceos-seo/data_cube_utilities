@@ -49,7 +49,6 @@ class DataAccessApi:
                               time=None,
                               longitude=None,
                               latitude=None,
-                              measurements=None,
                               output_crs=None,
                               resolution=None,
                               dask_chunks=None,
@@ -67,7 +66,6 @@ class DataAccessApi:
             longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
             latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
             crs (string): CRS lat/lon bounds are specified in, defaults to WGS84.
-            measurements (list): A list of strings that represents all measurements.
             output_crs (string): Determines reprojection of the data before its returned
             resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
             dask_chunks (dict): Lazy loaded array block sizes, not lazy loaded by default.
@@ -90,7 +88,7 @@ class DataAccessApi:
 
         data = self.dc.load(
             product=product,
-            measurements=measurements,
+            measurements=[],
             output_crs=output_crs,
             resolution=resolution,
             dask_chunks=dask_chunks,
