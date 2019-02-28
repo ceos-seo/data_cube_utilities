@@ -1,8 +1,28 @@
 import time
 import numpy as np
 from . import dc_utilities
+import datacube
 
 ## Export ##
+
+def export_xarray_to_netcdf(ds, path):
+    """
+    Exports an xarray.Dataset as a single NetCDF file.
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        The Dataset to export.
+    path: str
+        The path to store the exported NetCDF file at.
+        Must include the filename and ".nc" extension.
+    """
+    # Convert any boolean data variables to integer type to be able to export to NetCDF.
+    for data_var_name in ds.data_vars:
+        dtype = ds[data_var_name].dtype
+        if dtype == np.bool:
+            ds[data_var_name] = ds[data_var_name].astype(np.int8)
+    datacube.storage.storage.write_dataset_to_netcdf(ds, path)
 
 def export_slice_to_geotiff(ds, path):
     """
