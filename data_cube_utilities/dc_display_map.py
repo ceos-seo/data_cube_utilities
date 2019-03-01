@@ -61,12 +61,12 @@ def display_map(latitude = None, longitude = None, resolution = None):
     )
     
     ###### ###### ######   RESOLUTION GRID    ###### ###### ######
-    
+
     if resolution is not None:
         res_lat, res_lon = resolution
 
-        lats = np.arange(abs(res_lat), *latitude)
-        lons = np.arange(abs(res_lon), *longitude)
+        lats = np.arange(*latitude, abs(res_lat))
+        lons = np.arange(*longitude, abs(res_lon))
 
         vertical_grid   = map(lambda x :([x[0][0],x[1]],[x[0][1],x[1]]),itertools.product([latitude],lons))
         horizontal_grid = map(lambda x :([x[1],x[0][0]],[x[1],x[0][1]]),itertools.product([longitude],lats))
