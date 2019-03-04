@@ -152,12 +152,13 @@ def xr_interp(dataset, interp_config):
             bin_intervals = get_bin_intervals(dim_vals, num_pts)
             interp_vals = np.mean(bin_intervals, axis=1)
         if interp_type == 'interp':
-            interp_inds = np.linspace(0, len(dim_vals) - 1, num_pts).astype(np.int32)
+            interp_inds = np.linspace(0, len(dim_vals) - 1, num_pts, dtype=np.int32)
             interp_vals = dim_vals[interp_inds]
         # Convert scalars to NumPy datetime64 objects.
         if dim_dtype == np.datetime64:
             interp_vals = np.array(list(map(_scalar_to_n64_datetime, interp_vals)))
         new_coords[dim] = interp_vals
     # Nearest-neighbor interpolate data values.
-    interp_data = dataset.interp(coords=new_coords, method='nearest')
+    # xarray.Dataset.interp() converts to dtype float64, so cast back to the original dtype.
+    interp_data = dataset.interp(coords=new_coords, method='nearest').astype(dataset.dtype)
     return interp_data
