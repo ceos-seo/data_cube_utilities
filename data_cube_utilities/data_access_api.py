@@ -179,7 +179,7 @@ class DataAccessApi:
         dataset = self.get_dataset_by_extent(
             platform=platform, product=product, longitude=longitude, latitude=latitude, time=time, **kwargs)
 
-        if not dataset:
+        if len(dataset.dims) == 0:
             return {
                 'lat_extents': (None, None),
                 'lon_extents': (None, None),
@@ -220,7 +220,7 @@ class DataAccessApi:
         dataset = self.get_dataset_by_extent(
             product=product, platform=platform, longitude=longitude, latitude=latitude, time=time, dask_chunks={})
 
-        if not dataset:
+        if len(dataset.dims) == 0:
             return []
         return dataset.time.values.astype('M8[ms]').tolist()
 
@@ -255,7 +255,7 @@ class DataAccessApi:
                 latitude=latitude,
                 dask_chunks={})
 
-            if not dataset:
+            if len(dataset.dims) == 0:
                 continue
 
             dates += dataset.time.values.astype('M8[ms]').tolist()
@@ -279,7 +279,7 @@ class DataAccessApi:
         dataset = self.get_dataset_by_extent(
             product=product, platform=platform, longitude=longitude, latitude=latitude, time=time, dask_chunks={})
 
-        if not dataset:
+        if len(dataset.dims) == 0:
             return []
         return {'time': dataset.time, 'latitude': dataset.latitude, 'longitude': dataset.longitude}
 
