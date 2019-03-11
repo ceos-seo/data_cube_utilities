@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils.data_cube_utilities.dc_time import \
+from .dc_time import \
     _n64_datetime_to_scalar, _scalar_to_n64_datetime
 
 def get_bin_intervals(data, num_bins):
@@ -160,5 +160,10 @@ def xr_interp(dataset, interp_config):
         new_coords[dim] = interp_vals
     # Nearest-neighbor interpolate data values.
     # xarray.Dataset.interp() converts to dtype float64, so cast back to the original dtype.
-    interp_data = dataset.interp(coords=new_coords, method='nearest').astype(dataset.dtype)
+    interp_data = dataset.interp(coords=new_coords, method='nearest')
+    if isinstance(dataset, xr.DataArray):
+        interp_data = interp_data.astype(dataset.dtype)
+    elif isinstance(dataset, xr.Dataset):
+        for data_var_name in interp_data.data_vars:
+            interp_data[data_var_name] = interp_data[data_var_name].astype(dataset[data_var_name].dtype)
     return interp_data
