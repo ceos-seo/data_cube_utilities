@@ -32,6 +32,7 @@ def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
         merged.append(xarray_sortby_coord(dataset_temp, coord=sort_dim))
     return merged
 
+
 def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
                    x_coord='longitude', y_coord='latitude'):
     """
@@ -62,32 +63,45 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
     ------
     AssertionError: If no data was retrieved for any query
                     (i.e. `len(datasets_temp) == 0`).
-    
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+
     def xr_set_same_coords(datasets):
         first_ds = datasets[0]
         for i, ds in enumerate(datasets):
             datasets[i] = \
-                ds.assign_coords(**{x_coord:first_ds[x_coord],
-                                    y_coord:first_ds[y_coord]})
+                ds.assign_coords(**{x_coord: first_ds[x_coord],
+                                    y_coord: first_ds[y_coord]})
 
-    assert len(datasets_temp) > 0, "No data was retrieved." # No data for any query.
+    assert len(datasets_temp) > 0, "No data was retrieved."  # No data for any query.
     # If multiple non-empty datasets were retrieved, merge them and sort by time.
     masks = None
     if len(datasets_temp) > 1:
         # Merge datasets.
+        # Make sure all datasets have the same sizes in the x and y dimensions.
         datasets_temp_list = list(datasets_temp.values())
+        max_num_x = max([len(dataset[x_coord]) for dataset in datasets_temp_list])
+        max_num_y = max([len(dataset[y_coord]) for dataset in datasets_temp_list])
+        datasets_temp_list = [xr_scale_res(dataset, x_coord=x_coord, y_coord=y_coord,
+                                           abs_res=(max_num_x, max_num_y))
+                              for dataset in datasets_temp_list]
         # Set same x and y coords so `xr.concat()` concatenates as intended.
         xr_set_same_coords(datasets_temp_list)
         dataset = xr.concat(datasets_temp_list, dim='time')
         dataset = xarray_sortby_coord(dataset, 'time')
+
         # Merge clean masks.
+        # Make sure all clean masks have the same sizes in the x and y dimensions.
         clean_masks_temp_list = list(clean_masks_temp.values())
+        clean_masks_temp_list = [xr_scale_res(clean_mask.astype(np.int8), x_coord=x_coord, y_coord=y_coord,
+                                              abs_res=(max_num_x, max_num_y))
+                                 for clean_mask in clean_masks_temp_list]
+        # Set same x and y coords so `xr.concat()` concatenates as intended.
         xr_set_same_coords(clean_masks_temp_list)
         clean_mask = xr.concat(clean_masks_temp_list, dim='time')
-        clean_mask = xarray_sortby_coord(clean_mask, 'time')
+        clean_mask = xarray_sortby_coord(clean_mask, 'time').astype(np.bool)
         # Merge masks.
         if masks_per_platform is not None:
             num_platforms = len(masks_per_platform.keys())
@@ -97,8 +111,8 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
                 np_platform_masks[i] = mask_list
             masks = []
             for j in range(num_masks):
-                masks.append(xr.concat(list(np_platform_masks[:,j]), dim='time'))
-    else: # Select the only dataset.
+                masks.append(xr.concat(list(np_platform_masks[:, j]), dim='time'))
+    else:  # Select the only dataset.
         dataset = datasets_temp[list(datasets_temp.keys())[0]]
         clean_mask = clean_masks_temp[list(clean_masks_temp.keys())[0]]
         if masks_per_platform is not None:
@@ -338,7 +352,7 @@ def get_product_extents(api, platform, product):
         A 2-tuple of the minimum and maximum time available.
     """
     # Get the extents of the cube
-    descriptor = api.get_query_metadata(platform=platform, product=product, measurements=[])
+    descriptor = api.get_query_metadata(platform=platform, product=product)
     min_max_lat = descriptor['lat_extents']
     min_max_lon = descriptor['lon_extents']
     min_max_dates = descriptor['time_extents']
