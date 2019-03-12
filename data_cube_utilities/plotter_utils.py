@@ -368,14 +368,20 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     # Make the data 2D - time and a stack of all other dimensions.
     non_time_dims = list(set(dataset.dims) - {time_agg_str})
     all_plotting_bands = list(plot_descs.keys())
-    all_plotting_data = dataset[all_plotting_bands].stack(stacked_data=non_time_dims)
+
+    if len(non_time_dims) > 0:
+        all_plotting_data = dataset[all_plotting_bands].stack(stacked_data=non_time_dims)
+    else:
+        all_plotting_data = dataset[all_plotting_bands]
+
     all_times = all_plotting_data[time_agg_str].values
     # Mask out times for which no data variable to plot has any non-NaN data.
     nan_mask_data_vars = list(all_plotting_data[all_plotting_bands] \
                               .notnull().data_vars.values())
     for i, data_var in enumerate(nan_mask_data_vars):
         time_nan_mask = data_var.values if i == 0 else time_nan_mask | data_var.values
-    time_nan_mask = np.any(time_nan_mask, axis=1)
+    if len(non_time_dims) > 0:
+        time_nan_mask = np.any(time_nan_mask, axis=1)
     times_not_all_nan = all_times[time_nan_mask]
     all_plotting_data = all_plotting_data.loc[{time_agg_str: times_not_all_nan}]
 
@@ -396,9 +402,9 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     subset_num_cols = 2
     subset_num_rows = int(np.ceil(num_plots / subset_num_cols))
     if num_plots > 1:
-        base_figsize = fig_params.pop('figsize', \
-                                      figure_ratio(dataset, x_coord, y_coord,
-                                                   fixed_width=10))
+        default_base_figsize = figure_ratio(dataset, x_coord, y_coord, fixed_width=10)\
+            if len(non_time_dims) > 0 else None
+        base_figsize = fig_params.pop('figsize', default_base_figsize)
         figsize = [base * num for base, num in
                    zip(base_figsize, (subset_num_cols, subset_num_rows))]
         fig = plt.figure(figsize=figsize, **fig_params)
@@ -435,9 +441,11 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             r"For the '{}' DataArray: plot_type '{}' not recognized" \
                                 .format(data_arr_name, plot_type)
                         full_data_arr_plotting_data = plotting_data[data_arr_name].values
+
                         # Any times with all nan data are ignored in any plot type.
-                        data_arr_nan_mask = \
-                            np.any(~np.isnan(full_data_arr_plotting_data), axis=1)
+                        data_arr_nan_mask = ~np.isnan(full_data_arr_plotting_data)
+                        if len(full_data_arr_plotting_data.shape) == 2:
+                            data_arr_nan_mask = np.any(data_arr_nan_mask, axis=1)
 
                         # Skip plotting this data variable if it does not have
                         # enough data to plot.
@@ -451,33 +459,32 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                         # for some reason.
                         data_arr_x_locs = x_locs[data_arr_nan_mask]
 
-                        # Some plot types require aggregation.
-                        if plot_type in plot_types_requiring_aggregation:
-                            if agg_type not in many_to_one_agg_types:
-                                raise ValueError("For the '{}' DataArray: the plot type "
-                                                 "'{}' requires aggregation (currently using '{}'). "
-                                                 "Please pass any of {} as the aggregation type "
-                                                 "or change the plot type.".format(data_arr_name, \
-                                                                                   plot_type, agg_type,
-                                                                                   many_to_one_agg_types))
-                        # Some plot types cannot accept many-to-one aggregation.
-                        if plot_type not in plot_types_handling_aggregation:
-                            if agg_type not in many_to_many_agg_types:
-                                raise ValueError("For the '{}' DataArray: "
-                                                 "the plot type '{}' doesn't accept aggregation "
-                                                 "(currently using '{}'). Please pass any of {} as "
-                                                 "the aggregation type or change the plot type."
-                                                 .format(data_arr_name, plot_type, agg_type,
-                                                         many_to_many_agg_types))
+                        if len(non_time_dims) > 0:
+                            # Some plot types require aggregation.
+                            if plot_type in plot_types_requiring_aggregation:
+                                if agg_type not in many_to_one_agg_types:
+                                    raise ValueError("For the '{}' DataArray: the plot type "
+                                                     "'{}' requires aggregation (currently using '{}'). "
+                                                     "Please pass any of {} as the aggregation type "
+                                                     "or change the plot type.".format(data_arr_name, \
+                                                                                       plot_type, agg_type,
+                                                                                       many_to_one_agg_types))
+                            # Some plot types cannot accept many-to-one aggregation.
+                            if plot_type not in plot_types_handling_aggregation:
+                                if agg_type not in many_to_many_agg_types:
+                                    raise ValueError("For the '{}' DataArray: "
+                                                     "the plot type '{}' doesn't accept aggregation "
+                                                     "(currently using '{}'). Please pass any of {} as "
+                                                     "the aggregation type or change the plot type."
+                                                     .format(data_arr_name, plot_type, agg_type,
+                                                             many_to_many_agg_types))
 
-                        if agg_type == 'mean':
-                            y = ignore_warnings(np.nanmean, \
-                                                data_arr_plotting_data, axis=1)
-                        elif agg_type == 'median':
-                            y = ignore_warnings(np.nanmedian, \
-                                                data_arr_plotting_data, axis=1)
-                        elif agg_type == 'none':
-                            y = data_arr_plotting_data
+                        y = data_arr_plotting_data
+                        if len(non_time_dims) > 0:
+                            if agg_type == 'mean':
+                                y = ignore_warnings(np.nanmean, y, axis=1)
+                            elif agg_type == 'median':
+                                y = ignore_warnings(np.nanmedian, y, axis=1)
 
                         # Create specified plot types.
                         plot_type_str = ""  # Used to label the legend.
