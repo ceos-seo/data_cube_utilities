@@ -42,11 +42,16 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
 
     Parameters
     ----------
-    datasets_temp, clean_masks_temp, masks_per_platform: dict
-        Dictionaries that map, respectively, platforms to `xarray.Dataset`
-        or `xarray.DataArray` objects to merge, `xarray.DataArray` masks
-        to merge, and lists of `xarray.DataArray` masks to merge separately.
-        All entries must have a 'time' dimension.
+    datasets_temp: dict
+        Dictionary that maps platforms to `xarray.Dataset` or `xarray.DataArray`
+        objects to merge to make the output `dataset`.
+        Must have a 'time' dimensions.
+    clean_masks_temp: dict
+        Dictionary that maps platforms to `xarray.DataArray` masks to merge to make the output `clean_mask`.
+        Must have a 'time' dimension.
+    masks_per_platform: dict
+        Dictionary that maps platforms to `xarray.DataArray` masks to merge to make the output `masks`.
+        Must have a 'time' dimension.
     x_coord, y_coord: str
         Names of the x and y coordinates in the datasets in `datasets_temp`.
 
@@ -75,11 +80,15 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
                 ds.assign_coords(**{x_coord: first_ds[x_coord],
                                     y_coord: first_ds[y_coord]})
 
-    assert len(datasets_temp) > 0, "No data was retrieved."  # No data for any query.
-    # If multiple non-empty datasets were retrieved, merge them and sort by time.
     masks = None
-    if len(datasets_temp) > 1:
-        # Merge datasets.
+    if len(datasets_temp) == 0:  # No data was retrieved.
+        return xr.Dataset(), xr.DataArray(np.array(None)), np.array(None) if masks_per_platform is not None else None
+    elif len(datasets_temp) == 1:  # Select the only dataset.
+        dataset = datasets_temp[list(datasets_temp.keys())[0]]
+        clean_mask = clean_masks_temp[list(clean_masks_temp.keys())[0]]
+        if masks_per_platform is not None:
+            masks = masks_per_platform[list(masks_per_platform.keys())[0]]
+    else:  # Merge datasets.
         # Make sure all datasets have the same sizes in the x and y dimensions.
         datasets_temp_list = list(datasets_temp.values())
         max_num_x = max([len(dataset[x_coord]) for dataset in datasets_temp_list])
@@ -112,11 +121,6 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
             masks = []
             for j in range(num_masks):
                 masks.append(xr.concat(list(np_platform_masks[:, j]), dim='time'))
-    else:  # Select the only dataset.
-        dataset = datasets_temp[list(datasets_temp.keys())[0]]
-        clean_mask = clean_masks_temp[list(clean_masks_temp.keys())[0]]
-        if masks_per_platform is not None:
-            masks = masks_per_platform[list(masks_per_platform.keys())[0]]
     return dataset, clean_mask, masks
 
 def load_simple(dc, platform, product, frac_res=None, abs_res=None,
