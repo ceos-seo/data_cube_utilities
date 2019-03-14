@@ -49,6 +49,7 @@ class DataAccessApi:
                               time=None,
                               longitude=None,
                               latitude=None,
+                              measurements=None,
                               output_crs=None,
                               resolution=None,
                               dask_chunks=None,
@@ -88,7 +89,7 @@ class DataAccessApi:
 
         data = self.dc.load(
             product=product,
-            measurements=[],
+            measurements=measurements,
             output_crs=output_crs,
             resolution=resolution,
             dask_chunks=dask_chunks,
@@ -108,24 +109,24 @@ class DataAccessApi:
                                        dask_chunks=None,
                                        **kwargs):
         """
-          Gets and returns data based on lat/long bounding box inputs.
-          All params are optional. Leaving one out will just query the dc without it, (eg leaving out
-          lat/lng but giving product returns dataset containing entire product.)
+        Gets and returns data based on lat/long bounding box inputs.
+        All params are optional. Leaving one out will just query the dc without it, (eg leaving out
+        lat/lng but giving product returns dataset containing entire product.)
 
-          Args:
-              products (array of strings): The names of the product associated with the desired dataset.
-              product_type (string): The type of product associated with the desired dataset.
-              platforms (array of strings): The platforms associated with the desired dataset.
-              time (tuple): A tuple consisting of the start time and end time for the dataset.
-              longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
-              latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
-              measurements (list): A list of strings that represents all measurements.
-              output_crs (string): Determines reprojection of the data before its returned
-              resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
+        Args:
+          products (array of strings): The names of the product associated with the desired dataset.
+          product_type (string): The type of product associated with the desired dataset.
+          platforms (array of strings): The platforms associated with the desired dataset.
+          time (tuple): A tuple consisting of the start time and end time for the dataset.
+          longitude (tuple): A tuple of floats specifying the min,max longitude bounds.
+          latitude (tuple): A tuple of floats specifying the min,max latitutde bounds.
+          measurements (list): A list of strings that represents all measurements.
+          output_crs (string): Determines reprojection of the data before its returned
+          resolution (tuple): A tuple of min,max ints to determine the resolution of the data.
 
-          Returns:
-              data (xarray): dataset with the desired data.
-          """
+        Returns:
+          data (xarray): dataset with the desired data.
+        """
 
         data_array = []
 
@@ -175,9 +176,10 @@ class DataAccessApi:
             scene_metadata (dict): Dictionary containing a variety of data that can later be
                                    accessed.
         """
-
+        kwargs['measurements'] = []
         dataset = self.get_dataset_by_extent(
-            platform=platform, product=product, longitude=longitude, latitude=latitude, time=time, **kwargs)
+            platform=platform, product=product, longitude=longitude,
+            latitude=latitude, time=time, **kwargs)
 
         if len(dataset.dims) == 0:
             return {
@@ -218,7 +220,8 @@ class DataAccessApi:
                           sliced data.
         """
         dataset = self.get_dataset_by_extent(
-            product=product, platform=platform, longitude=longitude, latitude=latitude, time=time, dask_chunks={})
+            product=product, platform=platform, longitude=longitude,
+            latitude=latitude, time=time, dask_chunks={}, measurements=[])
 
         if len(dataset.dims) == 0:
             return []
@@ -253,7 +256,8 @@ class DataAccessApi:
                 time=time,
                 longitude=longitude,
                 latitude=latitude,
-                dask_chunks={})
+                dask_chunks={},
+                measurements=[])
 
             if len(dataset.dims) == 0:
                 continue
@@ -277,7 +281,8 @@ class DataAccessApi:
             dict containing time, latitude, and longitude, each containing the respective xarray dataarray
         """
         dataset = self.get_dataset_by_extent(
-            product=product, platform=platform, longitude=longitude, latitude=latitude, time=time, dask_chunks={})
+            product=product, platform=platform, longitude=longitude,
+            latitude=latitude, time=time, dask_chunks={}, measurements=[])
 
         if len(dataset.dims) == 0:
             return []
