@@ -302,7 +302,7 @@ def write_geotiff_from_xr(tif_path, data, bands=None, no_data=-9999, crs="EPSG:4
             count=count,
             dtype=dtype,
             crs=crs,
-            transform=_get_transform_from_xr(data),
+            transform=_get_transform_from_xr(data, x_coord=x_coord, y_coord=y_coord),
             nodata=no_data) as dst:
         if isinstance(data, xr.DataArray):
             dst.write(data.values, 1)

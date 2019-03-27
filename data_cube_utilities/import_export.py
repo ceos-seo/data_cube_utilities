@@ -24,22 +24,25 @@ def export_xarray_to_netcdf(ds, path):
             ds[data_var_name] = ds[data_var_name].astype(np.int8)
     datacube.storage.storage.write_dataset_to_netcdf(ds, path)
 
-def export_slice_to_geotiff(ds, path):
+def export_slice_to_geotiff(ds, path, x_coord='longitude', y_coord='latitude'):
     """
     Exports a single slice of an xarray.Dataset as a GeoTIFF.
 
     ds: xarray.Dataset
         The Dataset to export. Must have exactly 2 dimensions - 'latitude' and 'longitude'.
+    x_coord, y_coord: string
+        Names of the x and y coordinates in `ds`.
     path: str
         The path to store the exported GeoTIFF.
     """
-    kwargs = dict(tif_path=path, data=ds.astype(np.float32), bands=list(ds.data_vars.keys()))
+    kwargs = dict(tif_path=path, data=ds.astype(np.float32), bands=list(ds.data_vars.keys()),
+                  x_coord=x_coord, y_coord=y_coord)
     if 'crs' in ds.attrs:
         kwargs['crs'] = str(ds.attrs['crs'])
     dc_utilities.write_geotiff_from_xr(**kwargs)
 
 
-def export_xarray_to_geotiff(ds, path):
+def export_xarray_to_geotiff(ds, path, x_coord='longitude', y_coord='latitude'):
     """
     Exports an xarray.Dataset as individual time slices.
 
@@ -48,6 +51,8 @@ def export_xarray_to_geotiff(ds, path):
     ds: xarray.Dataset
         The Dataset to export. Must have exactly 3 dimensions - 'latitude', 'longitude', and 'time'.
         The 'time' dimension must have type `numpy.datetime64`.
+    x_coord, y_coord: string
+        Names of the x and y coordinates in `ds`.
     path: str
         The path prefix to store the exported GeoTIFFs. For example, 'geotiffs/mydata' would result in files named like
         'mydata_2016_12_05_12_31_36.tif' within the 'geotiffs' folder.
@@ -59,6 +64,7 @@ def export_xarray_to_geotiff(ds, path):
     for t in ds.time:
         time_slice_xarray = ds.sel(time=t)
         export_slice_to_geotiff(time_slice_xarray,
-                                path + "_" + time_to_string(t) + ".tif")
+                                path + "_" + time_to_string(t) + ".tif",
+                                x_coord=x_coord, y_coord=y_coord)
 
 ## End export ##
