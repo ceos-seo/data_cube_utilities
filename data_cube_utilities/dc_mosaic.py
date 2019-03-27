@@ -377,6 +377,69 @@ def ls8_unpack_qa( data_array , cover_type):
                                )
     return unpack_bits(land_cover_endcoding, data_array, cover_type)
 
+
+def ls8_oli_unpack_qa(data_array, cover_type):
+    """
+    Returns a boolean `xarray.DataArray` denoting which points in `data_array`
+    are of the selected `cover_type` (True indicates presence and
+    False indicates absence).
+
+    For more information, see this: https://landsat.usgs.gov/collectionqualityband
+    The most relevant section for this function is titled
+    "Landsat 8 OLI/ OLI-TIRS Level-1 Possible Attributes,
+     Pixel Values, and Pixel Value Interpretations".
+
+    Parameters
+    ----------
+    data_array: xarray.DataArray
+        A DataArray of the QA band.
+    cover_type: string
+        A string in the set [fill, terrain_occ, clear, rad_sat_1_2,
+                             rad_sat_3_4, rad_sat_5_pls, cloud, low_conf_cl,
+                             med_conf_cl, high_conf_cl, high_cl_shdw,
+                             high_snow_ice, low_conf_cir, high_conf_cir].
+
+        'fill' removes "no_data" values, which indicates an absence of data. This value is -9999 for Landsat platforms.
+        Generally, don't use 'fill'.
+        'terrain_occ' allows only occluded terrain.
+        'clear' allows only clear terrain. 'water' allows only water. 'shadow' allows only cloud shadows.
+        'rad_sat_1_2'   denotes radiometric saturation in 1 or 2 bands.
+        'rad_sat_3_4'   denotes radiometric saturation in 3 or 4 bands.
+        'rad_sat_5_pls' denotes radiometric saturation in 5 or more bands.
+        'cloud' allows only clouds, but note that it often only selects cloud boundaries.
+        'low_conf_cl', 'med_conf_cl', and 'high_conf_cl' denote low, medium, and high confidence in cloud coverage.
+        - 'low_conf_cl' is useful on its own for only removing clouds, however, 'clear' is usually better suited for this.
+        - 'med_conf_cl' is useful in combination with 'low_conf_cl' to allow slightly heavier cloud coverage.
+        - Note that 'med_conf_cl' and 'cloud' are very similar.
+        - 'high_conf_cl' is useful in combination with both 'low_conf_cl' and 'med_conf_cl'.
+        'high_cl_shdw' denotes high confidence in cloud shadow.
+        'high_snow_ice' denotes high confidence in snow or ice.
+        'low_conf_cir' and 'high_conf_cir' denote low and high confidence in cirrus clouds.
+
+    Returns
+    -------
+    mask: xarray.DataArray
+        The boolean `xarray.DataArray` denoting which points in `data_array`
+        are of the selected `cover_type` (True indicates presence and
+        False indicates absence). This will have the same dimensions and coordinates as `data_array`.
+    """
+    land_cover_encoding = dict(fill         =[1],
+                               terrain_occ  =[2, 2722],
+                               clear        =[2720, 2724, 2728, 2732],
+                               rad_sat_1_2  =[2724, 2756, 2804, 2980, 3012, 3748, 3780, 6820, 6852, 6900, 7076, 7108, 7844, 7876],
+                               rad_sat_3_4  =[2728, 2760, 2808, 2984, 3016, 3752, 3784, 6824, 6856, 6904, 7080, 7112, 7848, 7880],
+                               rad_sat_5_pls=[2732, 2764, 2812, 2988, 3020, 3756, 3788, 6828, 6860, 6908, 7084, 7116, 7852, 7884],
+                               cloud        =[2800, 2804, 2808, 2812, 6896, 6900, 6904, 6908],
+                               low_conf_cl  =[2752, 2722, 2724, 2728, 2732, 2976, 2980, 2984, 2988, 3744, 3748, 3752, 3756, 6816, 6820, 6824, 6828, 7072, 7076, 7080, 7084, 7840, 7844, 7848, 7852],
+                               med_conf_cl  =[2752, 2756, 2760, 2764, 3008, 3012, 3016, 3020, 3776, 3780, 3784, 3788, 6848, 6852, 6856, 6860, 7104, 7108, 7112, 7116, 7872, 7876, 7880, 7884],
+                               high_conf_cl =[2800, 2804, 2808, 2812, 6896, 6900, 6904, 6908],
+                               high_cl_shdw=[2976, 2980, 2984, 2988, 3008, 3012, 3016, 3020, 7072, 7076, 7080, 7084, 7104, 7108, 7112, 7116],
+                               high_snow_ice=[3744, 3748, 3752, 3756, 3776, 3780, 3784, 3788, 7840, 7844, 7848, 7852, 7872, 7876, 7880, 7884],
+                               low_conf_cir =[2720, 2722, 2724, 2728, 2732, 2752, 2756, 2760, 2764, 2800, 2804, 2808, 2812, 2976, 2980, 2984, 2988, 3008, 3012, 3016, 3020, 3744, 3748, 3752, 3756, 3780, 3784, 3788],
+                               high_conf_cir=[6816, 6820, 6824, 6828, 6848, 6852, 6856, 6860, 6896, 6900, 6904, 6908, 7072, 7076, 7080, 7084, 7104, 7108, 7112, 7116, 7840, 7844, 7848, 7852, 7872, 7876, 7880, 7884]
+                               )
+    return unpack_bits(land_cover_encoding, data_array, cover_type)
+
 def ls7_unpack_qa( data_array , cover_type):
 
     land_cover_endcoding = dict( fill     =  [1],
