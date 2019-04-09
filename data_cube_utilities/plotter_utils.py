@@ -1599,9 +1599,9 @@ def figure_ratio(data, x_coord='longitude', y_coord='latitude',
         height = fixed_height; width = height/aspect_ratio
     # If both `fixed_width` and `fixed_height` are specified, treat as maximums.
     if (fixed_width is not None) and (fixed_height is not None):
-        if height > fixed_height:
-            width *= fixed_height/height
-            height = fixed_height
+        if width > fixed_width:
+            height *= fixed_width/width
+            width = fixed_width
     return [width*num_cols, height*num_rows]
 
 def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
