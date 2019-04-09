@@ -1560,14 +1560,14 @@ def xarray_set_axes_labels(data, ax, x_coord='longitude', y_coord='latitude',
     ax.set_yticklabels(y_labels, **y_tick_label_kwargs)
 
 def figure_ratio(data, x_coord='longitude', y_coord='latitude', 
-                 fixed_width=8, fixed_height=None, 
+                 fixed_width=None, fixed_height=None,
                  num_cols=1, num_rows=1):
     """
-    Returns a list of the width and height that match constraints on height 
+    Returns a list of the width and height that match constraints on height
     and width for a figure while maintaining aspect ratio if possible.
     Also can be used to size a figure of a grid of plots of identically sized cells.
     Specifically, the width and height are scaled by `num_cols` and `num_rows`.
-        
+
     Parameters
     ----------
     data: xarray.Dataset or xarray.DataArray or list-like
@@ -1578,13 +1578,13 @@ def figure_ratio(data, x_coord='longitude', y_coord='latitude',
         Names of the x and y coordinates in `data`.
     fixed_width, fixed_height: float
         The desired width or height. If both are specified, the aspect
-        ratio is maintained and `fixed_width` and `fixed_height` are 
+        ratio is maintained and `fixed_width` and `fixed_height` are
         treated as maximum values for the size of a single grid element.
     num_cols, num_rows: int
         The number of columns and rows in the grid the plots will be in.
         Zero, one, or both may be specified.
     """
-    assert (fixed_width is not None) or (fixed_height is not None),\
+    assert (fixed_width is not None) or (fixed_height is not None), \
         "At least one of `fixed_width` or `fixed_height` must be specified."
     # Determine the x and y dimension sizes and the aspect ratio.
     if isinstance(data, xr.Dataset) or isinstance(data, xr.DataArray):
@@ -1599,10 +1599,12 @@ def figure_ratio(data, x_coord='longitude', y_coord='latitude',
         height = fixed_height; width = height/aspect_ratio
     # If both `fixed_width` and `fixed_height` are specified, treat as maximums.
     if (fixed_width is not None) and (fixed_height is not None):
+        if width > fixed_width:
+            height *= fixed_width/width; width = fixed_width
         if height > fixed_height:
-            width *= fixed_height/height
-            height = fixed_height
+            width *= fixed_height/height; height = fixed_height
     return [width*num_cols, height*num_rows]
+
 
 def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
     """
