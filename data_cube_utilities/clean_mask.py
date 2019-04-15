@@ -4,6 +4,43 @@ import xarray as xr
 from xarray.ufuncs import logical_and as xr_and
 from xarray.ufuncs import logical_or  as xr_or
 
+## Utils ##
+
+def xarray_values_in(data, values, data_vars=None):
+    """
+    Returns a mask for an xarray Dataset or DataArray, with `True` wherever the value is in values.
+
+    Parameters
+    ----------
+    data: xarray.Dataset or xarray.DataArray
+        The data to check for value matches.
+    values: list-like
+        The values to check for.
+    data_vars: list-like
+        The names of the data variables to check.
+
+    Returns
+    -------
+    mask: np.ndarray
+        A NumPy array shaped like ``data``. The mask can be used to mask ``data``.
+        That is, ``data.where(mask)`` is an intended use.
+    """
+    data_vars_to_check = data_vars if data_vars is not None else list(data.data_vars.keys())
+    if isinstance(data, xr.Dataset):
+        mask = np.full_like(data[data_vars_to_check[0]].values, False, dtype=np.bool)
+        for data_arr in data[data_vars_to_check].values():
+            for value in values:
+                mask = mask | (data_arr.values == value)
+    elif isinstance(data, xr.DataArray):
+        mask = np.full_like(data, False, dtype=np.bool)
+        for value in values:
+            mask = mask | (data.values == value)
+    return mask
+
+## End Utils ##
+
+## Misc ##
+
 def create_2D_mosaic_clean_mask(clean_mask):
     """
     The clean mask of a mosaic should be determined by the compositing function (e.g. mean 
@@ -26,6 +63,9 @@ def create_2D_mosaic_clean_mask(clean_mask):
         mosaic_clean_mask = np.logical_or(mosaic_clean_mask, clean_mask[i])    
     return mosaic_clean_mask
 
+## End Misc ##
+
+## Landsat ##
 
 def landsat_clean_mask_invalid(dataset):
     """
@@ -107,32 +147,54 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water']):
         clean_mask = cover_type_clean_mask if i == 0 else xr_or(clean_mask, cover_type_clean_mask)
     return clean_mask
 
-def xarray_values_in(data, values, data_vars=None):
+## End Landsat ##
+
+## Sentinel 2 ##
+
+def sentinel2_fmask_clean_mask(dataset, cover_types=['valid', 'water']):
     """
-    Returns a mask for an xarray Dataset or DataArray, with `True` wherever the value is in values.
+    Returns a clean_mask for `dataset` that masks out various types of terrain cover using the
+    Sentinel 2 fmask band. Note that clean masks specify what to keep, not what to remove.
+    This means that using `cover_types=['valid', 'water']` should keep only clear land and water.
+
+    See "Classification Mask Generation" here:
+    https://earth.esa.int/web/sentinel/technical-guides/sentinel-2-msi/level-2a/algorithm
 
     Parameters
     ----------
-    data: xarray.Dataset or xarray.DataArray
-        The data to check for value matches.
-    values: list-like
-        The values to check for.
-    data_vars: list-like
-        The names of the data variables to check.
+    dataset: xarray.Dataset
+        An xarray (usually produced by `datacube.load()`) that contains a `fmask` data
+        variable.
+    cover_types: list
+        A list of the cover types to include. Adding a cover type allows it to remain in the masked data.
+        Cover types for all Landsat platforms include:
+        ['null', 'valid', 'cloud', 'cloud_shadow', 'snow', 'water'].
+
+        'null' removes null values, which indicates an absense of data.
+        'valid' allows clear views that are not cloud shadow, snow, or water.
+        'cloud' allows clouds.
+        'cloud_shadow' allows only cloud shadows.
+        'snow' allows only snow.
+        'water' allows only water.
+
+        Here is a table of fmask values and their significances:
+        Value Description
+        0     Null
+        1     Valid
+        2     Cloud
+        3     Cloud shadow
+        4     Snow
+        5     water
 
     Returns
     -------
-    mask: np.ndarray
-        A NumPy array shaped like ``data``. The mask can be used to mask ``data``.
-        That is, ``data.where(mask)`` is an intended use.
+    clean_mask: xarray.DataArray of boolean
+        A boolean `xarray.DataArray` denoting which elements in `dataset` to keep -
+        with the same number and order of coordinates as in `dataset`.
     """
-    if isinstance(data, xr.Dataset):
-        mask = np.full_like(list(data.data_vars.values())[0], False, dtype=np.bool)
-        for data_arr in data.data_vars.values():
-            for value in values:
-                mask = mask | (data_arr.values == value)
-    elif isinstance(data, xr.DataArray):
-        mask = np.full_like(data, False, dtype=np.bool)
-        for value in values:
-            mask = mask | (data.values == value)
-    return mask
+    fmask_table = {'null': 0, 'valid': 1, 'cloud': 2, 'cloud_shadow': 3, 'snow': 4, 'water': 5}
+    fmask_values_to_keep = [fmask_table[cover_type] for cover_type in cover_types]
+    clean_mask = xarray_values_in(dataset.fmask, fmask_values_to_keep)
+    return clean_mask
+
+## End Sentinel 2 ##
