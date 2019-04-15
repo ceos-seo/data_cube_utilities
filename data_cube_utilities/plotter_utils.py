@@ -1673,18 +1673,41 @@ def get_weeks_per_month(num_weeks):
 
 num_weeks_per_month = np.tile([5,4],6)
 last_week_int_per_month = np.cumsum(num_weeks_per_month)
-month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+month_names_short = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+month_names_long = ['January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December']
+
+def day_of_year_int_to_str(day):
+    """
+    Converts an integer day of year to a string containing the month and day, like "January 1".
+    The argument value must be in range [1,366].
+
+    Parameters
+    ---------
+    day: int
+        The day of the year, represented as an integer.
+    """
+    month_int = 1
+    while month_int < 12:
+        days_curr_month = days_per_month[month_int]
+        if day < days_curr_month:
+            break
+        else:
+            day -= days_curr_month
+            month_int += 1
+    month_name = month_names_long[month_int - 1]
+    return "{} {}".format(month_name, day)
 
 def month_ints_to_month_names(month_ints):
     """
     Converts ordinal numbers for months (in range [1,12]) to their 3-letter names.
     """
-    return [month_names[i-1] for i in month_ints]
+    return [month_names_short[i - 1] for i in month_ints]
 
 def week_int_to_month_name(week_int):
     month_ind = np.argmax(week_int <= last_week_int_per_month)
-    return month_names[month_ind]
+    return month_names_short[month_ind]
 
 def week_ints_to_month_names(week_ints):
     return [week_int_to_month_name(week_int) for week_int in week_ints]
