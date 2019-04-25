@@ -24,6 +24,8 @@ import numpy as np
 import xarray as xr
 
 import datacube
+
+from utils.data_cube_utilities.dc_mosaic import restore_or_convert_dtypes
 from . import dc_utilities as utilities
 from .dc_utilities import create_default_clean_mask
 # Command line tool imports
@@ -260,6 +262,12 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
     # the same dtype (should be a reasonable
     # assumption)
 
+    # Save dtypes because the `astype()` calls below modify `dataset_in`.
+    band_list = ['red', 'green', 'blue', 'nir', 'swir1', 'swir2']
+    dataset_in_dtypes = {}
+    for band in band_list:
+        dataset_in_dtypes[band] = dataset_in[band].dtype
+
     if enforce_float64:
         if dtype != 'float64':
             blue.values = blue.values.astype('float64')
@@ -311,6 +319,8 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
             {'wofs': data_array},
             coords={time_coord: time_coords, y_coord: y_coords, x_coord: x_coords})
 
+    # Handle datatype conversions.
+    restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_in, no_data)
     return dataset_out
 
 
