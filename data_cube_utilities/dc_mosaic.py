@@ -545,20 +545,19 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
-def restore_or_convert_dtypes(dtype_for_all, band_list, dataset_in_dtypes, dataset_out, no_data):
+def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dtypes=None, dataset_out=None, no_data=None):
     """
-    Restores original datatypes to data variables in Datasets
-    output by mosaic functions.
+    Converts datatypes of data variables in a copy of an xarray Dataset.
 
     Parameters
     ----------
     dtype_for_all: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
         np.int16, np.float32) to convert the data to.
-    band_list: list-like
-        A list-like of the data variables in the dataset.
+    band_list: list-like, unused, deprecated
     dataset_in_dtypes: dict
         A dictionary mapping band names to datatypes.
+        One of `dtype_for_all` or `dataset_in_dtypes` must be `None`.
     no_data: int or float
         The no data value.
 
@@ -567,13 +566,15 @@ def restore_or_convert_dtypes(dtype_for_all, band_list, dataset_in_dtypes, datas
     dataset_out: xarray.Dataset
         The output Dataset.
     """
+    assert dtype_for_all is None or dataset_in_dtypes is None, \
+        "One of `dtype_for_all` or `dataset_in_dtypes` must be `None`."
     if dtype_for_all is not None:
         # Integer types can't represent nan.
         if np.issubdtype(dtype_for_all, np.integer): # This also works for Python int type.
             utilities.nan_to_num(dataset_out, no_data)
         convert_to_dtype(dataset_out, dtype_for_all)
     else:  # Restore dtypes to state before masking.
-        for band in band_list:
+        for band in dataset_in_dtypes:
             band_dtype = dataset_in_dtypes[band]
             if np.issubdtype(band_dtype, np.integer):
                 utilities.nan_to_num(dataset_out[band], no_data)
