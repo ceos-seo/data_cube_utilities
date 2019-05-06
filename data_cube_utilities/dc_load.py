@@ -5,6 +5,118 @@ from xarray.ufuncs import logical_and as xr_and
 from .sort import xarray_sortby_coord
 from .aggregate import xr_scale_res
 
+
+def match_prods_res(dc, products, method='min'):
+    """
+    Determines a resolution that matches a set of Data Cube products -
+    either the minimum or maximum resolution along the x and y dimensions.
+    Product resolutions are derived from Data Cube metadata for those products.
+
+    Parameters
+    ----------
+    dc: datacube.Datacube
+        A connection to the Data Cube to determine the resolution of
+        individual products from.
+    products: list of str
+        The names of the products to find a matching resolution for.
+    method: str
+        The method of finding a matching resolution. The options are
+        ['min', 'max'], which separately determine the y and x resolutions
+        as the minimum or maximum among all selected products.
+
+    Returns
+    -------
+    res: list
+        A list of the y and x resolutions, in that order.
+    """
+    if method not in ['min', 'max']:
+        raise ValueError("The method \"{}\" is not supported. "
+                         "Please choose one of ['min', 'max'].".format(method))
+    prod_info = dc.list_products()
+    resolutions = prod_info[prod_info['name'].isin(products)] \
+        ['resolution'].values
+
+    # The first resolution is for y and is negative.
+    # The second resolution is for x and is positive.
+    if method == 'min':
+        # Determine the minimum resolution, which is actually the maximum
+        # value resolution, since resolution is measured in degrees per pixel.
+        matching_res = [0] * 2
+        for res in resolutions:
+            matching_res[0] = res[0] if res[0] < matching_res[0] else matching_res[0]
+            matching_res[1] = res[1] if matching_res[1] < res[1] else matching_res[1]
+    else:
+        matching_res = [-np.inf, np.inf]
+        for res in resolutions:
+            matching_res[0] = res[0] if matching_res[0] < res[0] else matching_res[0]
+            matching_res[1] = res[1] if res[1] < matching_res[1] else matching_res[1]
+    return matching_res
+
+
+def match_dim_sizes(dc, products, x, y, x_y_coords=['longitude', 'latitude'], method='min'):
+    """
+    Returns the x and y dimension sizes that match some x and y extents.
+    This is useful when determining an absolute resolution to scale products to with
+    `xr_scale_res()` in the `aggregate.py` utility file.
+
+    Parameters
+    ----------
+    dc: datacube.Datacube
+        A connection to the Data Cube to determine the resolution of
+        individual products from.
+    products: list of str
+        The names of the products to find a matching resolution for.
+    x: list-like
+        A list-like of the minimum and maximum x-axis (e.g. longitude) extents for the products.
+    y: list-like
+        A list-like of the minimum and maximum y-axis (e.g. latitude) extents for the products.
+    x_y_coords: list-like or dict
+        Either a list-like of the x and y coordinate names or a dictionary mapping product names
+        to such list-likes.
+    method: str
+        The method of finding a matching resolution. See the documentation for `match_prods_res()`
+        in this utility file for more information.
+
+    Returns
+    -------
+    abs_res: list
+        A list of desired y and x dimension sizes, in that order.
+    same_dim_sizes: bool
+        Whether all of the dimension sizes were the same.
+    """
+    coords = []
+    if isinstance(x_y_coords, dict):
+        for product in products:
+            coords.append(x_y_coords[product])
+    else:
+        coords = [x_y_coords] * len(products)
+
+    datasets_empty = [dc.load(product=product, lon=x, lat=y, measurements=[]) for product in products]
+
+    # First check if all datasets will load with the same x and y dimension sizes.
+    same_dim_sizes = True
+    first_dataset_dim_size = [datasets_empty[0][coords[0][0]].size, datasets_empty[0][coords[0][1]].size]
+    for i in range(1, len(datasets_empty)):
+        if first_dataset_dim_size != [datasets_empty[i][coords[i][0]].size, datasets_empty[i][coords[i][1]].size]:
+            same_dim_sizes = False
+            break
+
+    if method == 'min':
+        abs_res = [np.inf, np.inf]
+        for i in range(1, len(datasets_empty)):
+            res = [datasets_empty[i][coords[i][0]].size, datasets_empty[i][coords[i][1]].size]
+            abs_res[0] = res[0] if res[0] < abs_res[0] else abs_res[0]
+            abs_res[1] = res[1] if res[1] < abs_res[1] else abs_res[1]
+    else:
+        abs_res = [0] * 2
+        for i in range(1, len(datasets_empty)):
+            res = [datasets_empty[i][coords[i][0]].size, datasets_empty[i][coords[i][1]].size]
+            abs_res[0] = res[0] if abs_res[0] < res[0] else abs_res[0]
+            abs_res[1] = res[1] if abs_res[1] < res[1] else abs_res[1]
+
+    # Reverse to be in order (x, y).
+    return abs_res[::-1], same_dim_sizes
+
 def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
     """
     Given parameters that are each a list of `xarray.Dataset` objects, merge each list 
@@ -14,10 +126,8 @@ def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
     ----------
     *args: list of lists of `xarray.Dataset`.
         A list of lists of `xarray.Dataset` objects to merge.
-    concat_dim, sort_dim: str or list of str
-        The string name of the dimension to concatenate or sort bythe data.
-        If a list, must be same length as `*args`, where each element of these variables
-        corresponds to the same element in `*args` by index.
+    concat_dim, sort_dim: str
+        The string name of the dimension to concatenate or sort by the data.
 
     Returns
     -------
@@ -26,8 +136,6 @@ def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
     """
     merged = []
     for i, arg in enumerate(args):
-        current_concat_dim = concat_dim[i] if isinstance(concat_dim, list) else concat_dim
-        current_sort_dim = sort_dim[i] if isinstance(sort_dim, list) else sort_dim
         dataset_temp = xr.concat(arg, dim=concat_dim)
         merged.append(xarray_sortby_coord(dataset_temp, coord=sort_dim))
     return merged
@@ -36,7 +144,7 @@ def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
 def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
                    x_coord='longitude', y_coord='latitude'):
     """
-    Merges dictionaries of platforms mapping to datasets, dataset clean masks,
+    Merges dictionaries of platform names mapping to datasets, dataset clean masks,
     and lists of other masks into one dataset, one dataset clean mask, and one
     of each type of other mask, ordering all by time.
 
@@ -45,7 +153,7 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
     datasets_temp: dict
         Dictionary that maps platforms to `xarray.Dataset` or `xarray.DataArray`
         objects to merge to make the output `dataset`.
-        Must have a 'time' dimensions.
+        Must have a 'time' dimension.
     clean_masks_temp: dict
         Dictionary that maps platforms to `xarray.DataArray` masks to merge to make the output `clean_mask`.
         Must have a 'time' dimension.
@@ -68,9 +176,6 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
     ------
     AssertionError: If no data was retrieved for any query
                     (i.e. `len(datasets_temp) == 0`).
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
 
     def xr_set_same_coords(datasets):
@@ -126,8 +231,9 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
 def load_simple(dc, platform, product, frac_res=None, abs_res=None,
                 load_params={}, masking_params={}, indiv_masks=None):
     """
+    **This function is DEPRECATED.**
     Simplifies loading from the Data Cube by retrieving a dataset along
-    with its mask.
+    with its mask. Currently only tested on Landsat data.
 
     Parameters
     ----------
@@ -172,9 +278,6 @@ def load_simple(dc, platform, product, frac_res=None, abs_res=None,
     Raises
     ------
     AssertionError: If no data is retrieved for any platform query.
-    
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     current_load_params = dict(platform=platform, product=product)
     current_load_params.update(load_params)
@@ -199,6 +302,7 @@ def load_simple(dc, platform, product, frac_res=None, abs_res=None,
 def load_multiplatform(dc, platforms, products, frac_res=None, abs_res=None,
                        load_params={}, masking_params={}, indiv_masks=None):
     """
+    **This function is DEPRECATED.**
     Load and merge data as well as clean masks given a list of platforms
     and products. Currently only tested on Landsat data.
     
@@ -209,13 +313,15 @@ def load_multiplatform(dc, platforms, products, frac_res=None, abs_res=None,
     platforms, products: list-like
         A list-like of platforms and products. Both must have the same length.
     frac_res: float
-        The fraction of the original resolution to scale to. Must be postive.
+        The fraction of the original resolution to scale to. Must be positive.
+        The x and y dimensions are scaled by the square root of this factor.
         Note that this can be greater than 1.0, in which case the resolution
-        is upsampled. The resolution used for all products will be the
-        minimum resolution for latitude and longitude among any of them.
+        is upsampled. The base resolution used for all products will be the
+        minimum resolution for latitude and longitude (considered separately -
+        i.e. one resolution for each dimension) among all of them.
     abs_res: list-like
         A list-like of the number of pixels for the x and y axes, respectively.
-        Overrides `frac_res` if specified.
+        That is, it is a list-like of 2 numbers. Overrides `frac_res` if specified.
     load_params: dict, optional
         A dictionary of parameters for `dc.load()` or a dictionary of
         dictionaries of such parameters, mapping platform names to parameter
@@ -233,12 +339,12 @@ def load_multiplatform(dc, platforms, products, frac_res=None, abs_res=None,
           'LANDSAT_8': dict(**common_load_params, time=ls8_date_range)}`,
           where `common_load_params` is a dictionary of load parameters common
           to both - most notably 'lat', 'lon', and 'measurements' - and the
-          'date_range' variables are .
+          'date_range' variables are list-likes of start and end dates.
     masking_params: dict, optional
         A dictionary mapping platform names to a dictionary of keyword
         arguments for corresponding masking functions.
         For example: {'LANDSAT_7': {'cover_types':['cloud']},
-                      'LANDSAT_8': {'firstcover_types': ['cloud']}}
+                      'LANDSAT_8': {'cover_types': ['cloud']}}
         would retain only clouds, because `landsat_qa_clean_mask()`  is used
         to create clean masks for the Landsat family of platforms.
     indiv_masks: list
@@ -252,15 +358,12 @@ def load_multiplatform(dc, platforms, products, frac_res=None, abs_res=None,
     clean_mask: xarray.DataArray
         The clean mask, formed as a logical AND of all masks used.
     masks: list of xarray.DataArray
-        A list of the masks requested by `indiv_masks`, 
+        A list of the masks requested by `indiv_masks`,
         or `None` if `indiv_masks` is not specified.
-        
+
     Raises
     ------
     AssertionError: If no data is retrieved from any product.
-    
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     # Determine what resolution the data will be scaled to.
     if frac_res is not None and abs_res is None:
@@ -275,7 +378,7 @@ def load_multiplatform(dc, platforms, products, frac_res=None, abs_res=None,
         for res in resolutions:
             min_res[0] = res[0] if res[0] < min_res[0] else min_res[0]
             min_res[1] = res[1] if min_res[1] < res[1] else min_res[1]
-        # Take reciprocal to convert pixels per degree to degrees per pixel.
+        # Take reciprocal to convert degrees per pixel to pixels per degree.
         # Reverse to be in order (x, y).
         min_res = [abs(frac_res*(1/res)) for res in min_res][::-1]
 
