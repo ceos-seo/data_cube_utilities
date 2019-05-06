@@ -9,7 +9,7 @@ def rgb(dataset, at_index=0, x_coord='longitude', y_coord='latitude',
         bands=['red', 'green', 'blue'], paint_on_mask = [],
         min_possible=0, max_possible=10000, use_data_min=False,
         use_data_max=False, min_inten=0.15, max_inten=1.0,
-        width=10, fig=None, ax=None):
+        width=10, fig=None, ax=None, imshow_kwargs=None):
     """
     Creates a figure showing an area, using three specified bands as the rgb componenets.
 
@@ -46,12 +46,17 @@ def rgb(dataset, at_index=0, x_coord='longitude', y_coord='latitude',
         If only `fig` is supplied, the Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
+    imshow_kwargs: dict
+        The dictionary of keyword arguments passed to `ax.imshow()`.
+        You can pass a colormap here with the key 'cmap'.
 
     Returns
     -------
     fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes
         The figure and axes used for the plot.
     """
+    imshow_kwargs = {} if imshow_kwargs is None else imshow_kwargs
+
     ### < Dataset to RGB Format, needs float values between 0-1 
     rgb = np.stack([dataset[bands[0]],
                     dataset[bands[1]],
@@ -73,8 +78,8 @@ def rgb(dataset, at_index=0, x_coord='longitude', y_coord='latitude',
     xarray_set_axes_labels(dataset, ax, x_coord, y_coord)
    
     if 'time' in dataset.dims:
-        ax.imshow(rgb[at_index])
+        ax.imshow(rgb[at_index], **imshow_kwargs)
     else:
-        ax.imshow(rgb)
+        ax.imshow(rgb, **imshow_kwargs)
     
     return fig, ax
