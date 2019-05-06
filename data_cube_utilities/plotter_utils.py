@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from datetime import datetime
 import numpy as np
 import pandas as pd
@@ -32,6 +34,7 @@ from .dc_mosaic import ls7_unpack_qa
 from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit
 from .scale import xr_scale, np_scale
 from .dc_utilities import ignore_warnings, perform_timeseries_analysis
+from .raster_filter import lone_object_filter
 
 from scipy.interpolate import interp1d
 
@@ -769,10 +772,22 @@ def convert_name_rgb_255(color):
 
     Parameters
     ----------
-    color: str or list (size 3)
-        The color name to convert or a list of red, green, and blue already in range [0,255].
+    color: str
+        The color name to convert to an rgb list.
     """
-    return [255*rgb for rgb in mpl.colors.to_rgb(color)] if isinstance(color,str) else color
+    return [int(255*rgb) for rgb in mpl.colors.to_rgb(color)] if isinstance(color,str) else color
+
+def convert_name_rgba_255(color):
+    """
+    Converts a name of a matplotlib color to a list of rgba values in the range [0,255].
+    Else, returns the original argument.
+
+    Parameters
+    ----------
+    color: str
+        The color name to convert to an rgba list.
+    """
+    return [*convert_name_rgb_255(color), 255] if isinstance(color,str) else color
 
 def norm_color(color):
     """
@@ -958,186 +973,296 @@ def create_gradient_color_map(data_range, colors, positions=None, cmap_name='my_
 
 ### Discrete color plotting (exclusive) ###
 
-def binary_class_change_plot(dataarrays, mask=None, x_coord='longitude', y_coord='latitude', 
-                             colors=None, class_legend_label=None, width=10, fig=None, ax=None, 
-                             title=None, fig_kwargs={}, title_kwargs={}, imshow_kwargs={}, 
-                             x_label_kwargs={}, y_label_kwargs={}, legend_kwargs={}):
+def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', y_coord='latitude',
+                             colors=None, override_mask=None, override_color=None,
+                             neg_trans=False, pos_trans=False,
+                             class_legend_label=None, width=10, fig=None, ax=None,
+                             fig_kwargs={}, title_kwargs={}, imshow_kwargs={},
+                             x_label_kwargs={}, y_label_kwargs={}, legend_kwargs={},
+                             create_stats_table=True, create_change_matrix=True,
+                             denoise=True, denoise_params=None):
     """
     Creates a figure showing one of the following, depending on the format of arguments:
         1. The change in the extents of a binary pixel classification in a region over time.
            Pixels are colored based on never, sometimes, or always being a member of the class.
            In this case, there are 3 regions - never, sometimes, and always.
         2. The change in the extents of a binary pixel classification in a region over time between
-           two time periods. Pixels are colored based on a change in having zero or more than zero 
+           two time periods. Pixels are colored based on a change in having zero or more than zero
            times in which they are members of the class between the time periods.
            In this case, there are 4 regions - (never,never),(never,some),(some,never),(some,some).
-    
+
     Parameters
     ----------
     dataarrays: list-like of xarray.DataArray
-        A list-like of one or two DataArrays of classification values 
+        A list-like of one or two DataArrays of classification values
         to plot, which must be either 0 or 1.
-    mask: numpy.ndarray
-        A NumPy array of the same shape as the dataarrays. 
-        The pixels for which it is `True` are colored `color_mask`.
+    clean_masks: list-like of xarray.DataArray
+        A list-like of one or two DataArrays of boolean values denoting
+        where the `xarray.DataArray` objects in `dataarrays` are considered
+        clean. Any non-clean values in `dataarrays` will be ignored.
+        If specifed, every entry in `datarrays` must have a corresponding entry in `clean_masks`
+        and their dimension order must be the same (i.e. their NumPy arrays have the same shape).
     x_coord, y_coord: str
-        Names of the x and y coordinates in the elements of `dataarrays` to use 
+        Names of the x and y coordinates in the elements of `dataarrays` to use
         as tick and axis labels.
-    colors: list-like:
-        A list-like of list-likes of 3 elements - red, green, and blue values in range [0,255], 
-        or the name of a matplotlib color.
-        
-        If `dataarrays` contains one DataArray, these are the colors for pixels. 
-        Provide 3 color entries - for never, sometimes, and always class membership, in that order.
-        
-        If `dataarrays` contains two DataArrays, these are the colors for pixels that have zero
-        or more than zero times in which they are members of the class between the time periods.
-        Provide 4 color entires - (never,never),(never,some),(some,never),(some,some) class membership.
+    colors: list-like
+        A list-like of matplotlib colors - whether string names of
+        matplotlib colors (like 'red'), or list-likes of rgba values in range [0,255].
+
+        If `dataarrays` contains one DataArray, provide 3 color entries -
+        for never, sometimes, and always class membership, in that order.
+
+        If `dataarrays` contains two DataArrays, provide 4 color entires -
+        for transitions betwen never and sometimes/always class membership
+        between the two time periods. These transitions are, in order,
+        (never,never),(never,some),(some,never),(some,some).
+    override_mask: numpy.ndarray
+        A NumPy array of the same shape as the dataarrays.
+        The pixels for which it is `True` are colored `override_color`.
+    override_color: str or list of rgba values
+        The color to use for `override_mask`. Can be a string name of a matplotlib color
+        or a list-like of rgba values (not rgb). By default, it is transparency.
+    neg_trans: bool
+        Whether to make pixels that are never a member of the class transparent.
+    pos_trans: bool
+        Whether to make pixels that are always a member of the class transparent.
     class_legend_label: str
-        The class label on the legend. For example, `class_legend_label='Water'` would yield legend labels
-        like "Never Water".
+        The class label on the legend. For example, `class_legend_label='Water'` would yield
+        legend labels like "Never Water".
     width: numeric
-        The width of the created ``matplotlib.figure.Figure``, if none is supplied in `fig`. 
+        The width of the created ``matplotlib.figure.Figure``, if none is supplied in `fig`.
         The height will be set to maintain aspect ratio.
         Will be overridden by `'figsize'` in `fig_kwargs`, if present.
     fig: matplotlib.figure.Figure
-        The figure to use for the plot. 
+        The figure to use for the plot.
         If `ax` is not supplied, the Axes object used will be the first.
     ax: matplotlib.axes.Axes
         The axes to use for the plot.
-    title: str
-        The title of the plot.
     fig_kwargs: dict
         The dictionary of keyword arguments used to build the figure.
     title_kwargs: dict
         The dictionary of keyword arguments used to format the title.
         Passed to `matplotlib.axes.Axes.set_title()`.
+        Set the title text with a 'label' keyword argument.
     imshow_kwargs: dict
         The dictionary of keyword arguments passed to `ax.imshow()`.
         You can pass a colormap here with the key 'cmap'.
     x_label_kwargs, y_label_kwargs: dict
-        Dictionaries of keyword arguments for 
+        Dictionaries of keyword arguments for
         `Axes.set_xlabel()` and `Axes.set_ylabel()`, respectively.
         They cannot reference the same dictionary.
     legend_kwargs: dict
         The dictionary of keyword arguments passed to `ax.legend()`.
-        
+    create_stats_table: bool
+        Whether to create a table of statistics showing the number and percent
+        of pixels in each category of membership.
+    create_change_matrix: bool
+        Wheter to create a 3x3 change matrix showing the number and percent of pixels
+        that experience each possible transition between never, sometimes, and always
+        a member of the class between the baseline and analysis time periods.
+        Only considered if `len(dataarrays) == 2`.
+    denoise: bool
+        Whether to denoise the output image.
+    denoise_params: dict
+        Dictionary of keyword arguments for
+        `utils.data_cube_utilites.raster_filter.lone_object_filter()`.
+        See that function's docstring for information about its parameters.
+
     Returns
     -------
-    (fig,ax), pcts: 
-        A 2-tuple of the figure and axes followed by a list of either 3 or 4 percents of 
-        pixel membership, depending on whether `dataarray` contains one or two DataArrays.
+    (fig,ax): tuple
+        A 2-tuple of the figure and axes used to create the figure.
 
-        If `dataarrays` contains one DataArray, there are 4 percents for never, sometimes, 
-        and always class membership, followed by the percent of pixels for which not enough
-        data was available to put them in any of the preceding categories.
+    stats: tuple
+        Only returned if `create_stats_table == True` or `create_change_matrix == True`.
 
-        If `dataarrays` contains two DataArrays, there are 5 percents for 
-        (never,never),(never,some),(some,never),(some,some) class membership, followed by 
-        the percent of pixels for which not enough data was available to put them in any 
-        of the preceding categories.
-    
+        If `create_stats_table == True`, `stats` includes a `pandas.DataFrame` containing
+        the number and percent of pixels in each category of membership,
+        with the categories depending on whether `dataarrays` contains one or two DataArrays.
+        * If `dataarrays` contains one DataArray, there are 4 rows for never, sometimes,
+          always, and unknown (due to `clean_masks`) class membership.
+        * If `dataarrays` contains two DataArrays, there are 6 rows for the transitions
+          (never,never), (never,some), (some,never), (some,some), the net change
+          ((never,some) + (some,never)), and unknown.
+
+        If `len(dataarrays == 2) and create_change_matrix == True`, `stats` includes
+        an `xarray.Dataset` containing the number and percent of pixels in each possible
+        transition between never, sometimes, and always a member of the class between
+        the baseline and analysis time periods. The number and percent are each a
+        data variable of the `xarray.Dataset`.
+
+        If a stats table and a change matrix are both created, they will be returned in that order.
+
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    denoise_params = {} if denoise_params is None and denoise else \
+        denoise_params
+
     # Avoid modifying the original arguments.
     fig_kwargs, title_kwargs, legend_kwargs = \
         fig_kwargs.copy(), title_kwargs.copy(), legend_kwargs.copy()
-    
+
     # Handle conversion of matplotlib color names to lists of rgb values (range [0,255] for plt.imshow()).
-    colors = list(map(convert_name_rgb_255, colors))
-    
-    def get_none_chng_perm_masks(dataarray, time_dim='time'):
+    colors = list(map(convert_name_rgba_255, colors))
+    override_color = convert_name_rgba_255(override_color) if override_color is not None else [0, 0, 0, 0]
+
+    def get_none_chng_perm_masks(dataarray, clean_mask, time_dim='time'):
         """
-        For a DataArray of binary classifications (0 or 1) with a 'time' dimension, 
-        get a list of masks indicating where the points are, in order, never, sometimes, 
-        or always a member of the class (1 indicates membership), considering only 
+        For a DataArray of binary classifications (0 or 1) with a time dimension,
+        get a list of masks indicating where the points are, in order, never, sometimes,
+        or always a member of the class (1 indicates membership), considering only
         non-NaN values for those points.
         """
-        # Get the sum of classifications across time.
-        sum_cls = dataarray.sum(dim=time_dim)
-        # The number of acquistions that were not nan for each point.
-        num_times_not_nan = dataarray.count(dim=time_dim) 
+        time_axis = dataarray.get_axis_num(time_dim)
+        # Get the mean classification across time.
+        masked_da = np.ma.array(dataarray.values, mask=~clean_mask.values)
+        frac_cls = masked_da.mean(axis=time_axis)
         # Find where pixels are permanent, changing, or never a member of the class.
-        none_mask = xr_and(sum_cls == 0, num_times_not_nan > 0)
-        chng_mask = xr_and(xr_and(0 < sum_cls, sum_cls < num_times_not_nan), num_times_not_nan > 0)
-        perm_mask = xr_and(sum_cls == num_times_not_nan, num_times_not_nan > 0)
+        none_mask = (frac_cls == 0).filled(False)
+        chng_mask = (0 < frac_cls).filled(False) & (frac_cls < 1).filled(False)
+        perm_mask = (1 == frac_cls).filled(False)
         return [none_mask, chng_mask, perm_mask]
-    
+
     # Assemble the color masks.
     masks = []
-    if len(dataarrays) == 1: # Determine extent change in one time period.
+    if len(dataarrays) == 1:  # Determine extent change in one time period.
         dataarray = dataarrays[0]
-        masks += get_none_chng_perm_masks(dataarray)
-    else: # Determine change between two time periods.
+        clean_mask = clean_masks[0]
+        masks += get_none_chng_perm_masks(dataarray, clean_mask)
+    else:  # Determine change between two time periods.
         baseline_da, analysis_da = dataarrays
-        baseline_none_mask, baseline_chng_mask, baseline_perm_mask = get_none_chng_perm_masks(baseline_da)
-        analysis_none_mask, analysis_chng_mask, analysis_perm_mask = get_none_chng_perm_masks(analysis_da)
+        baseline_clean_mask = clean_masks[0] if clean_masks is not None else None
+        analysis_clean_mask = clean_masks[1] if clean_masks is not None else None
+        baseline_none_mask, baseline_chng_mask, baseline_perm_mask = get_none_chng_perm_masks(baseline_da,
+                                                                                              baseline_clean_mask)
+        analysis_none_mask, analysis_chng_mask, analysis_perm_mask = get_none_chng_perm_masks(analysis_da,
+                                                                                              analysis_clean_mask)
         # Find where points are never a member of the class or are a member at one or more times.
         baseline_cls_ever = xr_or(baseline_chng_mask, baseline_perm_mask)
         analysis_cls_ever = xr_or(analysis_chng_mask, analysis_perm_mask)
-        # Find where points change between never being a member of the class 
+        # Find where points change between never being a member of the class
         # and being a member at one or more times between the two periods.
         no_cls_no_cls_mask = xr_and(baseline_none_mask, analysis_none_mask)
         no_cls_cls_mask = xr_and(baseline_none_mask, analysis_cls_ever)
         cls_no_cls_mask = xr_and(baseline_cls_ever, analysis_none_mask)
         cls_cls_mask = xr_and(baseline_cls_ever, analysis_cls_ever)
         masks += [no_cls_no_cls_mask, no_cls_cls_mask, cls_no_cls_mask, cls_cls_mask]
-        
+
     # Determine the overriding mask.
     y_x_shape = len(dataarrays[0][y_coord]), len(dataarrays[0][x_coord])
-    mask = np.zeros(y_x_shape, dtype=np.bool) if mask is None else mask
-    
-    # Color the image with the masks.
-    color_array = np.full((*y_x_shape, 3), 255).astype(np.int16)
+    override_mask = np.zeros(y_x_shape, dtype=np.bool) if override_mask is None else override_mask
+
+    # Create an array of integer-encoded change-class values.
+    cls_cng_arr = np.empty(y_x_shape, dtype=np.uint8)
     for i, mask in enumerate(masks):
-        color_array[mask.values] = colors[i]
-    
-    fig_kwargs['figsize'] = fig_kwargs.get('figsize', figure_ratio(dataarrays[0], x_coord, y_coord, 
-                                                                   fixed_width = width))
+        cls_cng_arr[mask] = i
+
+    # Denoise the class change image (optional).
+    if denoise:
+        cls_cng_arr = lone_object_filter(cls_cng_arr, **denoise_params)
+
+    # Color the image with the masks.
+    # Initialize pixels as white.
+    transparency_mask = np.zeros(y_x_shape, dtype=np.bool)
+    color_array = np.full((*y_x_shape, 4), 255, dtype=np.uint8)
+    for i in range(len(masks)):
+        if (neg_trans and i == 0) or (pos_trans and i == len(masks) - 1):
+            transparency_mask[cls_cng_arr == i] = True
+        color_array[cls_cng_arr == i] = colors[i]
+    if neg_trans or pos_trans:
+        color_array[transparency_mask] = [0, 0, 0, 0]
+    color_array[override_mask] = override_color
+
+    fig_kwargs['figsize'] = fig_kwargs.get('figsize', figure_ratio(dataarrays[0], x_coord, y_coord,
+                                                                   fixed_width=width))
     fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_kwargs)
-    
+
     # Set the tick and axes labels.
     xarray_set_axes_labels(dataarrays[0], ax, x_coord, y_coord, x_label_kwargs, y_label_kwargs)
-    
+
     # Title the plot.
-    if title is None:
-        title = "Class Extents Change" if len(dataarrays)==1 else \
-                "Class Extents Change (Baseline/Analysis)"
-    ax.set_title(title, **title_kwargs)
-    
+    title_kwargs.setdefault('label', "Class Extents" if len(dataarrays) == 1 else \
+        "Class Extents Change (Baseline/Analysis)")
+    ax.set_title(**title_kwargs)
+
     # Create the legend.
-    colors = [np.array(color)/255 for color in colors] # Colors must be in range [0,1] for color patches.
-    if len(dataarrays)==1:
+    # Colors must be in range [0,1] for color patches.
+    colors = [np.array(color) / 255 for color in colors]
+    if len(dataarrays) == 1:
         class_legend_label = "a Member of the Class" if class_legend_label is None else class_legend_label
-        labels = list(map(lambda str: str.format(class_legend_label), 
+        labels = list(map(lambda str: str.format(class_legend_label),
                           ['Never {}', 'Sometimes {}', 'Always {}']))
     else:
         class_legend_label = "Class Membership" if class_legend_label is None else class_legend_label
-        labels = list(map(lambda str: str.format(class_legend_label, class_legend_label), 
+        labels = list(map(lambda str: str.format(class_legend_label, class_legend_label),
                           ['No {} to No {}', 'No {} to {}', '{} to No {}', '{} to {}']))
-    color_patches = list(map(lambda color, label: mpatches.Patch(color=color, label=label), colors, labels)) 
+    color_patches = list(map(lambda color, label: mpatches.Patch(color=color, label=label), colors, labels))
     legend_kwargs.setdefault('loc', 'best')
     legend_kwargs['handles'] = color_patches
     ax.legend(**legend_kwargs)
-    
+
     ax.imshow(color_array, **imshow_kwargs)
-    
-    # Calculate the percentage of pixels that are permanent members, changing members, 
-    # never members, or don't have enough data to definitely be in any of those categories.
-    pcts = [float((mask.sum() / (y_x_shape[0]*y_x_shape[1])).values) for mask in masks]
-    pct_insufficient_data = xr_not(masks[0])
-    for i in range(1, len(masks)):
-        pct_insufficient_data = xr_and(pct_insufficient_data, xr_not(masks[i]))
-    pcts.append((pct_insufficient_data.sum() / (y_x_shape[0]*y_x_shape[1])).values)
-    
-    return [fig,ax], pcts
+
+    if create_stats_table or create_change_matrix:
+        stats_data = []
+    if create_stats_table:
+        num_table_rows = 4 if len(dataarrays) == 1 else 6
+        index = labels + ['Unknown'] if len(dataarrays) == 1 else \
+            labels + ['Net Change'] + ['Unknown']
+
+        stats_table = pd.DataFrame(data=np.zeros((num_table_rows, 2)),
+                                   index=index, columns=['Number', 'Percent'])
+        # Number
+        num_insufficient_data = xr_not(masks[0])
+        for i in range(1, len(masks)):
+            num_insufficient_data = xr_and(num_insufficient_data, xr_not(masks[i]))
+        num_insufficient_data = num_insufficient_data.sum()
+        mask_sums = np.array([mask.sum() for mask in masks])
+        if len(dataarrays) == 1:
+            stats_table.iloc[:, 0] = np.concatenate((mask_sums, np.array([num_insufficient_data])))
+        else:
+            stats_table.iloc[:, 0] = np.concatenate(
+                (mask_sums, np.array([mask_sums[[1, 2]].sum()]), np.array([num_insufficient_data])))
+        # Percent
+        stats_table.iloc[:, 1] = stats_table.iloc[:, 0] / (y_x_shape[0] * y_x_shape[1])
+        stats_data.append(stats_table)
+    if len(dataarrays) == 2 and create_change_matrix:
+        dims = ['baseline', 'analysis']
+        classes = ['always', 'sometimes', 'never']
+        coords = {'baseline': classes, 'analysis': classes}
+        # Number
+        num_px_trans_da = xr.DataArray(np.zeros((3, 3), dtype=np.uint64),
+                                       dims=dims, coords=coords)
+        baseline_dict = OrderedDict([('always', baseline_perm_mask),
+                                     ('sometimes', baseline_chng_mask),
+                                     ('never', baseline_none_mask)])
+        analysis_dict = OrderedDict([('always', analysis_perm_mask),
+                                     ('sometimes', analysis_chng_mask),
+                                     ('never', analysis_none_mask)])
+        for baseline_cls, baseline_cls_mask in baseline_dict.items():
+            num_px_trans_da.sel(dict(baseline=baseline_cls)).values[:] = \
+                np.array([((baseline_cls_mask == 1) & (analysis_cls_mask == 1)).sum()
+                          for analysis_cls_mask in analysis_dict.values()])
+        # Percent
+        percent_px_trans_da = xr.DataArray(np.zeros((3, 3), dtype=np.float64),
+                                           dims=dims, coords=coords)
+        percent_px_trans_da = num_px_trans_da / (y_x_shape[0] * y_x_shape[1])
+        stats_data.append(xr.Dataset(data_vars=dict(number=num_px_trans_da,
+                                                    percent=percent_px_trans_da)))
+    stats_data = tuple(stats_data)
+    if create_stats_table or create_change_matrix:
+        return (fig, ax), stats_data
+    else:
+        return (fig, ax)
     
 ## Threshold plotting ##
 
-def intersection_threshold_plot(first, second, th, mask = None, color_none='black', 
-                                color_first='green', color_second='red', 
-                                color_both='white', color_mask='gray', 
+def intersection_threshold_plot(first, second, th, mask = None,
+                                x_coord='longitude', y_coord='latitude',
+                                color_none='black', color_first='green',
+                                color_second='red', color_both='white',
+                                color_mask='gray',
                                 width = 10, fig=None, ax=None, *args, **kwargs):
     """
     Given two dataarrays, create a threshold plot showing where zero, one, or both are within a threshold.
@@ -1263,6 +1388,9 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         A matplotlib colormap used to color the cells based on `cell_value_mtx`.
     cell_val_fmt: str
         Formatting string for values in the matrix cells.
+        If `cell_label_mtx` is specified as strings, use 's'.
+        See the documentation of `seaborn.heatmap()` regarding its
+        `fmt` parameter for more information.
     annot_kwargs: dict
         Keyword arguments for ``ax.text`` for formatting cell annotation text.
     tick_fontsize: int
@@ -1271,6 +1399,8 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         Keyword arguments for x and y axis tick labels, respectively.
         Specifically, keyword arguments for calls to `ax.[x_axis,y_axis].set_ticklabels()`
         where `ax` is the `matplotlib.axes.Axes` object returned by `seaborn.heatmap()`.
+        If `x_axis_tick_kwargs is None`, the x ticks will be rotated 45 degrees from horizontal.
+        If `y_axis_tick_kwargs is None`, the y ticks will oriented horizontally.
     x_axis_ticks_position, y_axis_ticks_position: str
         The position of x and y axis ticks, respectively.
         For x_axis_ticks_position, possible values are ['top', 'bottom', 'both', 'default', 'none'].
@@ -1301,7 +1431,7 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
     df = pd.DataFrame(cell_value_mtx, index=row_labels, columns=col_labels)
     cell_labels = cell_label_mtx if show_cell_labels else None
     fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_kwargs)
-    heatmap = sns.heatmap(df, cmap=cmap, annot=cell_labels, fmt=cell_val_fmt, 
+    heatmap = sns.heatmap(df, cmap=cmap, annot=cell_labels, fmt=cell_val_fmt,
                           annot_kws=annot_kwargs, ax=ax, **heatmap_kwargs)
     if not show_row_labels:
         heatmap.set_yticks([]) # Ticks must be hidden explicitly.
