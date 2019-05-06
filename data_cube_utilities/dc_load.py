@@ -5,7 +5,6 @@ from xarray.ufuncs import logical_and as xr_and
 from .sort import xarray_sortby_coord
 from .aggregate import xr_scale_res
 
-
 def match_prods_res(dc, products, method='min'):
     """
     Determines a resolution that matches a set of Data Cube products -
@@ -140,6 +139,9 @@ def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
         merged.append(xarray_sortby_coord(dataset_temp, coord=sort_dim))
     return merged
 
+## End Combining Data ##
+
+## Load ##
 
 def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
                    x_coord='longitude', y_coord='latitude'):
@@ -440,6 +442,10 @@ def load_multiplatform(dc, platforms, products, frac_res=None, abs_res=None,
                 continue
     return merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform)
 
+## End Load ##
+
+## Extents ##
+
 def get_product_extents(api, platform, product):
     """
     Returns the minimum and maximum latitude, longitude, and date range of a product.
@@ -499,3 +505,40 @@ def get_overlapping_area(api, platforms, products):
     full_lon = (min_lon, max_lon)
     full_lat = (min_lat, max_lat)
     return full_lat, full_lon, min_max_dates
+
+## End Extents ##
+
+## Undesired Acquisition Removal ##
+
+def find_desired_acq_inds(dataset, clean_mask, time_dim='time', pct_clean=None):
+    """
+    Returns indices of acquisitions that meet a specified set of criteria in
+    an `xarray.Dataset` or `xarray.DataArray`.
+
+    Parameters
+    ----------
+    dataset: xarray.Dataset or xarray.DataArray
+        The `xarray` object to remove undesired acquisitions from.
+    clean_mask: xarray.DataArray
+        A boolean `xarray.DataArray` denoting the clean values in `dataset`.
+    time_dim: str
+        The string name of the time dimension.
+    pct_clean: float
+        The percent of clean pixels required to keep an acquisition.
+
+    Returns
+    -------
+    acq_inds_to_keep: list of int
+        A list of indices of acquisitions that meet the specified criteria.
+    """
+    acq_inds_to_keep = []
+    for time_ind in range(len(dataset[time_dim])):
+        remove_acq = False
+        if pct_clean is not None:
+            acq_pct_clean = clean_mask.isel(time=time_ind).mean()
+            remove_acq = acq_pct_clean < pct_clean
+        if not remove_acq:
+            acq_inds_to_keep.append(time_ind)
+    return acq_inds_to_keep
+
+## End Undesired Acquisition Removal ##

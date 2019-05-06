@@ -63,6 +63,39 @@ def create_2D_mosaic_clean_mask(clean_mask):
         mosaic_clean_mask = np.logical_or(mosaic_clean_mask, clean_mask[i])    
     return mosaic_clean_mask
 
+def create_circular_mask(h, w, center=None, radius=None):
+    """
+    Creates a NumPy array mask with a circle.
+    Credit goes to https://stackoverflow.com/a/44874588/5449970.
+
+    Parameters
+    ----------
+    h, w: int
+        The height and width of the data to mask, respectively.
+    center: 2-tuple of int
+        The center of the circle, specified as a 2-tuple of the x and y indices.
+        By default, the center will be the center of the image.
+    radius: numeric
+        The radius of the circle.
+        Be default, the radius will be the smallest distance between
+        the center and the image walls.
+
+    Returns
+    -------
+    mask: np.ndarray
+        A boolean 2D NumPy array.
+    """
+    if center is None: # use the middle of the image
+        center = [int(w/2), int(h/2)]
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask = dist_from_center <= radius
+    return mask
+
 ## End Misc ##
 
 ## Landsat ##
@@ -76,12 +109,12 @@ def landsat_clean_mask_invalid(dataset):
     Parameters
     ----------
     dataset: xarray.Dataset
-        An xarray `Dataset` containing bands such as 'red', 'green', or 'blue'.
+        An `xarray.Dataset` containing bands such as 'red', 'green', or 'blue'.
 
     Returns
     -------
     invalid_mask: xarray.DataArray
-        An xarray DataArray with the same number and order of coordinates as in `dataset`.
+        An `xarray.DataArray` with the same number and order of coordinates as in `dataset`.
     """
     invalid_mask = None
     data_arr_names = [arr_name for arr_name in list(dataset.data_vars)
