@@ -3,6 +3,8 @@ import xarray as xr
 import scipy.optimize as opt  #nnls
 
 import datacube
+
+from utils.data_cube_utilities.dc_utilities import create_default_clean_mask
 from . import dc_utilities as utilities
 
 # Command line tool imports
@@ -17,7 +19,8 @@ from datetime import datetime
 
 csv_file_path = os.path.join(os.path.dirname(__file__), 'endmembers_landsat.csv')
 
-def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
+
+def frac_coverage_classify(dataset_in, clean_mask=None):
     """
     Description:
       Performs fractional coverage algorithm on given dataset. If no clean mask is given, the 'cf_mask'
@@ -41,14 +44,16 @@ def frac_coverage_classify(dataset_in, clean_mask, no_data=-9999):
         variable
     Optional Inputs:
       clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
-        if user does not provide a clean mask, one will be created using cfmask
-      no_data (int/float) - no data pixel value; default: -9999
+        If none is provided, one will be created which considers all values to be clean.
     Output:
       dataset_out (xarray.Dataset) - fractional coverage results with no data = -9999; containing
           coordinates: latitude, longitude
           variables: bs, pv, npv
         where bs -> bare soil, pv -> photosynthetic vegetation, npv -> non-photosynthetic vegetation
     """
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
 
     band_stack = []
 
