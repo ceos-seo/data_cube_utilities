@@ -8,7 +8,8 @@ def EVI(ds, G=2.5, C1=6, C2=7.5, L=1, normalize=True):
     Computes the 3-band Enhanced Vegetation Index for an `xarray.Dataset`.
     The formula is G * (NIR - RED) / (NIR + C1*RED - C2*BLUE + L).
     Usually, G = 2.5, C1 = 6, C2 = 7.5, and L = 1.
-    Returned values should be in the range [-1,1] for Landsat MODIS data.
+    For Landsat MODIS data, returned values should be in the range [-1,1] if `normalize == True`.
+    If `normalize == False`, returned values should be in the range [-1,2.5].
 
     EVI is superior to NDVI in accuracy because it is less dependent on the solar
     incidence angle, atmospheric conditions (e.g. particles and clouds), shadows, and
@@ -48,7 +49,8 @@ def EVI2(ds, G=2.5, C=2.4, L=1, normalize=True):
     Computes the 2-band Enhanced Vegetation Index for an `xarray.Dataset`.
     The formula is G*((NIR-RED)/(NIR+C*Red+L)).
     Usually, G = 2.5, C = 2.4, and L = 1.
-    Returned values should be in the range [-1,1] for Landsat MODIS data.
+    For Landsat MODIS data, returned values should be in the range [-1,1] if `normalize == True`.
+    If `normalize == False`, returned values should be in the range [-1,2.5].
 
     EVI2 does not require a blue band like EVI, which means less data is required to use it.
     Additionally, the blue band used in EVI can have a low signal-to-noise ratio
