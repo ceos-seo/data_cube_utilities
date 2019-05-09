@@ -20,14 +20,14 @@ from datetime import datetime
 csv_file_path = os.path.join(os.path.dirname(__file__), 'endmembers_landsat.csv')
 
 
-def frac_coverage_classify(dataset_in, clean_mask=None):
+def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     """
     Description:
       Performs fractional coverage algorithm on given dataset. If no clean mask is given, the 'cf_mask'
       variable must be included in the input dataset, as it will be used to create a
       clean mask
     Assumption:
-      - The implemented algorithm is defined for Landsat 5/Landsat 7; in order for it to
+      - The implemented algqorithm is defined for Landsat 5/Landsat 7; in order for it to
         be used for Landsat 8, the bands will need to be adjusted
     References:
       - Guerschman, Juan P., et al. "Assessing the effects of site heterogeneity and soil

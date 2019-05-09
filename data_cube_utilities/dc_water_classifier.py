@@ -320,7 +320,7 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
             coords={time_coord: time_coords, y_coord: y_coords, x_coord: x_coords})
 
     # Handle datatype conversions.
-    restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_in, no_data)
+    restore_or_convert_dtypes(None, band_list, dataset_in_dtypes, dataset_in, no_data)
     return dataset_out
 
 
