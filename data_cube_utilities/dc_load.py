@@ -1,9 +1,11 @@
+import itertools
 import numpy as np
 import xarray as xr
 from .clean_mask import landsat_qa_clean_mask, landsat_clean_mask_invalid
 from xarray.ufuncs import logical_and as xr_and
 from .sort import xarray_sortby_coord
 from .aggregate import xr_scale_res
+from .dc_mosaic import restore_or_convert_dtypes
 
 def match_prods_res(dc, products, method='min'):
     """
@@ -73,8 +75,9 @@ def match_dim_sizes(dc, products, x, y, x_y_coords=['longitude', 'latitude'], me
         Either a list-like of the x and y coordinate names or a dictionary mapping product names
         to such list-likes.
     method: str
-        The method of finding a matching resolution. See the documentation for `match_prods_res()`
-        in this utility file for more information.
+        The method of finding a matching resolution. The options are
+        ['min', 'max'], which separately determine the y and x resolutions
+        as the minimum or maximum among all selected products.
 
     Returns
     -------
@@ -520,11 +523,12 @@ def find_desired_acq_inds(dataset, clean_mask, time_dim='time', pct_clean=None):
     dataset: xarray.Dataset or xarray.DataArray
         The `xarray` object to remove undesired acquisitions from.
     clean_mask: xarray.DataArray
-        A boolean `xarray.DataArray` denoting the clean values in `dataset`.
+        A boolean `xarray.DataArray` denoting the "clean" values in `dataset`.
+        More generally, in this mask, `True` values are considered desirable.
     time_dim: str
         The string name of the time dimension.
     pct_clean: float
-        The percent of clean pixels required to keep an acquisition.
+        The percent of "clean" (or "desired") pixels required to keep an acquisition.
 
     Returns
     -------
@@ -540,5 +544,60 @@ def find_desired_acq_inds(dataset, clean_mask, time_dim='time', pct_clean=None):
         if not remove_acq:
             acq_inds_to_keep.append(time_ind)
     return acq_inds_to_keep
+
+
+def group_dates_by_day(dates):
+    """
+    Given a list of dates, return the list of lists of dates grouped by day.
+
+    Parameters
+    ----------
+    dates: List[np.datetime64]
+
+    Returns
+    -------
+    grouped_dates: List[List[np.datetime64]]
+    """
+    generate_key = lambda b: ((b - np.datetime64('1970-01-01T00:00:00Z')) / (np.timedelta64(1, 'h') * 24)).astype(int)
+    return [list(group) for key, group in itertools.groupby(dates, key=generate_key)]
+
+
+def reduce_on_day(ds, reduction_func=np.nanmean):
+    """
+    Combine data in an `xarray.Dataset` for dates with the same day
+
+    Parameters
+    ----------
+    ds: xr.Dataset
+    reduction_func: np.ufunc
+
+    Returns
+    -------
+    reduced_ds: xr.Dataset
+    """
+    # Save dtypes to convert back to them.
+    dataset_in_dtypes = {}
+    for band in ds.data_vars:
+        dataset_in_dtypes[band] = ds[band].dtype
+
+    # Group dates by day into date_groups
+    day_groups = group_dates_by_day(ds.time.values)
+
+    # slice large dataset into many smaller datasets by date_group
+    group_chunks = (ds.sel(time=t) for t in day_groups)
+
+    # reduce each dataset using something like "average" or "median" such that many values for a day become one value
+    group_slices = (_ds.reduce(reduction_func, dim="time") for _ds in group_chunks if "time" in dict(ds.dims).keys())
+
+    # recombine slices into larger dataset
+    new_dataset = xr.concat(group_slices, dim="time")
+
+    # rename times values using the first time in each date_group
+    new_times = [day_group[0] for day_group in day_groups]  # list(map(get_first, day_groups))
+    new_dataset = new_dataset.reindex(dict(time=np.array(new_times)))
+
+    restore_or_convert_dtypes(None, None, dataset_in_dtypes, new_dataset)
+
+    return new_dataset
 
 ## End Undesired Acquisition Removal ##
