@@ -105,13 +105,13 @@ def match_dim_sizes(dc, products, x, y, x_y_coords=['longitude', 'latitude'], me
 
     if method == 'min':
         abs_res = [np.inf, np.inf]
-        for i in range(1, len(datasets_empty)):
+        for i in range(len(datasets_empty)):
             res = [datasets_empty[i][coords[i][0]].size, datasets_empty[i][coords[i][1]].size]
             abs_res[0] = res[0] if res[0] < abs_res[0] else abs_res[0]
             abs_res[1] = res[1] if res[1] < abs_res[1] else abs_res[1]
     else:
         abs_res = [0] * 2
-        for i in range(1, len(datasets_empty)):
+        for i in range(len(datasets_empty)):
             res = [datasets_empty[i][coords[i][0]].size, datasets_empty[i][coords[i][1]].size]
             abs_res[0] = res[0] if abs_res[0] < res[0] else abs_res[0]
             abs_res[1] = res[1] if abs_res[1] < res[1] else abs_res[1]
