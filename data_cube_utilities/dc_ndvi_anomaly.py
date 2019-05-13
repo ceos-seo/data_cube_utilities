@@ -2,28 +2,28 @@ from .dc_water_classifier import wofs_classify
 import xarray as xr
 import numpy as np
 # This import is only for
-from .vegetation import EVI, EVI2, NDVI
+from .vegetation import EVI as _EVI_orig, EVI2 as _EVI2_orig, NDVI as _NDVI_orig
 
 
 def EVI(*args, **kwargs):
     """
     Instead of this function, please use the EVI() function in vegetation.py.
     """
-    return EVI(*args, **kwargs)
+    return _EVI_orig(*args, **kwargs)
 
 
 def EVI2(*args, **kwargs):
     """
     Instead of this function, please use the EVI2() function in vegetation.py.
     """
-    return EVI2(*args, **kwargs)
+    return _EVI2_orig(*args, **kwargs)
 
 
 def NDVI(*args, **kwargs):
     """
     Instead of this function, please use the NDVI() function in vegetation.py.
     """
-    return NDVI(*args, **kwargs)
+    return _NDVI_orig(*args, **kwargs)
 
 
 def compute_ndvi_anomaly(baseline_data,
