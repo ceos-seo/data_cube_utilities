@@ -1000,8 +1000,9 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
         A list-like of one or two DataArrays of boolean values denoting
         where the `xarray.DataArray` objects in `dataarrays` are considered
         clean. Any non-clean values in `dataarrays` will be ignored.
-        If specifed, every entry in `datarrays` must have a corresponding entry in `clean_masks`
-        and their dimension order must be the same (i.e. their NumPy arrays have the same shape).
+        If specifed, every entry in `datarrays` must have a corresponding entry in `clean_masks`.
+        If this argument is not supplied (i.e. is `None`), all values will be
+        considered to be clean.
     x_coord, y_coord: str
         Names of the x and y coordinates in the elements of `dataarrays` to use
         as tick and axis labels.
@@ -1096,6 +1097,11 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    if clean_masks is None:
+        clean_masks = [xr.DataArray(np.ones(dataarray.shape, dtype=np.bool),
+                                    coords=dataarray.coords, dims=dataarray.dims)
+                       for dataarray in dataarrays]
+
     denoise_params = {} if denoise_params is None and denoise else \
         denoise_params
 
