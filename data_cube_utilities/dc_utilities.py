@@ -299,6 +299,8 @@ def write_geotiff_from_xr(tif_path, data, bands=None, no_data=-9999, crs="EPSG:4
 def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False,
                       no_data=-9999, crs="EPSG:4326"):
     """Write a rgb png from an xarray dataset.
+    Note that using `low_res==True` currently causes the file(s)
+    for `png_path` and `png_filled_path` to not be created.
 
     Args:
         png_path: path for the png to be written to.
