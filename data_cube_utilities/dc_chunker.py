@@ -22,13 +22,13 @@ def create_geographic_chunks(longitude=None, latitude=None, geographic_chunk_siz
     """
 
     assert latitude and longitude, "Longitude and latitude are both required kwargs."
-    assert len(latitude) == 2 and latitude[1] > latitude[
-        0], "Latitude must be a tuple of length 2 with the second element greater than the first."
-    assert len(longitude) == 2 and longitude[1] > longitude[
-        0], "Longitude must be a tuple of length 2 with the second element greater than the first."
+    assert len(latitude) == 2 and latitude[1] >= latitude[0], \
+        "Latitude must be a tuple of length 2 with the second element greater than or equal to the first."
+    assert len(longitude) == 2 and longitude[1] >= longitude[0], \
+        "Longitude must be a tuple of length 2 with the second element greater than or equal to the first."
 
     square_area = (latitude[1] - latitude[0]) * (longitude[1] - longitude[0])
-    geographic_chunks = math.ceil(square_area / geographic_chunk_size)
+    geographic_chunks = max(1, math.ceil(square_area / geographic_chunk_size))
 
     #we're splitting accross latitudes and not longitudes
     #this can be a fp value, no issue there.
