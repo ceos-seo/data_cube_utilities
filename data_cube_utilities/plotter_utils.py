@@ -6,40 +6,28 @@ default_fourier_n_harm = 10
 from collections import OrderedDict
 import re
 
-from datetime import datetime
 import numpy as np
 import pandas as pd
-import datacube as dc
 import xarray as xr
 from xarray.ufuncs import logical_and as xr_and
 from xarray.ufuncs import logical_or as xr_or
 from xarray.ufuncs import logical_not as xr_not
-from rasterstats import zonal_stats
-import pylab
 import matplotlib as mpl
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-import matplotlib.mlab as mlab
-import matplotlib.ticker as ticker
 from matplotlib.ticker import FuncFormatter
 from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
-from scipy import stats, exp
-from scipy.stats import norm
 from scipy.signal import gaussian
 from scipy.ndimage import filters
-from scipy.optimize import curve_fit
-from scipy.interpolate import spline, CubicSpline
-from sklearn import linear_model
-import calendar, datetime, time
-import pytz
+from scipy.interpolate import CubicSpline
+import time
 from scipy import stats
 import warnings
 
 from .dc_mosaic import ls7_unpack_qa
 from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit, fourier_fit
 from .scale import xr_scale, np_scale
-from .dc_utilities import ignore_warnings, perform_timeseries_analysis
 from .raster_filter import lone_object_filter
 from .dc_time import _n64_to_datetime, _n64_datetime_to_scalar, _scalar_to_n64_datetime
 
