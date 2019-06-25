@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import fft
 from scipy.optimize import curve_fit
-from scipy.interpolate import spline, CubicSpline
+from scipy.interpolate import CubicSpline
 from scipy.ndimage.filters import gaussian_filter1d
 
 from .scale import np_scale

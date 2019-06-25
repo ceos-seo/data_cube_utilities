@@ -968,56 +968,6 @@ def plot_band(dataset, figsize=(20, 15), fontsize=24, legend_fontsize=24):
     ax.set_ylabel('Value', fontsize=fontsize)
     plt.show()
 
-
-def plot_pixel_qa_value(dataset, platform, values_to_plot, bands="pixel_qa", plot_max=False, plot_min=False):
-    times = dataset.time.values
-    mpl.style.use('seaborn')
-    plt.figure(figsize=(20, 15))
-    quarters = []
-    three_quarters = []
-    percentiles = []
-
-    for i, v in enumerate(values_to_plot):
-        _xarray = ls7_unpack_qa(dataset.pixel_qa, values_to_plot[i])
-        y = _xarray.mean(dim=['latitude', 'longitude'])
-        times = dataset.time.values.astype(float)
-        std_dev = np.std(y)
-        std_dev = std_dev.values
-        b = gaussian(len(times), std_dev)
-        ga = filters.convolve1d(y, b / b.sum(), mode="reflect")
-        ga = interpolate_gaps(ga, limit=3)
-        plt.plot(times, ga, '-', label="Gaussian ", alpha=1, color='black')
-
-        x_smooth = np.linspace(times.min(), times.max(), 200)
-        y_smooth = spline(times, ga, x_smooth)
-        plt.plot(x_smooth, y_smooth, '-', label="Gaussian Smoothed", alpha=1, color='cyan')
-
-        for i, q in enumerate(_xarray):
-            quarters.append(np.nanpercentile(_xarray, 25))
-            three_quarters.append(np.nanpercentile(_xarray, 75))
-
-        ax = plt.gca()
-        ax.grid(color='lightgray', linestyle='-', linewidth=1)
-        fillcolor = 'gray'
-        fillalpha = 0.4
-        linecolor = 'gray'
-        linealpha = 0.6
-        plt.fill_between(times, y, quarters, interpolate=False, color=fillcolor, alpha=fillalpha)
-        plt.fill_between(times, y, three_quarters, interpolate=False, color=fillcolor, alpha=fillalpha)
-        plt.plot(times, quarters, color=linecolor, alpha=linealpha)
-        plt.plot(times, three_quarters, color=linecolor, alpha=linealpha)
-
-        medians = _xarray.median(dim=['latitude', 'longitude'])
-        plt.scatter(times, medians, color='mediumpurple', label="medians", marker="D")
-
-        m, b = np.polyfit(times, y, 1)
-        plt.plot(times, m * times + b, '-', color="red", label="linear regression")
-        plt.style.use('seaborn')
-
-        plt.plot(times, y, marker="o")
-        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.xticks(rotation=90)
-
     ## Color utils ##
 
 
