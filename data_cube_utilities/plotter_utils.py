@@ -18,14 +18,11 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
-from scipy.signal import gaussian
-from scipy.ndimage import filters
 from scipy.interpolate import CubicSpline
 import time
 from scipy import stats
 import warnings
 
-from .dc_mosaic import ls7_unpack_qa
 from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit, fourier_fit
 from .scale import xr_scale, np_scale
 from .raster_filter import lone_object_filter
