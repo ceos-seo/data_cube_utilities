@@ -25,7 +25,7 @@ import xarray as xr
 
 import datacube
 
-from utils.data_cube_utilities.dc_mosaic import restore_or_convert_dtypes
+from .dc_mosaic import restore_or_convert_dtypes
 from . import dc_utilities as utilities
 from .dc_utilities import create_default_clean_mask
 # Command line tool imports

@@ -82,6 +82,24 @@ def EVI2(ds, G=2.5, C=2.4, L=1, normalize=True):
         evi.values[pos_vals_mask] = np.interp(evi.values[pos_vals_mask], (0, 2.5), (0, 1))
     return evi
 
+def NBR(ds):
+    """
+    Computes the Normalized Burn Ratio for an `xarray.Dataset`.
+    The formula is (NIR - SWIR2) / (NIR + SWIR2).
+    Values should be in the range [-1,1] for valid LANDSAT data (nir and swir2 are positive).
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        An `xarray.Dataset` that must contain 'nir' and 'swir2' `DataArrays`.
+
+    Returns
+    -------
+    rbr: xarray.DataArray
+        An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
+        the same order.
+    """
+    return (ds.nir - ds.swir2) / (ds.nir + ds.swir2)
 
 def NDVI(ds):
     """

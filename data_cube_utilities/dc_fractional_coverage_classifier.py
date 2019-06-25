@@ -4,7 +4,7 @@ import scipy.optimize as opt  #nnls
 
 import datacube
 
-from utils.data_cube_utilities.dc_utilities import create_default_clean_mask
+from .dc_utilities import create_default_clean_mask
 from . import dc_utilities as utilities
 
 # Command line tool imports
@@ -53,7 +53,7 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     """
     # Default to masking nothing.
     if clean_mask is None:
-        clean_mask = create_default_clean_mask(dataset_in)
+        clean_mask = create_default_clean_mask(dataset_in).values
 
     band_stack = []
 

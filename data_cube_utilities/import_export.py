@@ -2,7 +2,7 @@ import time
 import numpy as np
 import xarray as xr
 
-from utils.data_cube_utilities.dc_utilities import _get_transform_from_xr
+from .dc_utilities import _get_transform_from_xr
 from . import dc_utilities
 import datacube
 import rasterio

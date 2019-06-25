@@ -95,11 +95,13 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
     for key in list(dataset_in.data_vars):
         dataset_in[key].values[np.invert(clean_mask)] = no_data
 
-    # Save dtypes because masking with Dataset.where() converts to float64.
-    band_list = list(dataset_in.data_vars)
-    dataset_in_dtypes = {}
-    for band in band_list:
-        dataset_in_dtypes[band] = dataset_in[band].dtype
+    dataset_in_dtypes = None
+    if dtype is None:
+        # Save dtypes because masking with Dataset.where() converts to float64.
+        band_list = list(dataset_in.data_vars)
+        dataset_in_dtypes = {}
+        for band in band_list:
+            dataset_in_dtypes[band] = dataset_in[band].dtype
 
     if intermediate_product is not None:
         dataset_out = intermediate_product.copy(deep=True)
@@ -153,11 +155,13 @@ def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, *
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    # Save dtypes because masking with Dataset.where() converts to float64.
-    band_list = list(dataset_in.data_vars)
-    dataset_in_dtypes = {}
-    for band in band_list:
-        dataset_in_dtypes[band] = dataset_in[band].dtype
+    dataset_in_dtypes = None
+    if dtype is None:
+        # Save dtypes because masking with Dataset.where() converts to float64.
+        band_list = list(dataset_in.data_vars)
+        dataset_in_dtypes = {}
+        for band in band_list:
+            dataset_in_dtypes[band] = dataset_in[band].dtype
 
     # Mask out clouds and scan lines.
     dataset_in = dataset_in.where((dataset_in != no_data) & (clean_mask))
@@ -198,11 +202,13 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None,
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    # Save dtypes because masking with Dataset.where() converts to float64.
-    band_list = list(dataset_in.data_vars)
-    dataset_in_dtypes = {}
-    for band in band_list:
-        dataset_in_dtypes[band] = dataset_in[band].dtype
+    dataset_in_dtypes = None
+    if dtype is None:
+        # Save dtypes because masking with Dataset.where() converts to float64.
+        band_list = list(dataset_in.data_vars)
+        dataset_in_dtypes = {}
+        for band in band_list:
+            dataset_in_dtypes[band] = dataset_in[band].dtype
 
     # Mask out clouds and Landsat 7 scan lines.
     dataset_in = dataset_in.where((dataset_in != no_data) & (clean_mask))
@@ -245,11 +251,13 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    # Save dtypes because masking with Dataset.where() converts to float64.
-    band_list = list(dataset_in.data_vars)
-    dataset_in_dtypes = {}
-    for band in band_list:
-        dataset_in_dtypes[band] = dataset_in[band].dtype
+    dataset_in_dtypes = None
+    if dtype is None:
+        # Save dtypes because masking with Dataset.where() converts to float64.
+        band_list = list(dataset_in.data_vars)
+        dataset_in_dtypes = {}
+        for band in band_list:
+            dataset_in_dtypes[band] = dataset_in[band].dtype
 
     # Mask out clouds and scan lines.
     dataset_in = dataset_in.where((dataset_in != -9999) & clean_mask)
@@ -309,11 +317,13 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    # Save dtypes because masking with Dataset.where() converts to float64.
-    band_list = list(dataset_in.data_vars)
-    dataset_in_dtypes = {}
-    for band in band_list:
-        dataset_in_dtypes[band] = dataset_in[band].dtype
+    dataset_in_dtypes = None
+    if dtype is None:
+        # Save dtypes because masking with Dataset.where() converts to float64.
+        band_list = list(dataset_in.data_vars)
+        dataset_in_dtypes = {}
+        for band in band_list:
+            dataset_in_dtypes[band] = dataset_in[band].dtype
 
     # Mask out clouds and scan lines.
     dataset_in = dataset_in.where((dataset_in != -9999) & clean_mask)
@@ -338,7 +348,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
                                         dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values <
                                                                                              dataset_out.ndvi.values]
     # Handle datatype conversions.
-    dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
+    dataset_out = restore_or_convert_dtypes(dtype, None, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
 def unpack_bits(land_cover_endcoding, data_array, cover_type):
@@ -507,11 +517,14 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
         clean_mask = create_default_clean_mask(dataset_in)
     assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
-    # Save dtypes because masking with Dataset.where() converts to float64.
     band_list = list(dataset_in.data_vars)
-    dataset_in_dtypes = {}
-    for band in band_list:
-        dataset_in_dtypes[band] = dataset_in[band].dtype
+    dataset_in_dtypes = None
+    if dtype is None:
+        # Save dtypes because masking with Dataset.where() converts to float64.
+        dataset_in_dtypes = {}
+        for band in band_list:
+            dataset_in_dtypes[band] = dataset_in[band].dtype
+
     # Mask out clouds and scan lines.
     dataset_in = dataset_in.where((dataset_in != no_data) & clean_mask)
 
@@ -545,7 +558,7 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
-def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dtypes=None, dataset_out=None, no_data=None):
+def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dtypes=None, dataset_out=None, no_data=-9999):
     """
     Converts datatypes of data variables in a copy of an xarray Dataset.
 
@@ -554,7 +567,8 @@ def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dty
     dtype_for_all: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
         np.int16, np.float32) to convert the data to.
-    band_list: list-like, unused, deprecated
+    band_list: list-like
+        !! UNUSED, DEPRECATED !!
     dataset_in_dtypes: dict
         A dictionary mapping band names to datatypes.
         One of `dtype_for_all` or `dataset_in_dtypes` must be `None`.

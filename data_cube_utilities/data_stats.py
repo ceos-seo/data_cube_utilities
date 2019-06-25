@@ -1,5 +1,5 @@
 import xarray as xr
-from utils.data_cube_utilities.dc_time import _n64_datetime_to_scalar
+from .dc_time import _n64_datetime_to_scalar
 
 ## Data Availability ##
 

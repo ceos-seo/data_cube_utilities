@@ -111,9 +111,9 @@ def xr_interp(dataset, interp_config):
         The Dataset or DataArray to interpolate.
     interp_config: dict
         Mapping of names of coordinates to 2-tuples of the interpolation types
-        to use and the parameters for those interpolation types.
-        The supported interpolation types are 'interp' for linear interpolation
-        and 'bin' for binning.
+        to use for those coordinates and the parameters for those interpolation types.
+        The supported coordinate interpolation types are 'interp' for
+        linear interpolation and 'bin' for binning.
         The parameters, with supported interpolation types annotated to their
         left, are as follow:
         ('interp', 'bin'): 'frac':
@@ -160,8 +160,8 @@ def xr_interp(dataset, interp_config):
             interp_vals = np.array(list(map(_scalar_to_n64_datetime, interp_vals)))
         new_coords[dim] = interp_vals
     # Nearest-neighbor interpolate data values.
-    # xarray.Dataset.interp() converts to dtype float64, so cast back to the original dtype.
     interp_data = dataset.interp(coords=new_coords, method='nearest')
+    # xarray.Dataset.interp() converts to dtype float64, so cast back to the original dtypes.
     if isinstance(dataset, xr.DataArray):
         interp_data = interp_data.astype(dataset.dtype)
     elif isinstance(dataset, xr.Dataset):
