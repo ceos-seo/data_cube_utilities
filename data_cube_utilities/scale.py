@@ -60,7 +60,7 @@ def np_scale(arr, pop_arr=None, pop_min_max=None, pop_mean_std=None, min_max=Non
         pop_min, pop_max = (pop_min_max[0], pop_min_max[1]) if pop_min_max is not None else (np.nanmin(pop_arr), np.nanmax(pop_arr))
         numerator, denominator = arr - pop_min, pop_max - pop_min
     elif scaling == 'std':
-        mean, std = mean_std if pop_mean_std is not None else (np.nanmean(pop_arr), np.nanstd(pop_arr))
+        mean, std = pop_mean_std if pop_mean_std is not None else (np.nanmean(pop_arr), np.nanstd(pop_arr))
         numerator, denominator = arr - mean, std
     # Primary scaling
     new_arr = arr
