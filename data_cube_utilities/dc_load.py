@@ -7,6 +7,23 @@ from .sort import xarray_sortby_coord
 from .aggregate import xr_scale_res
 from .dc_mosaic import restore_or_convert_dtypes
 
+## Misc ##
+
+def is_dataset_empty(ds:xr.Dataset) -> bool:
+    checks_for_empty = [
+                        lambda x: len(x.dims) == 0,      # Dataset has no dimensions
+                        lambda x: len(x.data_vars) == 0, # Dataset has no variables
+                        lambda x: list(x.data_vars.values())[0].count().values == 0 # Data variables are empty
+                       ]
+    for f in checks_for_empty:
+        if f(ds) == True:
+            return True
+    return False
+
+## End Misc ##
+
+## Combining Data ##
+
 def match_prods_res(dc, products, method='min'):
     """
     Determines a resolution that matches a set of Data Cube products -
@@ -116,8 +133,7 @@ def match_dim_sizes(dc, products, x, y, x_y_coords=['longitude', 'latitude'], me
             abs_res[0] = res[0] if abs_res[0] < res[0] else abs_res[0]
             abs_res[1] = res[1] if abs_res[1] < res[1] else abs_res[1]
 
-    # Reverse to be in order (x, y).
-    return abs_res[::-1], same_dim_sizes
+    return abs_res, same_dim_sizes
 
 def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
     """
@@ -141,10 +157,6 @@ def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
         dataset_temp = xr.concat(arg, dim=concat_dim)
         merged.append(xarray_sortby_coord(dataset_temp, coord=sort_dim))
     return merged
-
-## End Combining Data ##
-
-## Load ##
 
 def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
                    x_coord='longitude', y_coord='latitude'):
@@ -232,6 +244,10 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
             for j in range(num_masks):
                 masks.append(xr.concat(list(np_platform_masks[:, j]), dim='time'))
     return dataset, clean_mask, masks
+
+## End Combining Data ##
+
+## Load ##
 
 def load_simple(dc, platform, product, frac_res=None, abs_res=None,
                 load_params={}, masking_params={}, indiv_masks=None):
@@ -513,7 +529,7 @@ def get_overlapping_area(api, platforms, products):
 
 ## Undesired Acquisition Removal ##
 
-def find_desired_acq_inds(dataset, clean_mask, time_dim='time', pct_clean=None):
+def find_desired_acq_inds(dataset=None, clean_mask=None, time_dim='time', pct_clean=None, not_empty=False):
     """
     Returns indices of acquisitions that meet a specified set of criteria in
     an `xarray.Dataset` or `xarray.DataArray`.
@@ -528,19 +544,29 @@ def find_desired_acq_inds(dataset, clean_mask, time_dim='time', pct_clean=None):
     time_dim: str
         The string name of the time dimension.
     pct_clean: float
-        The percent of "clean" (or "desired") pixels required to keep an acquisition.
+        The minimum percent of "clean" (or "desired") pixels required to keep an acquisition.
+        Requires `clean_mask` to be suipplied.
+    not_empty: bool
+        Whether to remove empty acquisitions or not. An empty acquisition is one that contains data
+        Requires `dataset` to be suipplied.
 
     Returns
     -------
     acq_inds_to_keep: list of int
         A list of indices of acquisitions that meet the specified criteria.
     """
+    if pct_clean is not None:
+        assert clean_mask is not None, "If `pct_clean` is supplied, then `clean_mask` must also be supplied."
+    if not_empty:
+        assert dataset is not None, "If `not_empty==True`, then `dataset` must be supplied."
     acq_inds_to_keep = []
     for time_ind in range(len(dataset[time_dim])):
         remove_acq = False
         if pct_clean is not None:
             acq_pct_clean = clean_mask.isel(time=time_ind).mean()
             remove_acq = acq_pct_clean < pct_clean
+        if not_empty:
+            remove_acq = is_dataset_empty(dataset.isel(time=time_ind))
         if not remove_acq:
             acq_inds_to_keep.append(time_ind)
     return acq_inds_to_keep
