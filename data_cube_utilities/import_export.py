@@ -71,16 +71,17 @@ def export_xarray_to_multiple_geotiffs(ds, path, x_coord='longitude', y_coord='l
                                 x_coord=x_coord, y_coord=y_coord)
 
 
-def export_xarray_to_geotiff(tif_path, data, bands=None, no_data=-9999, crs="EPSG:4326",
+def export_xarray_to_geotiff(data, tif_path, bands=None, no_data=-9999, crs="EPSG:4326",
                              x_coord='longitude', y_coord='latitude'):
     """
-    Export a GeoTIFF from an `xarray.Dataset`.
+    Export a GeoTIFF from a 2D `xarray.Dataset`.
 
     Parameters
     ----------
+    data: xarray.Dataset or xarray.DataArray
+        An xarray with 2 dimensions to be exported as a GeoTIFF.
     tif_path: string
         The path to write the GeoTIFF file to. You should include the file extension.
-    data: xarray.Dataset or xarray.DataArray
     bands: list of string
         The bands to write - in the order they should be written.
         Ignored if `data` is an `xarray.DataArray`.
@@ -118,7 +119,7 @@ def export_xarray_to_geotiff(tif_path, data, bands=None, no_data=-9999, crs="EPS
             dst.write(data.values, 1)
         else:
             for index, band in enumerate(bands):
-                dst.write(data[band].values, index + 1)
+                dst.write(data[band].values.astype(dtype), index + 1)
     dst.close()
 
 ## End export ##
