@@ -480,7 +480,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             raise ValueError("For the '{}' DataArray: the plot type "
                                              "'{}' only accepts many-to-one aggregation (currently using '{}'). "
                                              "Please pass any of {} as the aggregation type "
-                                             "or change the plot type.".format(data_arr_name,
+                                             "or change the plot type.".format(data_arr_name, \
                                                                                plot_type, agg_type,
                                                                                many_to_one_agg_types))
                     # Some plot types cannot accept many-to-one aggregation.
@@ -721,11 +721,11 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                                         filtered_formatted_data.append(d[m])
                                 box_width = 0.5 * np.min(np.diff(x_locs)) \
                                     if len(x_locs) > 1 else 0.5
-                                # `manage_xticks=False` to avoid excessive padding on x-axis.
+                                # `manage_ticks=False` to avoid excessive padding on x-axis.
                                 bp = ax.boxplot(filtered_formatted_data,
                                                 widths=[box_width] * len(filtered_formatted_data),
                                                 positions=x_locs, patch_artist=True,
-                                                manage_xticks=False, **plot_kwargs)
+                                                manage_ticks=False, **plot_kwargs)
                                 plot_obj = bp['boxes'][0]
                             return plot_obj
 
@@ -756,7 +756,6 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
         title_postpend = " ({} to {})".format(date_strs[0], date_strs[-1])
         title_prepend = "Figure {}".format(ax_ind) if title is None else title
         plt.title(title_prepend + title_postpend)
-        plt.tight_layout()
     return fig, plotting_data_not_nan_and_extrap
 
 
