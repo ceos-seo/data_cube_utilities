@@ -390,7 +390,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     for i, data_var in enumerate(nan_mask_data_vars):
         time_nan_mask = data_var if i == 0 else time_nan_mask | data_var
     time_nan_mask = time_nan_mask.any([x_coord, y_coord])
-    times_not_all_nan = all_times[time_nan_mask]
+    times_not_all_nan = all_times[time_nan_mask.values]
     non_nan_plotting_data = all_plotting_data.loc[{time_agg_str: times_not_all_nan}]
 
     # Determine the number of extrapolation data points.
@@ -480,7 +480,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             raise ValueError("For the '{}' DataArray: the plot type "
                                              "'{}' only accepts many-to-one aggregation (currently using '{}'). "
                                              "Please pass any of {} as the aggregation type "
-                                             "or change the plot type.".format(data_arr_name, \
+                                             "or change the plot type.".format(data_arr_name,
                                                                                plot_type, agg_type,
                                                                                many_to_one_agg_types))
                     # Some plot types cannot accept many-to-one aggregation.
@@ -508,7 +508,8 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                         data_arr_epochs, y = get_curvefit(epochs_not_extrap, y.values, fit_type=plot_type,
                                                           x_smooth=x_smooth, fit_kwargs=plot_kwargs)
                         # Convert time stamps to NumPy datetime objects.
-                        data_arr_times = np.array(list(map(_scalar_to_n64_datetime, data_arr_epochs)))
+                        data_arr_times = np.array(list(map(_scalar_to_n64_datetime, data_arr_epochs))) \
+                            if time_agg_str == 'time' else data_arr_epochs
                         # Convert the NumPy array into an xarray DataArray.
                         coords = {time_agg_str: data_arr_times}
                         dims = list(coords.keys())
@@ -567,10 +568,13 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                                 r"For the '{}' DataArray: When using 'poly' as " \
                                 "the fit type, the fit kwargs must have 'degree' " \
                                 "specified.".format(data_arr_name)
-                            plot_type_str = plot_type_str.format(plot_kwargs.get('degree'))
+                            plot_type_str = plot_type_str.format(
+                                plot_kwargs.get('degree'))
                         if plot_type == 'fourier':
-                            plot_type_str = plot_type_str.format(plot_kwargs.get('n_harm', default_fourier_n_harm))
-                        # Legend labels for the non-extrapolation and extrapolation segments
+                            plot_type_str = plot_type_str.format(
+                                plot_kwargs.get('n_harm', default_fourier_n_harm))
+                        # Legend labels for the non-extrapolation
+                        # and extrapolation segments
                         plot_type_strs = []
 
                         # Remove plot kwargs that are not recognized
@@ -584,33 +588,45 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
 
                         # Handle default plot kwargs.
                         if plot_type == 'box':
-                            plot_kwargs.setdefault('boxprops', dict(facecolor='orange'))
-                            plot_kwargs.setdefault('flierprops', dict(marker='o', markersize=0.5))
+                            plot_kwargs.setdefault('boxprops',
+                                                   dict(facecolor='orange'))
+                            plot_kwargs.setdefault('flierprops',
+                                                   dict(marker='o', markersize=0.5))
                             plot_kwargs.setdefault('showfliers', False)
 
                         # Retrieve the plotting data.
-                        y = plotting_data_not_nan_and_extrap[(data_arr_name, agg_type, plot_type)]
-                        y = y.sel(time=slice(ax_time_bounds[0], ax_time_bounds[1]))
+                        y = plotting_data_not_nan_and_extrap[
+                            (data_arr_name, agg_type, plot_type)]
+                        y = y.sel({time_agg_str:
+                                       slice(ax_time_bounds[0], ax_time_bounds[1])})
                         if len(y[time_agg_str]) == 0:
                             # This particular plot has no data in this time range.
-                            # This is an extrapolation time range and this data has no extrapolation.
+                            # This is an extrapolation time range and this data
+                            # has no extrapolation.
                             continue
-                        data_arr_epochs = np.array(list(map(n64_to_epoch, y[time_agg_str].values))) \
-                            if time_agg_str == 'time' else ax_times_not_all_nan_and_extrap
-                        data_arr_x_locs = np.interp(data_arr_epochs, ax_epochs, ax_x_locs)
+                        data_arr_epochs = \
+                            np.array(list(map(n64_to_epoch, y[time_agg_str].values))) \
+                                if time_agg_str == 'time' else \
+                                ax_times_not_all_nan_and_extrap
+                        data_arr_x_locs = np.interp(data_arr_epochs,
+                                                    ax_epochs, ax_x_locs)
                         data_arr_time_bounds = y[time_agg_str].values[[0, -1]]
 
                         # Determine if this plotting data includes extrapolated values.
                         data_arr_non_extrap_time_bounds = None
-                        data_arr_has_non_extrap = data_arr_time_bounds[0] < times_not_all_nan[-1]
+                        data_arr_has_non_extrap = \
+                            data_arr_time_bounds[0] < times_not_all_nan[-1]
                         if data_arr_has_non_extrap:
-                            data_arr_non_extrap_time_bounds = [data_arr_time_bounds[0],
-                                                               min(data_arr_time_bounds[1],
-                                                                   times_not_all_nan[-1])]
-                            # Because the data could be smoothed, the last non-extrapolation time
-                            # is the last time before or at the last non-extrapolation time for the original data.
-                            non_extrap_plot_last_time = y.sel(time=data_arr_non_extrap_time_bounds[1],
-                                                              method='ffill').time.values
+                            data_arr_non_extrap_time_bounds = \
+                                [data_arr_time_bounds[0], min(data_arr_time_bounds[1],
+                                                              times_not_all_nan[-1])]
+                            # Because the data could be smoothed, the last
+                            # non-extrapolation time is the last time before
+                            # or at the last non-extrapolation time
+                            # for the original data.
+                            non_extrap_plot_last_time = \
+                                y.sel({time_agg_str: data_arr_non_extrap_time_bounds[1]},
+                                      method='ffill')[time_agg_str].values
                             data_arr_non_extrap_plotting_time_bounds = [data_arr_non_extrap_time_bounds[0],
                                                                         non_extrap_plot_last_time]
 
@@ -622,31 +638,36 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                                                            data_arr_time_bounds[1]]
                             # Because the data could be smoothed, the first extrapolation time
                             # is the first time after the last non-extrapolation time for the original data.
-                            extrap_plot_first_time = y.sel(time=data_arr_non_extrap_time_bounds[1],
-                                                           method='ffill').time.values \
-                                if data_arr_has_non_extrap else \
-                                data_arr_time_bounds[0]
+                            extrap_plot_first_time = \
+                                y.sel({time_agg_str: data_arr_non_extrap_time_bounds[1]},
+                                      method='ffill')[time_agg_str].values \
+                                    if data_arr_has_non_extrap else \
+                                    data_arr_time_bounds[0]
                             data_arr_extrap_plotting_time_bounds = [extrap_plot_first_time,
                                                                     data_arr_extrap_time_bounds[1]]
 
                         # Separate non-extrapolation and extrapolation data.
                         if data_arr_has_non_extrap:
-                            data_arr_non_extrap = y.sel(time=slice(*data_arr_non_extrap_plotting_time_bounds))
+                            data_arr_non_extrap = \
+                                y.sel({time_agg_str: slice(*data_arr_non_extrap_plotting_time_bounds)})
                             data_arr_non_extrap_epochs = \
-                                np.array(list(map(n64_to_epoch, data_arr_non_extrap.time.values))) \
-                                    if time_agg_str == 'time' else data_arr_non_extrap.time.values
-                            data_arr_non_extrap_x_locs = np.interp(data_arr_non_extrap_epochs, ax_epochs, ax_x_locs)
+                                np.array(list(map(n64_to_epoch, data_arr_non_extrap[time_agg_str].values))) \
+                                    if time_agg_str == 'time' else data_arr_non_extrap[time_agg_str].values
+                            data_arr_non_extrap_x_locs = \
+                                np.interp(data_arr_non_extrap_epochs, ax_epochs, ax_x_locs)
                             # Format plotting kwargs for the non-extrapolation data.
                             plot_kwargs_non_extrap = plot_kwargs.copy()
                             plot_kwargs_non_extrap.pop('extrap_color', None)
                         if data_arr_has_extrap:
                             # Include the last non-extrapolation point so the
                             # non-extrapolation and extrapolation lines connect.
-                            data_arr_extrap = y.sel(time=slice(*data_arr_extrap_plotting_time_bounds))
+                            data_arr_extrap = \
+                                y.sel({time_agg_str: slice(*data_arr_extrap_plotting_time_bounds)})
                             data_arr_extrap_epochs = \
-                                np.array(list(map(n64_to_epoch, data_arr_extrap.time.values))) \
-                                    if time_agg_str == 'time' else data_arr_extrap.time.values
-                            data_arr_extrap_x_locs = np.interp(data_arr_extrap_epochs, ax_epochs, ax_x_locs)
+                                np.array(list(map(n64_to_epoch, data_arr_extrap[time_agg_str].values))) \
+                                    if time_agg_str == 'time' else data_arr_extrap[time_agg_str].values
+                            data_arr_extrap_x_locs = \
+                                np.interp(data_arr_extrap_epochs, ax_epochs, ax_x_locs)
                             # Format plotting kwargs for the extrapolation data.
                             plot_kwargs_extrap = plot_kwargs.copy()
                             extrap_color = plot_kwargs_extrap.pop('extrap_color', None)
@@ -717,9 +738,10 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             data_arr_plots.append(plot_obj)
                             plot_type_strs.append('extrapolation of ' + plot_type_str)
                         plot_type_str_suffix = ' of {}'.format(agg_type) if agg_type != 'none' else ''
-                        plot_type_strs = [plot_type_str + plot_type_str_suffix for plot_type_str in plot_type_strs]
-                        [legend_labels.append('{} of {}'.format(plot_type_str, data_arr_name)) for plot_type_str in
-                         plot_type_strs]
+                        plot_type_strs = [plot_type_str + plot_type_str_suffix
+                                          for plot_type_str in plot_type_strs]
+                        [legend_labels.append('{} of {}'.format(plot_type_str, data_arr_name))
+                         for plot_type_str in plot_type_strs]
 
         # Label the axes and create the legend.
         date_strs = \
