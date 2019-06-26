@@ -554,7 +554,8 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
     }
     dataset_out = xr.Dataset(output_dict,
                              coords={'latitude': dataset_in['latitude'],
-                                     'longitude': dataset_in['longitude']})
+                                     'longitude': dataset_in['longitude']},
+                             attrs=dataset_in.attrs)
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
