@@ -95,7 +95,7 @@ def NBR(ds):
 
     Returns
     -------
-    rbr: xarray.DataArray
+    nbr: xarray.DataArray
         An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
         the same order.
     """
@@ -137,11 +137,21 @@ def SAVI(ds, L=0.5, normalize=True):
     as a modification of the Normalized Difference Vegetation Index to correct for
     the influence of soil brightness when vegetative cover is low.
 
-    SAVI is structured similar to NDVI, but with the addition of a
-    “soil brightness correction factor” - denoted `L`. The value of `L` varies
-    by the amount or cover of green vegetation. In very high vegetation regions,
-    `L=0`. In areas with no green vegetation, `L=1`. Generally, `L=0.5` works well
-    in most situations and is the default value. When `L=0`, `SAVI==NDVI`.
+    ds: xarray.Dataset
+        An `xarray.Dataset` that must contain 'nir', and 'red' `DataArrays`.
+    L: float
+        L is the “soil brightness correction factor”, which should be varied based
+        on the greenness of vegetation in the scene. In very high vegetation regions,
+        `L=0`. In areas with no green vegetation, `L=1`. Generally, `L=0.5` works well
+        and is the default value. When `L=0`, `SAVI==NDVI`.
+    normalize: boolean
+        Whether to normalize to the range [-1,1] - the range of most common spectral indices.
+
+    Returns
+    -------
+    savi: xarray.DataArray
+        An `xarray.DataArray` with the same shape as `ds` - the same coordinates in
+        the same order.
     """
     savi = (ds.nir - ds.red) / (ds.nir + ds.red + L) * (1 + L)
     if normalize:
