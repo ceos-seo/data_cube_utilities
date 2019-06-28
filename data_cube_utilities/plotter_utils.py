@@ -292,7 +292,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
         Here are the optional arguments, with format {plot_type: {arg_name: (data_type[, description]}}:
         {'box': # See matplotlib.axes.Axes.boxplot() for more information.
             {'boxprops': dict, 'flierprops': dict, 'showfliers': bool},
-         'gaussian_filter': # See gaussian_filter_fit() in ./curve_fitting.py for more information.
+         'gaussian_filter': # See gaussian_filter_fit() in data_cube_utilities/curve_fitting.py for more information.
              {'sigma': numeric},
          'fourier':
             {'extrap_time': (string, "an integer followed by Y, M, or D -
@@ -807,6 +807,10 @@ def get_curvefit(x, y, fit_type, x_smooth=None, n_pts=n_pts_smooth, fit_kwargs=N
     interpolation_curve_fits = ['gaussian', 'gaussian_filter',
                                 'poly', 'cubic_spline']
     extrapolation_curve_filts = ['fourier']
+    # Handle NaNs (omit them).
+    not_nan_mask = ~np.isnan(y)
+    y = y[not_nan_mask]
+    x = x[not_nan_mask]
     if x_smooth is None:
         x_smooth_inds = np.linspace(0, len(x) - 1, n_pts)
         x_smooth = np.interp(x_smooth_inds, np.arange(len(x)), x)
