@@ -70,7 +70,7 @@ def stats_filter(dataarray, statistic, filter_shape):
         but they don't have to.
     """
     # Allocate a Numpy array containing the content of `dataarray`, but padded
-    # with NaNs to ensure the statistics are correct at the x and y extremeties of the data.
+    # with NaNs to ensure the statistics are correct at the x and y extremities of the data.
     flt_shp = np.array(filter_shape)
     del filter_shape
     shp = np.array(dataarray.shape[:2])
