@@ -48,3 +48,55 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
         filtered = da.where(layer) if i == 0 else filtered.combine_first(da.where(layer))
     filtered.values[np.isnan(filtered.values)] = modal_filtered[np.isnan(filtered.values)]
     return filtered.values
+
+
+def stats_filter(dataarray, statistic, filter_shape):
+    """
+    Returns a mean, median, or standard deviation filter of a 3D `xarray.DataArray`.
+    This function is more accurate than using SciPy or scikit-image methods, because
+    those don't handle the extremities ideally. Specifically, only values actually
+    inside the filter should be considered, so the data is padded with NaNs.
+    This function is resilient to NaNs in the data.
+
+    Parameters
+    ----------
+    dataarray: xarray.DataArray
+        The data to create a filtered version of. Must have 3 dimensions.
+    statistic: string
+        The name of the statistic to use for the filter.
+        The possible values are ['mean', 'median', 'std'].
+    filter_shape: list-like of 2 odd, positive integers
+        The shape of the filter to use. Both dimensions should have odd lengths,
+        but they don't have to.
+    """
+    # Allocate a Numpy array containing the content of `dataarray`, but padded
+    # with NaNs to ensure the statistics are correct at the x and y extremeties of the data.
+    flt_shp = np.array(filter_shape)
+    del filter_shape
+    shp = np.array(dataarray.shape[:2])
+    pad_shp = (*(shp + flt_shp - 1), dataarray.shape[2])
+    padding = (flt_shp - 1) // 2  # The number of NaNs from an edge of the padding to the data.
+    padded_arr = np.full(pad_shp, np.nan)
+    padded_arr[padding[0]:pad_shp[0] - padding[0],
+    padding[1]:pad_shp[1] - padding[1]] = dataarray.values
+
+    filter_dims = dataarray.dims[:2]
+    filter_coords = {dim: dataarray.coords[dim] for dim in filter_dims}
+    filter_output = xr.DataArray(np.full(dataarray.shape[:2], np.nan),
+                                 coords=filter_coords, dims=filter_dims)
+
+    # For each point in the first two dimensions of `dataarray`...
+    for i in range(filter_output.shape[0]):
+        for j in range(filter_output.shape[1]):
+            # Apply NumPy nanmean, nanmedian, or nanstd, depending on `statistic`,
+            # on the 3D block with shape
+            # `(*filter_shape, sar_dataset[list(sar_dataset.data_vars.keys())[0]].shape[2])`.
+            padded_arr_segment = padded_arr[i:i + flt_shp[0],
+                                 j:j + flt_shp[1]]
+            if statistic == 'mean':
+                filter_output.values[i, j] = np.nanmean(padded_arr_segment)
+            elif statistic == 'median':
+                filter_output.values[i, j] = np.nanmedian(padded_arr_segment)
+            elif statistic == 'std':
+                filter_output.values[i, j] = np.nanstd(padded_arr_segment)
+    return filter_output
