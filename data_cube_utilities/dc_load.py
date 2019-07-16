@@ -465,7 +465,7 @@ def load_multiplatform(dc, platforms, products, frac_res=None, abs_res=None,
 
 ## Extents ##
 
-def get_product_extents(api, platform, product):
+def get_product_extents(api, platform, product, **kwargs):
     """
     Returns the minimum and maximum latitude, longitude, and date range of a product.
 
@@ -475,6 +475,8 @@ def get_product_extents(api, platform, product):
         An instance of `DataAccessApi` to get query metadata from.
     platform, product: str
         Names of the platform and product to query extent information for.
+    **kwargs: dict
+        Keyword arguments for `api.get_query_metadata()`.
 
     Returns
     -------
@@ -484,13 +486,13 @@ def get_product_extents(api, platform, product):
         A 2-tuple of the minimum and maximum time available.
     """
     # Get the extents of the cube
-    descriptor = api.get_query_metadata(platform=platform, product=product)
+    descriptor = api.get_query_metadata(platform=platform, product=product, **kwargs)
     min_max_lat = descriptor['lat_extents']
     min_max_lon = descriptor['lon_extents']
     min_max_dates = descriptor['time_extents']
     return min_max_lat, min_max_lon, min_max_dates
 
-def get_overlapping_area(api, platforms, products):
+def get_overlapping_area(api, platforms, products, **product_kwargs):
     """
     Returns the minimum and maximum latitude, longitude, and date range of the overlapping
     area for a set of products.
@@ -502,6 +504,9 @@ def get_overlapping_area(api, platforms, products):
     platforms, products: list-like of str
         A list-like of names of platforms and products to query extent information for.
         These lists must have the same length.
+    **product_kwargs: dict
+        A dictionary mapping product names to keyword arguments for
+        `get_product_extents()`
         
     Returns
     -------
@@ -516,7 +521,8 @@ def get_overlapping_area(api, platforms, products):
     min_max_lon = np.empty((len(platforms), 2))
     for i, (platform, product) in enumerate(zip(platforms, products)):
         min_max_lat[i], min_max_lon[i], min_max_dates[i] = \
-            get_product_extents(api, platform, product)
+            get_product_extents(api, platform, product,
+                                **product_kwargs.get(product, dict()))
     # Determine minimum and maximum lat and lon extents that bound a common area among the
     # products, which are the greatest minimums and smallest maximums.
     min_lon, max_lon = np.max(min_max_lon[:,0]), np.min(min_max_lon[:,1])
