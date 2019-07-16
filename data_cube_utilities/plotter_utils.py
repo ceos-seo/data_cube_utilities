@@ -721,11 +721,11 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                                         filtered_formatted_data.append(d[m])
                                 box_width = 0.5 * np.min(np.diff(x_locs)) \
                                     if len(x_locs) > 1 else 0.5
-                                # `manage_ticks=False` to avoid excessive padding on x-axis.
+                                # `manage_xticks=False` to avoid excessive padding on x-axis.
                                 bp = ax.boxplot(filtered_formatted_data,
                                                 widths=[box_width] * len(filtered_formatted_data),
                                                 positions=x_locs, patch_artist=True,
-                                                manage_ticks=False, **plot_kwargs)
+                                                manage_xticks=False, **plot_kwargs)
                                 plot_obj = bp['boxes'][0]
                             return plot_obj
 
