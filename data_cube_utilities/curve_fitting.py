@@ -5,7 +5,7 @@ from scipy.interpolate import CubicSpline
 from scipy.ndimage.filters import gaussian_filter1d
 
 from .scale import np_scale
-from .plotter_utils import n_pts_smooth, default_fourier_n_harm
+from .plotter_utils_consts import n_pts_smooth, default_fourier_n_harm
 
 
 def gauss(x, a, x0, sigma):

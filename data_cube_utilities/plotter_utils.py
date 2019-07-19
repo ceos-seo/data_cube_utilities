@@ -1,8 +1,3 @@
-## Constants ##
-n_pts_smooth = 500  # The number of points to use in smooth curve fits.
-default_fourier_n_harm = 10
-## End Constants ##
-
 from collections import OrderedDict
 import re
 
@@ -30,6 +25,7 @@ from .dc_time import _n64_to_datetime, _n64_datetime_to_scalar, _scalar_to_n64_d
 
 from scipy.interpolate import interp1d
 
+from .plotter_utils_consts import n_pts_smooth, default_fourier_n_harm
 
 def impute_missing_data_1D(data1D):
     """
@@ -1621,8 +1617,8 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         A 2D NumPy array to be used as the cell values when coloring with the colormap.
     cell_label_mtx: numpy.ndarray
         A 2D NumPy array to be used as the cell labels.
-    row_labels, col_labels: list
-        A list of labels in the order they index the matrix rows and columns, respectively.
+    row_labels, col_labels: list-like or xarray.DataArray
+        Lists of labels in the order they index the matrix rows and columns, respectively.
     show_row_labels, show_col_labels: bool
         Whether to show the row or column labels, respectively.
     show_cell_labels: bool
@@ -1631,9 +1627,6 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         A matplotlib colormap used to color the cells based on `cell_value_mtx`.
     cell_val_fmt: str
         Formatting string for values in the matrix cells.
-        If `cell_label_mtx` is specified as strings, use 's'.
-        See the documentation of `seaborn.heatmap()` regarding its
-        `fmt` parameter for more information.
     annot_kwargs: dict
         Keyword arguments for ``ax.text`` for formatting cell annotation text.
     tick_fontsize: int
@@ -1642,8 +1635,6 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         Keyword arguments for x and y axis tick labels, respectively.
         Specifically, keyword arguments for calls to `ax.[x_axis,y_axis].set_ticklabels()`
         where `ax` is the `matplotlib.axes.Axes` object returned by `seaborn.heatmap()`.
-        If `x_axis_tick_kwargs is None`, the x ticks will be rotated 45 degrees from horizontal.
-        If `y_axis_tick_kwargs is None`, the y ticks will oriented horizontally.
     x_axis_ticks_position, y_axis_ticks_position: str
         The position of x and y axis ticks, respectively.
         For x_axis_ticks_position, possible values are ['top', 'bottom', 'both', 'default', 'none'].
@@ -1667,8 +1658,10 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         The figure and axes used for the plot.
     """
     cell_label_mtx = cell_value_mtx if cell_label_mtx is None else cell_label_mtx
-    row_labels = [''] * cell_value_mtx.shape[0] if not show_row_labels else row_labels
-    col_labels = [''] * cell_value_mtx.shape[1] if not show_col_labels else col_labels
+    row_labels = [''] * cell_value_mtx.shape[0] if not show_row_labels \
+                                                   or row_labels is None else row_labels
+    col_labels = [''] * cell_value_mtx.shape[1] if not show_col_labels \
+                                                   or col_labels is None else col_labels
     heatmap_kwargs.setdefault('cbar', False)
 
     df = pd.DataFrame(cell_value_mtx, index=row_labels, columns=col_labels)
@@ -1684,7 +1677,7 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         y_axis_tick_kwargs.setdefault('fontsize', tick_fontsize)
         heatmap.yaxis.set_ticklabels(heatmap.yaxis.get_ticklabels(), **y_axis_tick_kwargs)
         heatmap.yaxis.set_ticks_position(y_axis_ticks_position)
-        heatmap.yaxis.tick_left()  # Ticks may also appear on the right side otherwise.
+        heatmap.yaxis.tick_left()  # Ticks will also appear on the right side otherwise.
     if not show_col_labels:
         heatmap.set_xticks([])
     else:
@@ -1693,6 +1686,7 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
         x_axis_tick_kwargs.setdefault('fontsize', tick_fontsize)
         heatmap.xaxis.set_ticklabels(heatmap.xaxis.get_ticklabels(), **x_axis_tick_kwargs)
         heatmap.xaxis.set_ticks_position(x_axis_ticks_position)
+        heatmap.xaxis.tick_bottom()  # Ticks will also appear on the top side otherwise.
     return fig, ax
 
 
