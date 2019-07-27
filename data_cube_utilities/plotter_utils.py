@@ -1979,7 +1979,7 @@ def figure_ratio(data, x_coord='longitude', y_coord='latitude',
     return [width * num_cols, height * num_rows]
 
 
-def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
+def retrieve_or_create_fig_ax(fig=None, ax=None, **subplots_kwargs):
     """
     Returns appropriate matplotlib Figure and Axes objects given Figure and/or Axes objects.
     If neither is supplied, a new figure will be created with associated axes.
@@ -1990,10 +1990,13 @@ def retrieve_or_create_fig_ax(fig=None, ax=None, **fig_params):
     -------
     fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes
         The figure and the axes of that figure.
+    **subplots_kwargs: dict
+        A dictionary of keyword arguments to passed to `matplotlib.pyplot.subplots()`,
+        such as `ncols` or `figsize`.
     """
     if ax is None:
         if fig is None:
-            fig, ax = plt.subplots(**fig_params)
+            fig, ax = plt.subplots(**subplots_kwargs)
         else:
             if len(fig.axes) == 0:
                 fig.add_axes([1, 1, 1, 1])
