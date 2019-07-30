@@ -33,7 +33,8 @@ def DBSI(ds, normalize=True):
     The formula is (SWIR1 - GREEN) / (SWIR1 + GREEN) - NDVI.
     If `normalize == False`, returned values should be in the range [-2,2].
 
-    This is a spectral index for which high values often indicate urban areas.
+    This is a spectral index for which high values often indicate bare soil and
+    low values often indicate urban areas.
     Note that DBSI often performs better in arid and semi-arid environments than NDBI, since
     it differentiates bare soil from urban areas better.
 
