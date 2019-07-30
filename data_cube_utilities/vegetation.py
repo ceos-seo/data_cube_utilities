@@ -137,6 +137,8 @@ def SAVI(ds, L=0.5, normalize=True):
     as a modification of the Normalized Difference Vegetation Index to correct for
     the influence of soil brightness when vegetative cover is low.
 
+    Parameters
+    ----------
     ds: xarray.Dataset
         An `xarray.Dataset` that must contain 'nir', and 'red' `DataArrays`.
     L: float
