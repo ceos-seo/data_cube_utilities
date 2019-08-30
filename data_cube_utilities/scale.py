@@ -29,11 +29,12 @@ def xr_scale(data, data_vars=None, min_max=None, scaling='norm', copy=False):
     elif isinstance(data, xr.DataArray): 
         data.values = np_scale(data.values, min_max=min_max, scaling=scaling)
     return data
-    
+
+
 def np_scale(arr, pop_arr=None, pop_min_max=None, pop_mean_std=None, min_max=None, scaling='norm'):
     """
     Scales a NumPy array with standard scaling or norm scaling, default to norm scaling.
-    
+
     Parameters
     ----------
     arr: numpy.ndarray
@@ -52,12 +53,15 @@ def np_scale(arr, pop_arr=None, pop_min_max=None, pop_mean_std=None, min_max=Non
         The desired minimum and maximum of the final output, in that order.
         If all values are the same, all values will become `min_max[0]`.
     scaling: str, optional
-        The options are ['std', 'norm']. 
-        The option 'std' standardizes. The option 'norm' normalizes (min-max scales). 
+        The options are ['std', 'norm'].
+        The option 'std' standardizes. The option 'norm' normalizes (min-max scales).
     """
+    if len(arr) == 0:
+        return arr
     pop_arr = arr if pop_arr is None else pop_arr
     if scaling == 'norm':
-        pop_min, pop_max = (pop_min_max[0], pop_min_max[1]) if pop_min_max is not None else (np.nanmin(pop_arr), np.nanmax(pop_arr))
+        pop_min, pop_max = (pop_min_max[0], pop_min_max[1]) if pop_min_max is not None \
+            else (np.nanmin(pop_arr), np.nanmax(pop_arr))
         numerator, denominator = arr - pop_min, pop_max - pop_min
     elif scaling == 'std':
         mean, std = pop_mean_std if pop_mean_std is not None else (np.nanmean(pop_arr), np.nanstd(pop_arr))
@@ -68,6 +72,8 @@ def np_scale(arr, pop_arr=None, pop_min_max=None, pop_mean_std=None, min_max=Non
         new_arr = numerator / denominator
     # Optional final scaling.
     if min_max is not None:
-        new_arr = np.interp(new_arr, (np.nanmin(new_arr), np.nanmax(new_arr)), min_max) if denominator > 0 else \
-                  np.full_like(new_arr, min_max[0]) # The values are identical - set all values to the low end of the desired range.
+        if denominator > 0:
+            new_arr = np.interp(new_arr, (np.nanmin(new_arr), np.nanmax(new_arr)), min_max)
+        else: # The values are identical - set all values to the low end of the desired range.
+            new_arr = np.full_like(new_arr, min_max[0])
     return new_arr
