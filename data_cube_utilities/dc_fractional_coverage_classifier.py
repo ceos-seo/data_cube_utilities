@@ -53,7 +53,7 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     """
     # Default to masking nothing.
     if clean_mask is None:
-        clean_mask = create_default_clean_mask(dataset_in).values
+        clean_mask = create_default_clean_mask(dataset_in)
 
     band_stack = []
 
