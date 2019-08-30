@@ -336,9 +336,9 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     fig: matplotlib.figure.Figure
         The figure containing the plot grid.
     plotting_data: dict
-        A dictionary mapping 2-tuples of aggregation types and plot types (e.g. ('none', 'box'))
-        to xarray.DataArray objects of the data that was plotted for those combinations of aggregation
-        types and plot types.
+        A dictionary mapping 3-tuples of data array names, aggregation types, and plot types
+        (e.g. ('ndvi', 'none', 'box')) to `xarray.DataArray` objects of the data that was
+        plotted for those combinations of aggregation types and plot types.
 
     Raises
     ------
@@ -439,7 +439,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                         n_extrap_pts = max(n_extrap_pts, n_predict)
 
     # Collect (1) the times not containing only NaN values and (2) the extrapolation times.
-    if time_agg_str == 'time':
+    if time_agg_str == 'time' and len(times_not_all_nan) > 0:
         first_extrap_time = times_not_all_nan[-1] + np.timedelta64(extrap_day_range, 'D') / n_extrap_pts
         last_extrap_time = times_not_all_nan[-1] + np.timedelta64(extrap_day_range, 'D')
         extrap_times = np.linspace(_n64_datetime_to_scalar(first_extrap_time),
@@ -455,7 +455,6 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     epochs = np.array(list(map(n64_to_epoch, times_not_all_nan_and_extrap))) \
         if time_agg_str == 'time' else times_not_all_nan_and_extrap
     epochs_not_extrap = epochs[:len(times_not_all_nan)]
-    x_locs_not_extrap = np_scale(epochs)
 
     # For each data array to plot...
     for data_arr_name, agg_dict in plot_descs.items():
@@ -517,12 +516,16 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
         max_times_per_plot
     num_times = len(times_not_all_nan_and_extrap)
     num_plots = int(np.ceil(num_times / max_times_per_plot))
-    num_times_per_plot = round(num_times / num_plots)
+    num_times_per_plot = round(num_times / num_plots) if num_plots != 0 else 0
     num_cols = min(num_plots, max_cols)
-    num_rows = int(np.ceil(num_plots / num_cols))
+    num_rows = int(np.ceil(num_plots / num_cols)) if num_cols != 0 else 0
     # Set a reasonable figsize if one is not set in `fig_params`.
     fig_params.setdefault('figsize', (12 * num_cols, 6 * num_rows))
     fig = plt.figure(**fig_params)
+
+    # Check if there are no plots to make.
+    if num_plots == 0:
+        return fig, plotting_data_not_nan_and_extrap
 
     # Create each plot.
     for time_ind, ax_ind in zip(range(0, len(times_not_all_nan_and_extrap), num_times_per_plot),
@@ -748,10 +751,10 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                     month_ints_to_month_names(ax_times_not_all_nan_and_extrap)
         plt.xticks(ax_x_locs, date_strs, rotation=45, ha='right', rotation_mode='anchor')
         if show_legend:
-            plt.legend(handles=data_arr_plots, labels=legend_labels, loc='best')
+            ax.legend(handles=data_arr_plots, labels=legend_labels, loc='best')
         title_postpend = " ({} to {})".format(date_strs[0], date_strs[-1])
         title_prepend = "Figure {}".format(ax_ind) if title is None else title
-        plt.title(title_prepend + title_postpend)
+        ax.set_title(title_prepend + title_postpend)
     return fig, plotting_data_not_nan_and_extrap
 
 
@@ -1706,7 +1709,8 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
                   imshow_kwargs=None, x_label_kwargs=None, y_label_kwargs=None,
                   cbar_kwargs=None, nan_color='white', legend_kwargs=None,
                   ax_tick_label_kwargs=None, x_tick_label_kwargs=None,
-                  y_tick_label_kwargs=None, title=None, title_kwargs=None):
+                  y_tick_label_kwargs=None, title=None, title_kwargs=None,
+                  possible_plot_values=None):
     """
     Shows a heatmap of an xarray DataArray with only latitude and longitude dimensions.
     Unlike matplotlib `imshow()` or `data.plot.imshow()`, this sets axes ticks and labels.
@@ -1762,6 +1766,8 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
         The title of the figure.
     title_kwargs: dict
         The dictionary of keyword arguments passed to `ax.set_title()`.
+    possible_plot_values: list-like
+        The possible range of values for `data`. The affects the coloring of the map and the legend entries.
 
     Returns
     -------
@@ -1807,10 +1813,11 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
     masked_array = np.ma.array(data_arr, mask=np.isnan(data_arr))
     cmap = imshow_kwargs.setdefault('cmap', plt.get_cmap('viridis'))
     cmap.set_bad(nan_color)
-    # Handle kwargs for `imshow()` if a colorbar is to be plotted.
-    if use_colorbar:
-        imshow_kwargs.setdefault('vmin', 0)
-        imshow_kwargs.setdefault('vmax', 1)
+    # Handle kwargs for `imshow()`.
+    vmin, vmax = (np.min(possible_plot_values), np.max(possible_plot_values)) \
+                  if possible_plot_values is not None else (np.nanmin(data), np.nanmax(data))
+    imshow_kwargs.setdefault('vmin', vmin)
+    imshow_kwargs.setdefault('vmax', vmax)
     im = ax.imshow(masked_array, **imshow_kwargs)
 
     # Set axis labels and tick labels.
@@ -1840,17 +1847,21 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
         legend_kwargs = {} if legend_kwargs is None else legend_kwargs.copy()
         legend_kwargs.setdefault("framealpha", 0.4)
 
-        # Determine the legend labels.
-        unique_values = np.unique(data.values)
-        unique_values = unique_values[~np.isnan(unique_values)]
-        if legend_labels is None:
-            legend_labels = ["{}".format(value) for value in unique_values]
+        # Determine the legend labels. If no set of values to create legend entries for
+        # is specified, use the unique values.
+        if possible_plot_values is None:
+            legend_values = np.unique(data.values)
+            legend_values = legend_values[~np.isnan(legend_values)]
         else:
-            legend_labels = [legend_labels.get(value, "{}".format(value)) for value in unique_values]
+            legend_values = possible_plot_values
+        if legend_labels is None:
+            legend_labels = ["{}".format(value) for value in legend_values]
+        else:
+            legend_labels = [legend_labels.get(value, "{}".format(value)) for value in legend_values]
 
-        colors = [im.cmap(im.norm(unique_values)) for unique_values in unique_values]
+        colors = [im.cmap(value/np.max(legend_values)) for value in legend_values]
         patches = [mpatches.Patch(color=colors[i], label=legend_labels[i])
-                   for i in range(len(legend_labels))]
+                   for i in range(len(legend_values))]
 
         legend_kwargs.setdefault('loc', 'best')
         legend_kwargs['handles'] = patches
