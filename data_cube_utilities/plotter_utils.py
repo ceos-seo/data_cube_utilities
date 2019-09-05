@@ -370,7 +370,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     all_agg_types = many_to_one_agg_types + many_to_many_agg_types
 
     # Determine how the data was aggregated, if at all.
-    possible_time_agg_strs = ['week', 'month']
+    possible_time_agg_strs = ['time', 'week', 'month']
     time_agg_str = 'time'
     for possible_time_agg_str in possible_time_agg_strs:
         if possible_time_agg_str in list(dataset.coords):
@@ -389,7 +389,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     times_not_all_nan = all_times[time_nan_mask.values]
     non_nan_plotting_data = all_plotting_data.loc[{time_agg_str: times_not_all_nan}]
 
-    # Determine the number of extrapolation data points.
+    # Determine the number of extrapolation data points. #
     extrap_day_range = 0
     n_extrap_pts = 0
     # For each data array to plot...
@@ -456,6 +456,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
         if time_agg_str == 'time' else times_not_all_nan_and_extrap
     epochs_not_extrap = epochs[:len(times_not_all_nan)]
 
+    # Handle aggregations and curve fits. #
     # For each data array to plot...
     for data_arr_name, agg_dict in plot_descs.items():
         data_arr_plotting_data = non_nan_plotting_data[data_arr_name]
@@ -527,7 +528,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     if num_plots == 0:
         return fig, plotting_data_not_nan_and_extrap
 
-    # Create each plot.
+    # Create each plot. #
     for time_ind, ax_ind in zip(range(0, len(times_not_all_nan_and_extrap), num_times_per_plot),
                                 range(num_plots)):
         # The time bounds of this canvas (or "Axes object" or "plot grid cell").
@@ -598,11 +599,20 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             (data_arr_name, agg_type, plot_type)]
                         y = y.sel({time_agg_str:
                                        slice(ax_time_bounds[0], ax_time_bounds[1])})
-                        if len(y[time_agg_str]) == 0:
-                            # This particular plot has no data in this time range.
-                            # This is an extrapolation time range and this data
-                            # has no extrapolation.
+
+                        # Handle cases of insufficient data for this section of the plot.
+                        not_nat_times = None
+                        if time_agg_str == 'time':
+                            not_nat_times = ~np.isnat(y[time_agg_str])
+                        else:
+                            not_nat_times = ~np.isnan(y[time_agg_str])
+                        num_unique_times_y = len(np.unique(y[time_agg_str].values[not_nat_times]))
+                        if num_unique_times_y == 0:  # There is no data.
                             continue
+                        if num_unique_times_y == 1:  # There is 1 data point.
+                            plot_type = 'scatter';
+                            plot_kwargs = {}
+
                         data_arr_epochs = \
                             np.array(list(map(n64_to_epoch, y[time_agg_str].values))) \
                                 if time_agg_str == 'time' else \
@@ -623,9 +633,11 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             # non-extrapolation time is the last time before
                             # or at the last non-extrapolation time
                             # for the original data.
-                            non_extrap_plot_last_time = \
-                                y.sel({time_agg_str: data_arr_non_extrap_time_bounds[1]},
-                                      method='ffill')[time_agg_str].values
+                            non_extrap_plot_last_time = data_arr_non_extrap_time_bounds[1]
+                            if num_unique_times_y > 1:
+                                non_extrap_plot_last_time = \
+                                    y.sel({time_agg_str: data_arr_non_extrap_time_bounds[1]},
+                                          method='ffill')[time_agg_str].values
                             data_arr_non_extrap_plotting_time_bounds = [data_arr_non_extrap_time_bounds[0],
                                                                         non_extrap_plot_last_time]
 
@@ -799,6 +811,9 @@ def get_curvefit(x, y, fit_type, x_smooth=None, n_pts=n_pts_smooth, fit_kwargs=N
     -------
     x_smooth, y_smooth: numpy.ndarray
         The smoothed x and y values of the curve fit.
+        If there are no non-NaN values in `y`, these will be filled with `n_pts` NaNs.
+        If there is only 1 non-NaN value in `y`, these will be filled with
+        their corresponding values (y or x value) for that point to a length of `n_pts`.
 
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
@@ -808,11 +823,22 @@ def get_curvefit(x, y, fit_type, x_smooth=None, n_pts=n_pts_smooth, fit_kwargs=N
     extrapolation_curve_filts = ['fourier']
     # Handle NaNs (omit them).
     not_nan_mask = ~np.isnan(y)
-    y = y[not_nan_mask]
-    x = x[not_nan_mask]
+    x = x[not_nan_mask]; y = y[not_nan_mask]
+
+    # Handle the cases of there being too few points to curve fit.
+    if len(y) == 0:
+        x_smooth = np.repeat(np.nan, n_pts)
+        y_smooth = np.repeat(np.nan, n_pts)
+        return x_smooth, y_smooth
+    if len(y) == 1:
+        x_smooth = np.repeat(x[0], n_pts)
+        y_smooth = np.repeat(y[0], n_pts)
+        return x_smooth, y_smooth
+
     if x_smooth is None:
         x_smooth_inds = np.linspace(0, len(x) - 1, n_pts)
         x_smooth = np.interp(x_smooth_inds, np.arange(len(x)), x)
+
     opt_params = {}
     if fit_type == 'gaussian':
         x_smooth, y_smooth = gaussian_fit(x, y, x_smooth)

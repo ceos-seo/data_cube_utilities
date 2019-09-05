@@ -68,7 +68,7 @@ def gaussian_filter_fit(x, y, x_smooth=None, n_pts=n_pts_smooth, sigma=None):
         The smoothed x and y values of the curve fit.
     """
     if x_smooth is None:
-        x_smooth_inds = np.linspace(0, len(x), n_pts)
+        x_smooth_inds = np.linspace(0, len(x)-1, n_pts)
         x_smooth = np.interp(x_smooth_inds, np.arange(len(x)), x)
     sigma = sigma if sigma is not None else 4 * np.std(y)
     gauss_filter_y = gaussian_filter1d(y, sigma)
