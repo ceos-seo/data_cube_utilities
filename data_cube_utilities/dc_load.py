@@ -73,7 +73,7 @@ def match_prods_res(dc, products, method='min'):
 
 def match_dim_sizes(dc, products, x, y, x_y_coords=['longitude', 'latitude'], method='min'):
     """
-    Returns the x and y dimension sizes that match some x and y extents.
+    Returns the x and y dimension sizes that match some x and y extents for some products.
     This is useful when determining an absolute resolution to scale products to with
     `xr_scale_res()` in the `aggregate.py` utility file.
 
