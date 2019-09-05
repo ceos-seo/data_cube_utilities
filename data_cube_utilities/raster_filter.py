@@ -114,7 +114,7 @@ def stats_filter_3d_composite_2d(dataarray, statistic, filter_size=1,
         The name of the statistic to use for the filter.
         The possible values are ['mean', 'median', 'std'].
     filter_size: int
-        The size of the filter to use. Must be postive and should be odd.
+        The size of the filter to use. Must be positive and should be odd.
         The filter shape will be `(filter_size, filter_size)`.
     time_dim: str
         The string name of the time dimension.
@@ -166,7 +166,7 @@ def stats_filter_2d(dataarray, statistic, filter_size=3):
         The name of the statistic to use for the filter.
         The possible values are ['mean', 'median', 'std'].
     filter_size: int
-        The size of the filter to use. Must be postive and should be odd.
+        The size of the filter to use. Must be positive and should be odd.
         The filter shape will be `(filter_size, filter_size)`.
     """
     if filter_size == 1: return dataarray
