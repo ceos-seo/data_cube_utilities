@@ -3,7 +3,10 @@ import xarray as xr
 import numpy as np
 
 from rasterio.features import geometry_mask
+import shapely
 from shapely.geometry import shape
+from functools import partial
+import pyproj
 
 
 def shapefile_mask(dataset: xr.Dataset, shapefile) -> np.array:
@@ -20,7 +23,13 @@ def shapefile_mask(dataset: xr.Dataset, shapefile) -> np.array:
         collection = list(source)
         geometries = []
         for feature in collection:
-            geometries.append(shape(feature['geometry']))
+            geom = shape(feature['geometry'])
+            project = partial(
+                pyproj.transform,
+                pyproj.Proj(init=source.crs['init']), # source crs
+                pyproj.Proj(init='epsg:4326')) # destination crs
+            geom = shapely.ops.transform(project, geom)  # apply projection
+            geometries.append(geom)
         geobox = dataset.geobox
         mask = geometry_mask(
             geometries,
