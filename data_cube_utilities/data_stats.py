@@ -21,7 +21,7 @@ def find_gaps(data_arr, aggregation_method):
     -------
     gaps: xarray.DataArray of float64
         The time gaps between True values in `data_arr`. Due to limitations of the numpy.datetime64 data type,
-        The time differences are in seconds, stored as np.float64.
+        the time differences are in seconds, stored as np.float64.
     """
     time_index = 0
     # 1. Convert time from numpy.datetime64 to scalars and broadcast along latitude and longitude.

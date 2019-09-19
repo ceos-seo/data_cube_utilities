@@ -18,7 +18,7 @@ def get_bin_intervals(data, num_bins):
     Returns
     -------
     bin_intervals: np.ndarray of shape (num_bins, 2)
-        A 2D NumPy array of bin intevals, with each row being one bin,
+        A 2D NumPy array of bin intervals, with each row being one bin,
         with the first value being the lower bound for the bin and
         the second being the upper bound for the bin.
     """

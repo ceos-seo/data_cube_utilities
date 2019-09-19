@@ -551,10 +551,11 @@ def find_desired_acq_inds(dataset=None, clean_mask=None, time_dim='time', pct_cl
         The string name of the time dimension.
     pct_clean: float
         The minimum percent of "clean" (or "desired") pixels required to keep an acquisition.
-        Requires `clean_mask` to be suipplied.
+        Requires `clean_mask` to be supplied.
     not_empty: bool
-        Whether to remove empty acquisitions or not. An empty acquisition is one that contains data
-        Requires `dataset` to be suipplied.
+        Whether to remove empty acquisitions or not.
+        Here, an empty acquisition is one that contains all NaN values.
+        Requires `dataset` to be supplied.
 
     Returns
     -------
