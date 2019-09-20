@@ -4,9 +4,6 @@ import re
 import numpy as np
 import pandas as pd
 import xarray as xr
-from xarray.ufuncs import logical_and as xr_and
-from xarray.ufuncs import logical_or as xr_or
-from xarray.ufuncs import logical_not as xr_not
 import matplotlib as mpl
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -277,8 +274,8 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
 
         Aggregation happens within time slices and can be many-to-many or many-to-one.
         Some plot types require many-to-many aggregation (e.g. 'none'), and some other plot types
-        require many-to-one aggregation (e.g. 'mean' or 'median']). Aggregation types can be any of
-        ['mean', 'median', 'none'], with 'none' performing no aggregation.
+        require many-to-one aggregation (e.g. 'mean'). Aggregation types can be any of
+        ['min', 'mean', 'median', 'none', 'max'], with 'none' performing no aggregation.
 
         Plot types can be any of
         ['scatter', 'line', 'box', 'gaussian', 'gaussian_filter', 'poly', 'cubic_spline', 'fourier'].
@@ -291,7 +288,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
          'gaussian_filter': # See gaussian_filter_fit() in data_cube_utilities/curve_fitting.py for more information.
              {'sigma': numeric},
          'fourier':
-            {'extrap_time': (string, "an integer followed by Y, M, or D -
+            {'extrap_time': (string, "a positive integer followed by Y, M, or D -
                                       year, month, or day - specifying the
                                       amount of time to extrapolate over."),
              'extrap_color': (matplotlib color, "a matplotlib color to color the extrapolated data with.")}}
@@ -364,7 +361,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                               plot_types_supporting_extrapolation))
 
     # Aggregation types that aggregate all values for a given time to one value.
-    many_to_one_agg_types = ['mean', 'median']
+    many_to_one_agg_types = ['min', 'mean', 'median', 'max']
     # Aggregation types that aggregate to many values or do not aggregate.
     many_to_many_agg_types = ['none']
     all_agg_types = many_to_one_agg_types + many_to_many_agg_types
@@ -491,10 +488,14 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
 
                     # Aggregate if necessary.
                     y = data_arr_plotting_data
+                    if agg_type == 'min':
+                        y = y.min([x_coord, y_coord])
                     if agg_type == 'mean':
                         y = y.mean([x_coord, y_coord])
                     if agg_type == 'median':
                         y = y.median([x_coord, y_coord])
+                    if agg_type == 'max':
+                        y = y.max([x_coord, y_coord])
 
                     # Handle curve fits.
                     if plot_type in plot_types_curve_fit:
@@ -522,7 +523,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     num_rows = int(np.ceil(num_plots / num_cols)) if num_cols != 0 else 0
     # Set a reasonable figsize if one is not set in `fig_params`.
     fig_params.setdefault('figsize', (12 * num_cols, 6 * num_rows))
-    fig = plt.figure(**fig_params)
+    fig = plt.figure(**fig_params) if fig is None else fig
 
     # Check if there are no plots to make.
     if num_plots == 0:
@@ -1403,14 +1404,14 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
         analysis_none_mask, analysis_chng_mask, analysis_perm_mask = get_none_chng_perm_masks(analysis_da,
                                                                                               analysis_clean_mask)
         # Find where points are never a member of the class or are a member at one or more times.
-        baseline_cls_ever = xr_or(baseline_chng_mask, baseline_perm_mask)
-        analysis_cls_ever = xr_or(analysis_chng_mask, analysis_perm_mask)
+        baseline_cls_ever = baseline_chng_mask | baseline_perm_mask
+        analysis_cls_ever = analysis_chng_mask | analysis_perm_mask
         # Find where points change between never being a member of the class
         # and being a member at one or more times between the two periods.
-        no_cls_no_cls_mask = xr_and(baseline_none_mask, analysis_none_mask)
-        no_cls_cls_mask = xr_and(baseline_none_mask, analysis_cls_ever)
-        cls_no_cls_mask = xr_and(baseline_cls_ever, analysis_none_mask)
-        cls_cls_mask = xr_and(baseline_cls_ever, analysis_cls_ever)
+        no_cls_no_cls_mask = baseline_none_mask & analysis_none_mask
+        no_cls_cls_mask = baseline_none_mask & analysis_cls_ever
+        cls_no_cls_mask = baseline_cls_ever & analysis_none_mask
+        cls_cls_mask = baseline_cls_ever & analysis_cls_ever
         masks += [no_cls_no_cls_mask, no_cls_cls_mask, cls_no_cls_mask, cls_cls_mask]
 
     # Determine the overriding mask.
@@ -1478,9 +1479,9 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
         stats_table = pd.DataFrame(data=np.zeros((num_table_rows, 2)),
                                    index=index, columns=['Number', 'Percent'])
         # Number
-        num_insufficient_data = xr_not(masks[0])
+        num_insufficient_data = ~masks[0]
         for i in range(1, len(masks)):
-            num_insufficient_data = xr_and(num_insufficient_data, xr_not(masks[i]))
+            num_insufficient_data = num_insufficient_data & ~masks[i]
         num_insufficient_data = num_insufficient_data.sum()
         mask_sums = np.array([mask.sum() for mask in masks])
         if len(dataarrays) == 1:
