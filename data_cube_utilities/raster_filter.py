@@ -45,7 +45,7 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
         Andrew Lubawy (andrew.m.lubawy@ama-inc.com)\n
         John Rattz    (john.c.rattz@ama-inc.com)
     """
-    assert kernel_size % 2 == 0, "The parameter `kernel_size` must be an odd number."
+    assert kernel_size % 2 == 1, "The parameter `kernel_size` must be an odd number."
     modal_filtered = modal(image, create_circular_mask(kernel_size, kernel_size))
 
     da = xr.DataArray(image)
