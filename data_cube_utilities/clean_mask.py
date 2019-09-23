@@ -1,8 +1,6 @@
 from .dc_mosaic import (ls7_unpack_qa, ls8_unpack_qa, ls5_unpack_qa)
 import numpy as np
 import xarray as xr
-from xarray.ufuncs import logical_and as xr_and
-from xarray.ufuncs import logical_or  as xr_or
 
 ## Utils ##
 
@@ -115,14 +113,15 @@ def landsat_clean_mask_invalid(dataset):
     -------
     invalid_mask: xarray.DataArray
         An `xarray.DataArray` with the same number and order of coordinates as in `dataset`.
+        The `True` values specify what pixels are valid.
     """
     invalid_mask = None
     data_arr_names = [arr_name for arr_name in list(dataset.data_vars)
                       if arr_name not in ['pixel_qa', 'radsat_qa', 'cloud_qa']]
     # Only keep data where all bands are in the valid range.
     for i, data_arr_name in enumerate(data_arr_names):
-        invalid_mask_arr = xr_and(0 < dataset[data_arr_name], dataset[data_arr_name] < 10000)
-        invalid_mask = invalid_mask_arr if i == 0 else xr_and(invalid_mask, invalid_mask_arr)
+        invalid_mask_arr = (0 < dataset[data_arr_name]) & (dataset[data_arr_name] < 10000)
+        invalid_mask = invalid_mask_arr if i == 0 else (invalid_mask & invalid_mask_arr)
     return invalid_mask
 
 
@@ -177,7 +176,7 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water']):
     # Keep all specified cover types (e.g. 'clear', 'water'), so logically or the separate masks.
     for i, cover_type in enumerate(cover_types):
         cover_type_clean_mask = processing_options[platform](dataset.pixel_qa, cover_type)
-        clean_mask = cover_type_clean_mask if i == 0 else xr_or(clean_mask, cover_type_clean_mask)
+        clean_mask = cover_type_clean_mask if i == 0 else (clean_mask | cover_type_clean_mask)
     return clean_mask
 
 ## End Landsat ##
