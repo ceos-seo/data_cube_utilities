@@ -1510,11 +1510,9 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
                 np.array([((baseline_cls_mask == 1) & (analysis_cls_mask == 1)).sum()
                           for analysis_cls_mask in analysis_dict.values()])
         # Percent
-        percent_px_trans_da = xr.DataArray(np.zeros((3, 3), dtype=np.float64),
-                                           dims=dims, coords=coords)
         percent_px_trans_da = num_px_trans_da / (y_x_shape[0] * y_x_shape[1])
-        stats_data.append(xr.Dataset(data_vars=dict(number=num_px_trans_da,
-                                                    percent=percent_px_trans_da)))
+        stats_data.append(xr.Dataset(data_vars=dict(Number=num_px_trans_da,
+                                                    Percent=percent_px_trans_da)))
     stats_data = tuple(stats_data)
     if create_stats_table or create_change_matrix:
         return (fig, ax), stats_data
