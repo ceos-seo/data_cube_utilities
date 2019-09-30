@@ -9,7 +9,7 @@ import rasterio
 
 ## Export ##
 
-def export_xarray_to_netcdf(ds, path):
+def export_xarray_to_netcdf(data, path):
     """
     Exports an xarray.Dataset as a single NetCDF file.
     All attributes except CRS will be lost, and the CRS
@@ -17,31 +17,32 @@ def export_xarray_to_netcdf(ds, path):
 
     Parameters
     ----------
-    ds: xarray.Dataset
-        The Dataset to export.
+    data: xarray.Dataset or xarray.DataArray
+        The Dataset or DataArray to export.
     path: str
         The path to store the exported NetCDF file at.
         Must include the filename and ".nc" extension.
     """
     # To be able to call `xarray.Dataset.to_netcdf()`, convert the CRS
     # object from the Data Cube to a string and remove all other attributes.
-    for attr in ds.attrs:
+    for attr in data.attrs:
         if attr == 'crs' and not isinstance(attr, str):
-            ds.attrs['crs'] = ds.crs.crs_str
+            data.attrs['crs'] = data.crs.crs_str
         else:
-            del ds.attrs[attr]
-    for data_var in ds.data_vars:
-        for attr in list(ds[data_var].attrs):
-            if attr == 'crs' and not isinstance(attr, str):
-                ds[data_var].attrs['crs'] = ds[data_var].crs.crs_str
-            else:
-                del ds[data_var].attrs[attr]
-    if 'time' in ds.coords:
-        if 'units' in ds.time.attrs:
-            time_units = ds.time.attrs['units']
-            del ds.time.attrs['units']
-            ds.time.encoding['units'] = time_units
-    ds.to_netcdf(path)
+            del data.attrs[attr]
+    if isinstance(data, xr.Dataset):
+        for data_var in data.data_vars:
+            for attr in list(data[data_var].attrs):
+                if attr == 'crs' and not isinstance(attr, str):
+                    data[data_var].attrs['crs'] = data[data_var].crs.crs_str
+                else:
+                    del data[data_var].attrs[attr]
+    if 'time' in data.coords:
+        if 'units' in data.time.attrs:
+            time_units = data.time.attrs['units']
+            del data.time.attrs['units']
+            data.time.encoding['units'] = time_units
+    data.to_netcdf(path)
 
 def export_slice_to_geotiff(ds, path, x_coord='longitude', y_coord='latitude'):
     """
