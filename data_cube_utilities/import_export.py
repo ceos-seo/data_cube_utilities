@@ -11,7 +11,7 @@ import rasterio
 
 def export_xarray_to_netcdf(data, path):
     """
-    Exports an xarray.Dataset as a single NetCDF file.
+    Exports an xarray object as a single NetCDF file.
 
     Parameters
     ----------
