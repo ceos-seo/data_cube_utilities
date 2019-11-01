@@ -12,8 +12,6 @@ import rasterio
 def export_xarray_to_netcdf(data, path):
     """
     Exports an xarray.Dataset as a single NetCDF file.
-    All attributes except CRS will be lost, and the CRS
-    attribute will be converted to a string.
 
     Parameters
     ----------
@@ -23,26 +21,47 @@ def export_xarray_to_netcdf(data, path):
         The path to store the exported NetCDF file at.
         Must include the filename and ".nc" extension.
     """
-    # To be able to call `xarray.Dataset.to_netcdf()`, convert the CRS
-    # object from the Data Cube to a string and remove all other attributes.
-    for attr in data.attrs:
-        if attr == 'crs' and not isinstance(attr, str):
-            data.attrs['crs'] = data.crs.crs_str
-        else:
+    # Record original attributes to restore after export.
+    orig_data_attrs = data.attrs.copy()
+    orig_data_var_attrs = {}
+    if isinstance(data, xr.Dataset):
+        for data_var in data.data_vars:
+            orig_data_var_attrs[data_var] = data[data_var].attrs.copy()
+
+    # If present, convert the CRS object from the Data Cube to a string.
+    # String and numeric attributes are retained.
+    # All other attributes are removed.
+    def handle_attr(data, attr):
+        if attr == 'crs' and not isinstance(data.attrs[attr], str):
+            data.attrs[attr] = data.crs.crs_str
+        elif not isinstance(attr, (str, int, float)):
             del data.attrs[attr]
+
+    # To be able to call `xarray.Dataset.to_netcdf()`, convert the CRS
+    # object from the Data Cube to a string, retain string and numeric
+    # attributes, and remove all other attributes.
+    for attr in data.attrs:
+        handle_attr(data, attr)
     if isinstance(data, xr.Dataset):
         for data_var in data.data_vars:
             for attr in list(data[data_var].attrs):
-                if attr == 'crs' and not isinstance(attr, str):
-                    data[data_var].attrs['crs'] = data[data_var].crs.crs_str
-                else:
-                    del data[data_var].attrs[attr]
+                handle_attr(data[data_var], attr)
+    # Move units from the time coord attributes to its encoding.
     if 'time' in data.coords:
+        orig_time_attrs = data.time.attrs.copy()
         if 'units' in data.time.attrs:
             time_units = data.time.attrs['units']
             del data.time.attrs['units']
             data.time.encoding['units'] = time_units
+    # Export to NetCDF.
     data.to_netcdf(path)
+    # Restore original attributes.
+    data.attrs = orig_data_attrs
+    if 'time' in data.coords:
+        data.time.attrs = orig_time_attrs
+    if isinstance(data, xr.Dataset):
+        for data_var in data.data_vars:
+            data[data_var].attrs = orig_data_var_attrs[data_var]
 
 def export_slice_to_geotiff(ds, path, x_coord='longitude', y_coord='latitude'):
     """
