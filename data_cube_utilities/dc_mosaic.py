@@ -511,6 +511,8 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
                                           dtype=None,
                                           intermediate_product=None,
                                           operation="median",
+                                          x_coord='longitude', 
+                                          y_coord='latitude',
                                           **kwargs):
     """
     Calculates the geomedian or geomedoid using a multi-band processing method.
@@ -530,6 +532,8 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
         np.int16, np.float32) to convert the data to.
     operation: str in ['median', 'medoid']
+    x_coord, y_coord: str
+        Names of DataArrays in `dataset_in` to use as x, y, and time coordinates.
 
     Returns
     -------
@@ -579,8 +583,8 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
         for index, value in enumerate(band_list)
     }
     dataset_out = xr.Dataset(output_dict,
-                             coords={'latitude': dataset_in['latitude'],
-                                     'longitude': dataset_in['longitude']},
+                             coords={y_coord: dataset_in[y_coord],
+                                     x_coord: dataset_in[x_coord]},
                              attrs=dataset_in.attrs)
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
