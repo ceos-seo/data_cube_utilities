@@ -533,7 +533,7 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
         np.int16, np.float32) to convert the data to.
     operation: str in ['median', 'medoid']
     x_coord, y_coord: str
-        Names of DataArrays in `dataset_in` to use as x, y, and time coordinates.
+        Names of DataArrays in `dataset_in` to use as x and y coordinates.
 
     Returns
     -------
