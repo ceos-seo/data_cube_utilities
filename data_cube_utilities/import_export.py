@@ -34,7 +34,7 @@ def export_xarray_to_netcdf(data, path):
     def handle_attr(data, attr):
         if attr == 'crs' and not isinstance(data.attrs[attr], str):
             data.attrs[attr] = data.crs.crs_str
-        elif not isinstance(attr, (str, int, float)):
+        elif not isinstance(data.attrs[attr], (str, int, float)):
             del data.attrs[attr]
 
     # To be able to call `xarray.Dataset.to_netcdf()`, convert the CRS

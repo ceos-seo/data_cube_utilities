@@ -604,9 +604,9 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                         # Handle cases of insufficient data for this section of the plot.
                         not_nat_times = None
                         if time_agg_str == 'time':
-                            not_nat_times = ~np.isnat(y[time_agg_str])
+                            not_nat_times = ~np.isnat(y[time_agg_str].values)
                         else:
-                            not_nat_times = ~np.isnan(y[time_agg_str])
+                            not_nat_times = ~np.isnan(y[time_agg_str].values)
                         num_unique_times_y = len(np.unique(y[time_agg_str].values[not_nat_times]))
                         if num_unique_times_y == 0:  # There is no data.
                             continue

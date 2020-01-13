@@ -141,7 +141,7 @@ def xr_interp(dataset, interp_config):
         if num_pts is None:
             frac = interp_kwargs.get('frac', None)
             num_pts_orig = len(dataset[dim])
-            num_pts = round(num_pts_orig * frac)
+            num_pts = int(round(num_pts_orig * frac))
         dim_vals = dataset[dim].values
         dim_dtype = type(dim_vals[0])
         # Convert NumPy datetime64 objects to scalars.

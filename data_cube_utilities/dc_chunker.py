@@ -1,24 +1,25 @@
 import math
-from datetime import datetime
 from itertools import groupby
 import xarray as xr
 import numpy as np
-import os
+import itertools
 
 
 def create_geographic_chunks(longitude=None, latitude=None, geographic_chunk_size=0.5):
-    """Chunk a parameter set defined by latitude, longitude, and a list of acquisitions.
+    """Spatially chunk a parameter set defined by latitude and longitude.
 
-    Process the lat/lon/time parameters defined for loading Data Cube Data - these should be
-    produced by dc.list_acquisition_dates
+    Parameters
+    ----------
+    longitude: list-like
+        Longitude range to split
+    latitude: list-like
+        Latitude range to split
 
-    Args:
-        latitude: Latitude range to split
-        longitude: Longitude range to split
-
-    Returns:
-        A zip formatted list of dicts containing longitude, latitude that can be used to update params
-
+    Returns
+    -------
+    geographic_chunks: list of dicts
+        A list of dicts mapping longitude and latitude to 2-tuples of their ranges
+        for each chunk.
     """
 
     assert latitude and longitude, "Longitude and latitude are both required kwargs."
@@ -40,6 +41,48 @@ def create_geographic_chunks(longitude=None, latitude=None, geographic_chunk_siz
 
     return [{'longitude': pair[0], 'latitude': pair[1]} for pair in zip(longitude_ranges, latitude_ranges)]
 
+
+def create_square_geographic_chunks(longitude=None, latitude=None,
+                                    geographic_chunk_size=0.05):
+    """
+    Chunk a parameter into square chunks defined by latitude and longitude.
+
+    Parameters
+    ----------
+    latitude: list-like
+        Latitude range to split
+    longitude: list-like
+        Longitude range to split
+    geographic_chunk_size: numeric
+        The maximum allowed size of a chunk in square degrees.
+
+    Returns
+    -------
+    geographic_chunks: list of dict
+        A list of dicts mapping longitude and latitude to 2-tuples of their ranges
+        for each chunk.
+    """
+
+    assert latitude and longitude, "Longitude and latitude are both required kwargs."
+    assert len(latitude) == 2 and latitude[1] >= latitude[0], \
+        "Latitude must be a tuple of length 2 with the second element greater than or equal to the first."
+    assert len(longitude) == 2 and longitude[1] >= longitude[0], \
+        "Longitude must be a tuple of length 2 with the second element greater than or equal to the first."
+
+    square_area = (latitude[1] - latitude[0]) * (longitude[1] - longitude[0])
+    num_geographic_chunks = max(1, np.ceil(square_area / geographic_chunk_size))
+
+    # Get the values of the lower bounds of the ranges.
+    lat_pts = np.linspace(min(latitude), max(latitude),
+                          np.ceil(np.sqrt(num_geographic_chunks)) + 1)
+    lon_pts = np.linspace(min(longitude), max(longitude),
+                          np.ceil(np.sqrt(num_geographic_chunks)) + 1)
+    # Get the ranges (2-tuples).
+    lat_rngs = [(lat_pts[i], lat_pts[i + 1]) for i in range(len(lat_pts) - 1)]
+    lon_rngs = [(lon_pts[i], lon_pts[i + 1]) for i in range(len(lon_pts) - 1)]
+
+    return [{'latitude': lat_rng, 'longitude': lon_rng} for lat_rng, lon_rng
+            in itertools.product(lat_rngs, lon_rngs)]
 
 def combine_geographic_chunks(chunks):
     """

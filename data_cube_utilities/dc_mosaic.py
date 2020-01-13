@@ -70,25 +70,28 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
     dtype: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
         np.int16, np.float32) to convert the data to.
+    intermediate_product: xarray.Dataset
+        A 2D dataset used to store intermediate results.
 
     Returns
     -------
     dataset_out: xarray.Dataset
-        Compositited data with the format:
+        Composited data with the format:
         coordinates: latitude, longitude
         variables: same as dataset_in
     """
-    dataset_in = dataset_in.copy(deep=True)
-
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    # Mask data with clean_mask. All values where clean_mask==False are set to no_data.
+    # Mask data with clean_mask.
+    # All values where `clean_mask==False` are set to `no_data`.
+    dataset_in = dataset_in.copy(deep=True)
+    not_clean_mask = np.invert(clean_mask) # True where unclean.
     for key in list(dataset_in.data_vars):
-        dataset_in[key].values[np.invert(clean_mask)] = no_data
+        dataset_in[key].values[not_clean_mask] = no_data
 
-    dataset_in_dtypes = None
+    dataset_in_dtypes, band_list = [None]*2
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
         band_list = list(dataset_in.data_vars)
@@ -101,8 +104,9 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
     else:
         dataset_out = None
 
-    time_slices = reversed(
-        range(len(dataset_in.time))) if 'reverse_time' in kwargs else range(len(dataset_in.time))
+    time_slices = range(len(dataset_in.time))
+    if 'reverse_time' in kwargs:
+        time_slices = reversed(time_slices)
     for index in time_slices:
         dataset_slice = dataset_in.isel(time=index).drop('time')
         if dataset_out is None:
@@ -110,9 +114,8 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
             utilities.clear_attrs(dataset_out)
         else:
             for key in list(dataset_in.data_vars):
-                dataset_out[key].values[dataset_out[key].values == -9999] = dataset_slice[key].values[dataset_out[key]
-                                                                                                      .values == -9999]
-                dataset_out[key].attrs = OrderedDict()
+                data_var_is_no_data = dataset_out[key].values == no_data
+                dataset_out[key].values[data_var_is_no_data] = dataset_slice[key].values[data_var_is_no_data]
 
     # Handle datatype conversions.
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
@@ -148,7 +151,7 @@ def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, *
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    dataset_in_dtypes = None
+    dataset_in_dtypes, band_list = [None]*2
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
         band_list = list(dataset_in.data_vars)
@@ -195,7 +198,7 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None,
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    dataset_in_dtypes = None
+    dataset_in_dtypes, band_list = [None]*2
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
         band_list = list(dataset_in.data_vars)
@@ -203,7 +206,7 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None,
         for band in band_list:
             dataset_in_dtypes[band] = dataset_in[band].dtype
 
-    # Mask out clouds and Landsat 7 scan lines.
+    # Mask out missing and unclean data.
     dataset_in = dataset_in.where((dataset_in != no_data) & (clean_mask))
     dataset_out = dataset_in.median(dim='time', skipna=True, keep_attrs=False)
 
@@ -230,6 +233,8 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     dtype: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
         np.int16, np.float32) to convert the data to.
+    intermediate_product: xarray.Dataset
+        A 2D dataset used to store intermediate results.
 
     Returns
     -------
@@ -238,22 +243,17 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
         coordinates: latitude, longitude
         variables: same as dataset_in
     """
-    dataset_in = dataset_in.copy(deep=True)
-
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    dataset_in_dtypes = None
+    dataset_in_dtypes, band_list = [None]*2
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
         band_list = list(dataset_in.data_vars)
         dataset_in_dtypes = {}
         for band in band_list:
             dataset_in_dtypes[band] = dataset_in[band].dtype
-
-    # Mask out clouds and scan lines.
-    dataset_in = dataset_in.where((dataset_in != -9999) & clean_mask)
 
     if intermediate_product is not None:
         dataset_out = intermediate_product.copy(deep=True)
@@ -263,16 +263,22 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     time_slices = range(len(dataset_in.time))
     for timeslice in time_slices:
         dataset_slice = dataset_in.isel(time=timeslice).drop('time')
+        clean_mask_slice = clean_mask[timeslice]
+        # Mask out clouds and scan lines.
+        dataset_slice = dataset_slice.where((dataset_slice != no_data) & clean_mask_slice)
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
-        ndvi.values[np.invert(clean_mask)[timeslice, ::]] = -1000000000
+        # Set unclean areas to an arbitrarily low value so they
+        # are not used (this is a max mosaic).
+        ndvi.values[np.invert(clean_mask_slice)] = -1000000000
         dataset_slice['ndvi'] = ndvi
         if dataset_out is None:
-            dataset_out = dataset_slice.copy(deep=True)
+            dataset_out = dataset_slice
             utilities.clear_attrs(dataset_out)
         else:
+            use_mask = dataset_slice.ndvi.values > dataset_out.ndvi.values
             for key in list(dataset_slice.data_vars):
-                dataset_out[key].values[dataset_slice.ndvi.values > dataset_out.ndvi.values] = \
-                    dataset_slice[key].values[dataset_slice.ndvi.values > dataset_out.ndvi.values]
+                dataset_out[key].values[use_mask] = \
+                    dataset_slice[key].values[use_mask]
     # Handle datatype conversions.
     dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
@@ -304,22 +310,17 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
         coordinates: latitude, longitude
         variables: same as dataset_in
     """
-    dataset_in = dataset_in.copy(deep=True)
-
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    dataset_in_dtypes = None
+    dataset_in_dtypes, band_list = [None]*2
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
         band_list = list(dataset_in.data_vars)
         dataset_in_dtypes = {}
         for band in band_list:
             dataset_in_dtypes[band] = dataset_in[band].dtype
-
-    # Mask out clouds and scan lines.
-    dataset_in = dataset_in.where((dataset_in != -9999) & clean_mask)
 
     if intermediate_product is not None:
         dataset_out = intermediate_product.copy(deep=True)
@@ -329,17 +330,20 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     time_slices = range(len(dataset_in.time))
     for timeslice in time_slices:
         dataset_slice = dataset_in.isel(time=timeslice).drop('time')
+        clean_mask_slice = clean_mask[timeslice]
+        # Mask out clouds and scan lines.
+        dataset_slice = dataset_slice.where((dataset_slice != no_data) & clean_mask_slice)
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
-        ndvi.values[np.invert(clean_mask)[timeslice, ::]] = 1000000000
+        ndvi.values[np.invert(clean_mask_slice)] = 1000000000
         dataset_slice['ndvi'] = ndvi
         if dataset_out is None:
-            dataset_out = dataset_slice.copy(deep=True)
+            dataset_out = dataset_slice
             utilities.clear_attrs(dataset_out)
         else:
+            use_mask = dataset_slice.ndvi.values > dataset_out.ndvi.values
             for key in list(dataset_slice.data_vars):
-                dataset_out[key].values[dataset_slice.ndvi.values <
-                                        dataset_out.ndvi.values] = dataset_slice[key].values[dataset_slice.ndvi.values <
-                                                                                             dataset_out.ndvi.values]
+                dataset_out[key].values[use_mask] = \
+                    dataset_slice[key].values[use_mask]
     # Handle datatype conversions.
     dataset_out = restore_or_convert_dtypes(dtype, None, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
