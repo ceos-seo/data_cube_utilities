@@ -115,6 +115,7 @@ def export_xarray_to_geotiff(data, tif_path, bands=None, no_data=-9999, crs="EPS
     ----------
     data: xarray.Dataset or xarray.DataArray
         An xarray with 2 dimensions to be exported as a GeoTIFF.
+        If the dtype is `bool`, convert to dtype `numpy.uint8`.
     tif_path: string
         The path to write the GeoTIFF file to. You should include the file extension.
     bands: list of string
