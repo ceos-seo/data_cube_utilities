@@ -84,13 +84,6 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    # Mask data with clean_mask.
-    # All values where `clean_mask==False` are set to `no_data`.
-    dataset_in = dataset_in.copy(deep=True)
-    not_clean_mask = np.invert(clean_mask) # True where unclean.
-    for key in list(dataset_in.data_vars):
-        dataset_in[key].values[not_clean_mask] = no_data
-
     dataset_in_dtypes, band_list = [None]*2
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
@@ -107,13 +100,15 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
     time_slices = range(len(dataset_in.time))
     if 'reverse_time' in kwargs:
         time_slices = reversed(time_slices)
-    for index in time_slices:
-        dataset_slice = dataset_in.isel(time=index).drop('time')
+    for timeslice in time_slices:
+        dataset_slice = dataset_in.isel(time=timeslice).drop('time')
+        clean_mask_slice = clean_mask[timeslice]
+        dataset_slice = dataset_slice.where((dataset_slice != no_data) & (clean_mask_slice))
         if dataset_out is None:
             dataset_out = dataset_slice.copy(deep=True)
             utilities.clear_attrs(dataset_out)
         else:
-            for key in list(dataset_in.data_vars):
+            for key in list(dataset_slice.data_vars):
                 data_var_is_no_data = dataset_out[key].values == no_data
                 dataset_out[key].values[data_var_is_no_data] = dataset_slice[key].values[data_var_is_no_data]
 
