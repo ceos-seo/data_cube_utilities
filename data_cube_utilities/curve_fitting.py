@@ -42,7 +42,7 @@ def gaussian_fit(x, y, x_smooth=None, n_pts=n_pts_smooth):
     return x_smooth, y_smooth
 
 
-def gaussian_filter_fit(x, y, x_smooth=None, n_pts=n_pts_smooth, sigma=None):
+def gaussian_filter_fit(x, y, x_smooth=None, n_pts=n_pts_smooth, sigma=0.75):
     """
     Fits a Gaussian filter to some data - x and y. Returns predicted interpolation values.
     Currently, smoothing is achieved by fitting a cubic spline to the gaussian filter fit
@@ -60,7 +60,7 @@ def gaussian_filter_fit(x, y, x_smooth=None, n_pts=n_pts_smooth, sigma=None):
         The number of evenly spaced points spanning the range of `x` to interpolate for.
     sigma: numeric, optional
         The standard deviation of the Gaussian kernel. A larger value yields a smoother curve,
-        but also reduced the closeness of the fit. By default, it is `4 * np.std(y)`.
+        but also reduced the closeness of the fit. By default, it is `0.75`.
 
     Returns
     -------
@@ -70,7 +70,6 @@ def gaussian_filter_fit(x, y, x_smooth=None, n_pts=n_pts_smooth, sigma=None):
     if x_smooth is None:
         x_smooth_inds = np.linspace(0, len(x)-1, n_pts)
         x_smooth = np.interp(x_smooth_inds, np.arange(len(x)), x)
-    sigma = sigma if sigma is not None else 4 * np.std(y)
     gauss_filter_y = gaussian_filter1d(y, sigma)
     cs = CubicSpline(x, gauss_filter_y)
     y_smooth = cs(x_smooth)
@@ -100,7 +99,7 @@ def poly_fit(x, y, degree, x_smooth=None, n_pts=n_pts_smooth):
         The smoothed x and y values of the curve fit.
     """
     if x_smooth is None:
-        x_smooth_inds = np.linspace(0, len(x), n_pts)
+        x_smooth_inds = np.linspace(0, len(x)-1, n_pts)
         x_smooth = np.interp(x_smooth_inds, np.arange(len(x)), x)
     y_smooth = np.array([np.array([coef * (x_val ** current_degree) for
                                    coef, current_degree in zip(np.polyfit(x, y, degree),
@@ -135,7 +134,7 @@ def fourier_fit(x, y, n_predict=0, x_smooth=None, n_pts=n_pts_smooth,
         The smoothed x and y values of the curve fit.
     """
     if x_smooth is None:
-        x_smooth_inds = np.linspace(0, len(x), n_pts)
+        x_smooth_inds = np.linspace(0, len(x)-1, n_pts)
         x_smooth = np.interp(x_smooth_inds, np.arange(len(x)), x)
     n_predict_smooth = int((len(x_smooth) / len(x)) * n_predict)
     # These points are evenly spaced for the fourier fit implementation we use.
