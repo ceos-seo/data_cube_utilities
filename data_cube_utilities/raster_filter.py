@@ -13,7 +13,7 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
     representing the surrounding pixels.
 
     More specifically, this reduces noise in a raster by setting
-    contiguous regions of values of a specified minimum size to
+    contiguous regions of values greater than a specified minimum size to
     the modal value in a specified neighborhood.
 
     The default argument values filter out lone, singular pixels.
@@ -22,21 +22,24 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
 
     Args:
         image (numpy.ndarray):
-            The image to filter.
+            The image to filter. Must not contain NaNs.
         min_size (int):
             Defines the minimum number of contiguous pixels that will not
-            be set to the modal value of their neighborhood. Setting this to 1
-            is pointless, since this function will then do nothing to the raster.
+            be set to the modal value of their neighborhood. Must be greater than 2.
+            Setting this to 1 is pointless, since this function will then do nothing to the raster.
         connectivity (int):
             The maximum distance between any two pixels such that they are
             considered one group. For example, a connectivity of 1 considers
             only adjacent values to be within one group, but a connectivity of 2
-            also considers diagonally connected values to be within one group.
+            also considers diagonally connected values to be within one group. 
+            Must be greater than 0.
         kernel_size (int or float):
             The diameter of the circular kernel to use for the modal filter.
-            If there are still large, contiguous regions of lone pixels,
-            increase this value to remove them. Note that the larger this value
-            is, the more detail may be lost in the image.
+            If there are still contiguous regions of pixels that should be set to the
+            modal value of their neighborhood, increase this value to remove them.
+            This parameter generally should scale roughly with the square root of the 
+            `min_size` parameter. Note that the larger this value is, the more detail 
+            may be lost in the image and the slower this function will run.
 
     Returns:
         The filtered image.
@@ -46,13 +49,21 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
         John Rattz    (john.c.rattz@ama-inc.com)
     """
     assert kernel_size % 2 == 1, "The parameter `kernel_size` must be an odd number."
+    image_min, image_max = image.min(), image.max()
+    image_dtype = image.dtype
+    image = np.interp(image, [image_min, image_max], [0,255]).astype(np.uint8)
     modal_filtered = modal(image, create_circular_mask(kernel_size, kernel_size))
-
+    
     da = xr.DataArray(image)
     for i, val in enumerate(np.unique(image)):
+        # Determine the pixels with this value that will be not be filtered (True to keep).
         layer = remove_small_objects(image == val, min_size=min_size, connectivity=connectivity)
+        # Select the values from the image that will remain (filter it).
         filtered = da.where(layer) if i == 0 else filtered.combine_first(da.where(layer))
-    filtered.values[np.isnan(filtered.values)] = modal_filtered[np.isnan(filtered.values)]
+    # Fill in the removed values with their local modes.
+    filtered_nan_mask = np.isnan(filtered.values)
+    filtered.values[filtered_nan_mask] = modal_filtered[filtered_nan_mask]
+    filtered.values = np.interp(filtered.values, [0,255], [image_min, image_max]).astype(image_dtype)
     return filtered.values
 
 ## End Selective Filters ##
