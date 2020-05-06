@@ -30,16 +30,15 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
         connectivity (int):
             The maximum distance between any two pixels such that they are
             considered one group. For example, a connectivity of 1 considers
-            only adjacent values to be within one group, but a connectivity of 2
-            also considers diagonally connected values to be within one group. 
-            Must be greater than 0.
+            only adjacent values to be within one group (contiguous areas), but 
+            a connectivity of 2 also considers diagonally connected values to be 
+            within one group. Must be greater than 0.
         kernel_size (int or float):
             The diameter of the circular kernel to use for the modal filter.
-            If there are still contiguous regions of pixels that should be set to the
+            If there are still pixels that should be set to the
             modal value of their neighborhood, increase this value to remove them.
-            This parameter generally should scale roughly with the square root of the 
-            `min_size` parameter. Note that the larger this value is, the more detail 
-            may be lost in the image and the slower this function will run.
+            Note that the larger this value is, the more detail will tend to be
+            lost in the image and the slower this function will run.
 
     Returns:
         The filtered image.
