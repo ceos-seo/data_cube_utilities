@@ -1,13 +1,17 @@
 import numpy as np
 import xarray as xr
+import dask
+import scipy
+from xarray.ufuncs import isnan as xr_nan
 from .clean_mask import create_circular_mask
 from skimage.filters.rank import modal
 from skimage.morphology import remove_small_objects
-import scipy
+from .unique import dask_array_uniques
 
 ## Selective Filters (do not necessarily apply to all pixels) ##
 
-def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
+def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3,
+                       unique_vals=None):
     """
     Replaces isolated, contiguous regions of values in a raster with values
     representing the surrounding pixels.
@@ -39,6 +43,9 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
             modal value of their neighborhood, increase this value to remove them.
             Note that the larger this value is, the more detail will tend to be
             lost in the image and the slower this function will run.
+        unique_vals: numpy.ndarray
+            The unique values in `image`. If this is not supplied, the unique values will be
+            determined on each call.
 
     Returns:
         The filtered image.
@@ -50,20 +57,35 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3):
     assert kernel_size % 2 == 1, "The parameter `kernel_size` must be an odd number."
     image_min, image_max = image.min(), image.max()
     image_dtype = image.dtype
-    image = np.interp(image, [image_min, image_max], [0,255]).astype(np.uint8)
-    modal_filtered = modal(image, create_circular_mask(kernel_size, kernel_size))
+    image = (((image - image_min) / (image_max - image_min)) * 255).astype(np.uint8)
+    if isinstance(image, np.ndarray):
+        modal_filtered = modal(image, create_circular_mask(kernel_size, kernel_size))
+    elif isinstance(image, dask.array.core.Array):
+        modal_filtered = image.map_blocks(modal, selem=create_circular_mask(kernel_size, kernel_size))
     
-    da = xr.DataArray(image)
-    for i, val in enumerate(np.unique(image)):
-        # Determine the pixels with this value that will be not be filtered (True to keep).
-        layer = remove_small_objects(image == val, min_size=min_size, connectivity=connectivity)
+    image_da = xr.DataArray(image)
+    if unique_vals is None:
+        unique_vals = []
+        if isinstance(image, np.ndarray):
+            unique_vals = np.unique(image)
+        elif isinstance(image, dask.array.core.Array):
+            unique_vals = dask_array_uniques(image)
+    else: # Scale to the range [0,1].
+        unique_vals = (((unique_vals - image_min) / (image_max - image_min)) * 255).astype(np.uint8)
+
+    for i, val in enumerate(unique_vals):
+        # Determine the pixels with this value that will not be filtered (True to keep).
+        if isinstance(image, np.ndarray):
+            layer = remove_small_objects(image == val, min_size=min_size, connectivity=connectivity)
+        elif isinstance(image, dask.array.core.Array):
+            layer = (image == val).map_blocks(remove_small_objects, min_size=min_size, connectivity=connectivity)
         # Select the values from the image that will remain (filter it).
-        filtered = da.where(layer) if i == 0 else filtered.combine_first(da.where(layer))
+        filtered = image_da.where(layer) if i == 0 else filtered.combine_first(image_da.where(layer))
     # Fill in the removed values with their local modes.
-    filtered_nan_mask = np.isnan(filtered.values)
-    filtered.values[filtered_nan_mask] = modal_filtered[filtered_nan_mask]
-    filtered.values = np.interp(filtered.values, [0,255], [image_min, image_max]).astype(image_dtype)
-    return filtered.values
+    filtered_nan_mask = xr_nan(filtered).data
+    filtered = filtered.where(~filtered_nan_mask, modal_filtered)
+    filtered = ((filtered / 255) * (image_max - image_min) + image_min).astype(image_dtype)
+    return filtered.data
 
 ## End Selective Filters ##
 

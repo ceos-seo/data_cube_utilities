@@ -19,6 +19,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import dask
 import gdal, osr
 import numpy as np
 import xarray as xr
@@ -98,13 +99,22 @@ def create_default_clean_mask(dataset_in):
     Throws:
         ValueError - if dataset_in is an empty xarray.Dataset.
     """
-    data_vars = dataset_in.data_vars
-    if len(data_vars) != 0:
-        first_data_var = next(iter(data_vars))
-        clean_mask = np.ones(dataset_in[first_data_var].shape).astype(np.bool)
-        return clean_mask
+    data = None
+    if isinstance(dataset_in, xr.Dataset):
+        data_vars = list(dataset_in.data_vars)
+        if len(data_vars) != 0:
+            data = dataset_in[data_vars[0]].data
+    elif isinstance(dataset_in, xr.DataArray):
+        data = dataset_in.data
+    clean_mask = None
+    if isinstance(data, dask.array.core.Array):
+        clean_mask = dask.array.ones_like(data, dtype='uint8')
     else:
-        raise ValueError('`dataset_in` has no data!')
+        if data is None:
+            clean_mask = np.ones(dataset_in.shape, dtype=np.bool)
+        else:
+            clean_mask = np.ones_like(data, dtype=np.bool)
+    return clean_mask.astype(np.bool)
 
 def get_spatial_ref(crs):
     """

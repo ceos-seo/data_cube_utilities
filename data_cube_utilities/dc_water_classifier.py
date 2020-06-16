@@ -22,7 +22,7 @@
 import gc
 import numpy as np
 import xarray as xr
-
+import dask
 import datacube
 
 from .dc_mosaic import restore_or_convert_dtypes
@@ -80,7 +80,7 @@ def NDWI(data, normalize=False, band_pair=0):
     return ndwi
 
 def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='latitude',
-                  time_coord='time', no_data=-9999, mosaic=False, enforce_float64=False):
+                  time_coord='time', no_data=-9999, mosaic=False):
     """
     Description:
       Performs WOfS algorithm on given dataset.
@@ -129,10 +129,12 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
         ndi_43 = _band_ratio(band4, band3)
         ndi_72 = _band_ratio(band7, band2)
 
-        #classified = np.ones(shape, dtype='uint8')
-
-        classified = np.full(shape, no_data, dtype='uint8')
-
+        if isinstance(band1, np.ndarray):
+            classified = np.full_like(band1, no_data, dtype='uint8')
+        elif isinstance(band1, dask.array.core.Array):
+            classified = dask.array.full_like(band1, no_data, dtype='uint8',
+                                      chunks=band1.chunks)
+    
         # Start with the tree's left branch, finishing nodes as needed
 
         # Left branch
@@ -268,31 +270,16 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
     for band in band_list:
         dataset_in_dtypes[band] = dataset_in[band].dtype
 
-    if enforce_float64:
-        if dtype != 'float64':
-            blue.values = blue.values.astype('float64')
-            green.values = green.values.astype('float64')
-            red.values = red.values.astype('float64')
-            nir.values = nir.values.astype('float64')
-            swir1.values = swir1.values.astype('float64')
-            swir2.values = swir2.values.astype('float64')
-    else:
-        if dtype == 'float64':
-            pass
-        elif dtype != 'float32':
-            blue.values = blue.values.astype('float32')
-            green.values = green.values.astype('float32')
-            red.values = red.values.astype('float32')
-            nir.values = nir.values.astype('float32')
-            swir1.values = swir1.values.astype('float32')
-            swir2.values = swir2.values.astype('float32')
-
-    shape = blue.values.shape
-    classified = _run_regression(blue.values, green.values, red.values, nir.values, swir1.values, swir2.values)
-
-    classified_clean = np.full(classified.shape, no_data, dtype='float64')
-    classified_clean[clean_mask] = classified[clean_mask]  # Contains data for clear pixels
-
+    classified = _run_regression(blue.data, green.data, red.data, 
+                                 nir.data, swir1.data, swir2.data)
+    
+    classified_clean = classified - classified + no_data
+    
+    if isinstance(classified_clean, np.ndarray):
+        classified_clean = np.where(clean_mask, classified, classified_clean)
+    elif isinstance(classified_clean, dask.array.core.Array):
+        classified_clean = dask.array.where(clean_mask, classified, classified_clean)
+    
     # Create xarray of data
     x_coords = dataset_in[x_coord]
     y_coords = dataset_in[y_coord]
