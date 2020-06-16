@@ -21,6 +21,7 @@
 
 import numpy as np
 import xarray as xr
+import dask
 from collections import OrderedDict
 import hdmedians as hd
 
@@ -345,17 +346,21 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
 
 def unpack_bits(land_cover_endcoding, data_array, cover_type):
     """
-	Description:
-		Unpack bits for end of ls7 and ls8 functions 
-	-----
-	Input:
-		land_cover_encoding(dict hash table) land cover endcoding provided by ls7 or ls8
+    Description:
+        Unpack bits for end of ls7 and ls8 functions 
+    -----
+    Input:
+        land_cover_encoding(dict hash table) land cover endcoding provided by ls7 or ls8
         data_array( xarray DataArray)
         cover_type(String) type of cover
-	Output:
+    Output:
         unpacked DataArray
-	"""
-    boolean_mask = np.isin(data_array.values, land_cover_endcoding[cover_type]) 
+    """
+    data = data_array.data
+    if isinstance(data, np.ndarray):
+        boolean_mask = np.isin(data, land_cover_endcoding[cover_type]) 
+    elif isinstance(data, dask.array.core.Array):
+        boolean_mask = dask.array.isin(data, land_cover_endcoding[cover_type])
     return xr.DataArray(boolean_mask.astype(bool),
                         coords = data_array.coords,
                         dims = data_array.dims,
