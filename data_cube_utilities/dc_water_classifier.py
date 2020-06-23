@@ -259,17 +259,6 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
     swir1 = dataset_in.swir1
     swir2 = dataset_in.swir2
 
-    # Enforce float calculations - float64 if user specified, otherwise float32 will do
-    dtype = blue.values.dtype  # This assumes all dataset bands will have
-    # the same dtype (should be a reasonable
-    # assumption)
-
-    # Save dtypes because the `astype()` calls below modify `dataset_in`.
-    band_list = ['red', 'green', 'blue', 'nir', 'swir1', 'swir2']
-    dataset_in_dtypes = {}
-    for band in band_list:
-        dataset_in_dtypes[band] = dataset_in[band].dtype
-
     classified = _run_regression(blue.data, green.data, red.data, 
                                  nir.data, swir1.data, swir2.data)
     
@@ -306,8 +295,6 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
             {'wofs': data_array},
             coords={time_coord: time_coords, y_coord: y_coords, x_coord: x_coords})
 
-    # Handle datatype conversions.
-    restore_or_convert_dtypes(None, band_list, dataset_in_dtypes, dataset_in, no_data)
     return dataset_out
 
 
