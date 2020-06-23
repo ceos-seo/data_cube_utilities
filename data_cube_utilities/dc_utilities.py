@@ -184,21 +184,6 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
     return dataset_out
 
 
-def nan_to_num(data, number):
-    """
-    Converts all nan values in `data` to `number`.
-
-    Parameters
-    ----------
-    data: xarray.Dataset or xarray.DataArray
-    """
-    if isinstance(data, xr.Dataset):
-        for key in list(data.data_vars):
-            data[key].values[np.isnan(data[key].values)] = number
-    elif isinstance(data, xr.DataArray):
-        data.values[np.isnan(data.values)] = number
-
-
 def clear_attrs(dataset):
     """Clear out all attributes on an xarray dataset to write to disk."""
     dataset.attrs = collections.OrderedDict()

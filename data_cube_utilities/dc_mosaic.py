@@ -22,40 +22,23 @@
 import numpy as np
 import xarray as xr
 import dask
+from functools import partial
+from xarray.ufuncs import isnan as xr_nan
 from collections import OrderedDict
 import hdmedians as hd
 
 from . import dc_utilities as utilities
 from .dc_utilities import create_default_clean_mask
 
-"""
-Utility Functions
-"""
-
-def convert_to_dtype(data, dtype):
-    """
-    A utility function converting xarray, pandas, or NumPy data to a given dtype.
-
-    Parameters
-    ----------
-    data: xarray.Dataset, xarray.DataArray, pandas.Series, pandas.DataFrame,
-             or numpy.ndarray
-    dtype: str or numpy.dtype
-        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
-        np.int16, np.float32) to convert the data to.
-    """
-    if dtype is None: # Don't convert the data type.
-        return data
-    return data.astype(dtype)
-
 
 """
 Compositing Functions
 """
 
-def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, intermediate_product=None, **kwargs):
+def create_min_max_var_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, 
+                              var=None, min_max=None):
     """
-    Creates a most-recent-to-oldest mosaic of the input dataset.
+    Creates a minimum or maximum mosaic for a specified data variable in `dataset_in`.
 
     Parameters
     ----------
@@ -71,8 +54,91 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
     dtype: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
         np.int16, np.float32) to convert the data to.
+    var: str
+        The name of the data variable in `dataset_in` to use.
+    min_max: Whether to use the minimum or maximum times of `var` for the composite.
+
+    Returns
+    -------
+    dataset_out: xarray.Dataset
+        Composited data with the format:
+        coordinates: latitude, longitude
+        variables: same as dataset_in
+    """
+    assert var is not None, \
+        "The parameter `var` must be set to the name of a data variable in `dataset_in`"
+    assert min_max is not None and min_max in ['min', 'max'], \
+        "The parameter `min_max` must be one of ['min', 'max']."
+    
+    # Default to masking nothing.
+    if clean_mask is None:
+        clean_mask = create_default_clean_mask(dataset_in)
+
+    data_var_name_list = list(dataset_in.data_vars)
+    dataset_in_dtypes = None
+    if dtype is None:
+        # Save dtypes because masking with Dataset.where() converts to float64.
+        dataset_in_dtypes = {}
+        for data_var in data_var_name_list:
+            dataset_in_dtypes[data_var] = dataset_in[data_var].dtype
+
+    # Mask out missing and unclean data.
+    dataset_in = dataset_in.where((dataset_in != no_data) & clean_mask)
+            
+    first_arr_data = dataset_in[data_var_name_list[0]].data
+    if isinstance(first_arr_data, dask.array.core.Array):
+        dataset_in = dataset_in.chunk({'time':-1})
+    
+    def mosaic_ufunc_max(arr, sel_var):
+        # Set NaNs to the minimum possible value.
+        sel_var[np.isnan(sel_var)] = np.finfo(sel_var.dtype).min
+        # Acquire the desired indices along time.
+        inds = np.argmax(sel_var, axis=-1)
+        inds = np.expand_dims(inds, axis=-1)
+        out = np.take_along_axis(arr, inds, axis=-1).squeeze()
+        return out
+    def mosaic_ufunc_min(arr, sel_var):
+        # Set NaNs to the minimum possible value.
+        sel_var[np.isnan(sel_var)] = np.finfo(sel_var.dtype).max
+        # Acquire the desired indices along time.
+        inds = np.argmin(sel_var, axis=-1)
+        inds = np.expand_dims(inds, axis=-1)
+        out = np.take_along_axis(arr, inds, axis=-1).squeeze()
+        return out
+    
+    dataset_out = xr.apply_ufunc(mosaic_ufunc_max if min_max == 'max' else mosaic_ufunc_min, 
+                                 dataset_in, dataset_in[var],
+                                 input_core_dims=[['time'], ['time']],
+                                 dask='parallelized',
+                                 output_dtypes=[float])
+    # Handle datatype conversions.
+    dataset_out = restore_or_convert_dtypes(dtype, dataset_in_dtypes, dataset_out, no_data)
+    return dataset_out
+
+def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, 
+                  intermediate_product=None, reverse_time=False):
+    """
+    Creates a most-recent-to-oldest mosaic of the input dataset.
+
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A dataset retrieved from the Data Cube; should contain:
+        coordinates: time, latitude, longitude
+        variables: variables to be mosaicked (e.g. red, green, and blue bands)
+    clean_mask: xarray.DataArray or numpy.ndarray or dask.core.array.Array
+        A boolean mask of the same shape as `dataset_in` - specifying which values to mask out.
+        If no clean mask is specified, then all values are kept during compositing.
+    no_data: int or float
+        The no data value.
+    dtype: str or numpy.dtype
+        A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
+        numpy.int16, numpy.float32) to convert the data to.
     intermediate_product: xarray.Dataset
         A 2D dataset used to store intermediate results.
+    reverse_time: bool
+        Whether or not to reverse the time order. If `False`, the output is a most recent
+        mosaic. If `True`, the output is a least recent mosaic.
 
     Returns
     -------
@@ -85,36 +151,38 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, interm
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    dataset_in_dtypes, band_list = [None]*2
+    data_var_name_list = list(dataset_in.data_vars)
+    dataset_in_dtypes = None
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
-        band_list = list(dataset_in.data_vars)
         dataset_in_dtypes = {}
-        for band in band_list:
-            dataset_in_dtypes[band] = dataset_in[band].dtype
+        for data_var in data_var_name_list:
+            dataset_in_dtypes[data_var] = dataset_in[data_var].dtype
 
+    # Mask out missing and unclean data.
+    dataset_in = dataset_in.where((dataset_in != no_data) & clean_mask)
+            
     if intermediate_product is not None:
         dataset_out = intermediate_product.copy(deep=True)
     else:
         dataset_out = None
 
-    time_slices = range(len(dataset_in.time))
-    if 'reverse_time' in kwargs:
-        time_slices = reversed(time_slices)
-    for timeslice in time_slices:
-        dataset_slice = dataset_in.isel(time=timeslice).drop('time')
-        clean_mask_slice = clean_mask[timeslice]
-        dataset_slice = dataset_slice.where((dataset_slice != no_data) & (clean_mask_slice))
-        if dataset_out is None:
-            dataset_out = dataset_slice.copy(deep=True)
-            utilities.clear_attrs(dataset_out)
-        else:
-            for key in list(dataset_slice.data_vars):
-                data_var_is_no_data = dataset_out[key].values == no_data
-                dataset_out[key].values[data_var_is_no_data] = dataset_slice[key].values[data_var_is_no_data]
-
+    first_arr_data = dataset_in[data_var_name_list[0]].data
+    if isinstance(first_arr_data, dask.array.core.Array):
+        dataset_in = dataset_in.chunk({'time':-1})
+    def mosaic_ufunc(arr):
+        if reverse_time:
+            arr = arr[:,:,::-1]
+        first_data_time_inds = np.expand_dims(np.argmax(~np.isnan(arr), axis=-1), axis=-1)
+        out = np.take_along_axis(arr, first_data_time_inds, axis=-1).squeeze()
+        return out
+    dataset_out = xr.apply_ufunc(mosaic_ufunc, dataset_in,
+                                 input_core_dims=[['time']],
+                                 dask='parallelized',
+                                 output_dtypes=[float])
+    
     # Handle datatype conversions.
-    dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
+    dataset_out = restore_or_convert_dtypes(dtype, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
 def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, **kwargs):
@@ -127,14 +195,14 @@ def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, *
         A dataset retrieved from the Data Cube; should contain:
         coordinates: time, latitude, longitude
         variables: variables to be mosaicked (e.g. red, green, and blue bands)
-    clean_mask: np.ndarray
+    clean_mask: numpy.ndarray
         An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
         If no clean mask is specified, then all values are kept during compositing.
     no_data: int or float
         The no data value.
     dtype: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
-        np.int16, np.float32) to convert the data to.
+        numpy.int16, numpy.float32) to convert the data to.
 
     Returns
     -------
@@ -147,20 +215,20 @@ def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, *
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    dataset_in_dtypes, band_list = [None]*2
+    data_var_name_list = list(dataset_in.data_vars)
+    dataset_in_dtypes = None
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
-        band_list = list(dataset_in.data_vars)
         dataset_in_dtypes = {}
-        for band in band_list:
-            dataset_in_dtypes[band] = dataset_in[band].dtype
+        for data_var in data_var_name_list:
+            dataset_in_dtypes[data_var] = dataset_in[data_var].dtype
 
-    # Mask out clouds and scan lines.
+    # Mask out missing and unclean data.
     dataset_in = dataset_in.where((dataset_in != no_data) & (clean_mask))
-    dataset_out = dataset_in.mean(dim='time', skipna=True, keep_attrs=False)
+    dataset_out = dataset_in.mean(dim='time', skipna=True)
 
     # Handle datatype conversions.
-    dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
+    dataset_out = restore_or_convert_dtypes(dtype, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
 
@@ -174,14 +242,12 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None,
         A dataset retrieved from the Data Cube; should contain:
         coordinates: time, latitude, longitude
         variables: variables to be mosaicked (e.g. red, green, and blue bands)
-    clean_mask: np.ndarray
+    clean_mask: numpy.ndarray
         An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
         If no clean mask is specified, then all values are kept during compositing.
-    no_data: int or float
-        The no data value.
     dtype: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
-        np.int16, np.float32) to convert the data to.
+        numpy.int16, numpy.float32) to convert the data to.
 
     Returns
     -------
@@ -193,21 +259,28 @@ def create_median_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None,
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
-
-    dataset_in_dtypes, band_list = [None]*2
+        
+    data_var_name_list = list(dataset_in.data_vars)
+    dataset_in_dtypes = None
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
-        band_list = list(dataset_in.data_vars)
         dataset_in_dtypes = {}
-        for band in band_list:
-            dataset_in_dtypes[band] = dataset_in[band].dtype
+        for data_var in data_var_name_list:
+            dataset_in_dtypes[data_var] = dataset_in[data_var].dtype
 
     # Mask out missing and unclean data.
-    dataset_in = dataset_in.where((dataset_in != no_data) & (clean_mask))
-    dataset_out = dataset_in.median(dim='time', skipna=True, keep_attrs=False)
-
+    dataset_in = dataset_in.where((dataset_in != no_data) & clean_mask)
+    data = dataset_in[data_var_name_list[0]].data
+    
+    if isinstance(data, dask.array.core.Array):
+        dataset_in = dataset_in.chunk({'time':-1})
+    dataset_out = xr.apply_ufunc(partial(np.nanmedian, axis=-1), dataset_in,
+                                 input_core_dims=[['time']],
+                                 dask='parallelized',
+                                 output_dtypes=[float])
+    
     # Handle datatype conversions.
-    dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
+    dataset_out = restore_or_convert_dtypes(dtype, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
 
@@ -221,14 +294,14 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
         A dataset retrieved from the Data Cube; should contain:
         coordinates: time, latitude, longitude
         variables: variables to be mosaicked (e.g. red, green, and blue bands)
-    clean_mask: np.ndarray
+    clean_mask: numpy.ndarray
         An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
         If no clean mask is specified, then all values are kept during compositing.
     no_data: int or float
         The no data value.
     dtype: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
-        np.int16, np.float32) to convert the data to.
+        numpy.int16, numpy.float32) to convert the data to.
     intermediate_product: xarray.Dataset
         A 2D dataset used to store intermediate results.
 
@@ -243,13 +316,13 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    dataset_in_dtypes, band_list = [None]*2
+    data_var_name_list = list(dataset_in.data_vars)
+    dataset_in_dtypes = None
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
-        band_list = list(dataset_in.data_vars)
         dataset_in_dtypes = {}
-        for band in band_list:
-            dataset_in_dtypes[band] = dataset_in[band].dtype
+        for data_var in data_var_name_list:
+            dataset_in_dtypes[data_var] = dataset_in[data_var].dtype
 
     if intermediate_product is not None:
         dataset_out = intermediate_product.copy(deep=True)
@@ -260,7 +333,7 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     for timeslice in time_slices:
         dataset_slice = dataset_in.isel(time=timeslice).drop('time')
         clean_mask_slice = clean_mask[timeslice]
-        # Mask out clouds and scan lines.
+        # Mask out missing and unclean data.
         dataset_slice = dataset_slice.where((dataset_slice != no_data) & clean_mask_slice)
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
         # Set unclean areas to an arbitrarily low value so they
@@ -276,7 +349,7 @@ def create_max_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
                 dataset_out[key].values[use_mask] = \
                     dataset_slice[key].values[use_mask]
     # Handle datatype conversions.
-    dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
+    dataset_out = restore_or_convert_dtypes(dtype, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
 
@@ -290,14 +363,14 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
         A dataset retrieved from the Data Cube; should contain:
         coordinates: time, latitude, longitude
         variables: variables to be mosaicked (e.g. red, green, and blue bands)
-    clean_mask: np.ndarray
+    clean_mask: numpy.ndarray
         An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
         If no clean mask is specified, then all values are kept during compositing.
     no_data: int or float
         The no data value.
     dtype: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
-        np.int16, np.float32) to convert the data to.
+        numpy.int16, numpy.float32) to convert the data to.
 
     Returns
     -------
@@ -310,13 +383,13 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
 
-    dataset_in_dtypes, band_list = [None]*2
+    data_var_name_list = list(dataset_in.data_vars)
+    dataset_in_dtypes = None
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
-        band_list = list(dataset_in.data_vars)
         dataset_in_dtypes = {}
-        for band in band_list:
-            dataset_in_dtypes[band] = dataset_in[band].dtype
+        for data_var in data_var_name_list:
+            dataset_in_dtypes[data_var] = dataset_in[data_var].dtype
 
     if intermediate_product is not None:
         dataset_out = intermediate_product.copy(deep=True)
@@ -327,7 +400,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
     for timeslice in time_slices:
         dataset_slice = dataset_in.isel(time=timeslice).drop('time')
         clean_mask_slice = clean_mask[timeslice]
-        # Mask out clouds and scan lines.
+        # Mask out missing and unclean data.
         dataset_slice = dataset_slice.where((dataset_slice != no_data) & clean_mask_slice)
         ndvi = (dataset_slice.nir - dataset_slice.red) / (dataset_slice.nir + dataset_slice.red)
         ndvi.values[np.invert(clean_mask_slice)] = 1000000000
@@ -341,7 +414,7 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
                 dataset_out[key].values[use_mask] = \
                     dataset_slice[key].values[use_mask]
     # Handle datatype conversions.
-    dataset_out = restore_or_convert_dtypes(dtype, None, dataset_in_dtypes, dataset_out, no_data)
+    dataset_out = restore_or_convert_dtypes(dtype, dataset_in_dtypes, dataset_out, no_data)
     return dataset_out
 
 def unpack_bits(land_cover_endcoding, data_array, cover_type):
@@ -492,14 +565,14 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
         A dataset retrieved from the Data Cube; should contain:
         coordinates: time, latitude, longitude (in that order)
         variables: variables to be mosaicked (e.g. red, green, and blue bands)
-    clean_mask: np.ndarray
-        An ndarray of the same shape as `dataset_in` - specifying which values to mask out.
+    clean_mask: xarray.DataArray or numpy.ndarray or dask.core.array.Array
+        A boolean mask of the same shape as `dataset_in` - specifying which values to mask out.
         If no clean mask is specified, then all values are kept during compositing.
     no_data: int or float
         The no data value.
     dtype: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
-        np.int16, np.float32) to convert the data to.
+        numpy.int16, numpy.float32) to convert the data to.
     operation: str in ['median', 'medoid']
 
     Returns
@@ -509,54 +582,54 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
         coordinates: latitude, longitude
         variables: same as dataset_in
     """
+    assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
+    mosaic_func = hd.nangeomedian if operation == 'median' else hd.nanmedoid
+    
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
-    assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
 
-    band_list = list(dataset_in.data_vars)
+    data_var_name_list = list(dataset_in.data_vars)
     dataset_in_dtypes = None
     if dtype is None:
         # Save dtypes because masking with Dataset.where() converts to float64.
         dataset_in_dtypes = {}
-        for band in band_list:
-            dataset_in_dtypes[band] = dataset_in[band].dtype
+        for data_var in data_var_name_list:
+            dataset_in_dtypes[data_var] = dataset_in[data_var].dtype
 
-    # Mask out clouds and scan lines.
+    # Mask out missing and unclean data.
     dataset_in = dataset_in.where((dataset_in != no_data) & clean_mask)
 
-    arrays = [dataset_in[band] for band in band_list]
-    stacked_data = np.stack(arrays)
-    bands_shape, time_slices_shape, lat_shape, lon_shape = stacked_data.shape[0], \
-                                                           stacked_data.shape[1], stacked_data.shape[2], \
-                                                           stacked_data.shape[3]
-    # Reshape to remove lat/lon
-    reshaped_stack = stacked_data.reshape(bands_shape, time_slices_shape,
-                                          lat_shape * lon_shape)
-    # Build zeroes array across time slices.
-    hdmedians_result = np.zeros((bands_shape, lat_shape * lon_shape))
-
-    # For each pixel (lat/lon combination), find the geomedian or geomedoid across time.
-    for x in range(reshaped_stack.shape[2]):
-        try:
-            hdmedians_result[:, x] = hd.nangeomedian(
-                reshaped_stack[:, :, x], axis=1) if operation == "median" else hd.nanmedoid(
-                reshaped_stack[:, :, x], axis=1)
-        except ValueError as e:
-            # If all bands have nan values across time, the geomedians are nans.
-            hdmedians_result[:, x] = np.full((bands_shape), np.nan)
-    output_dict = {
-        value: (('latitude', 'longitude'), hdmedians_result[index, :].reshape(lat_shape, lon_shape))
-        for index, value in enumerate(band_list)
-    }
-    dataset_out = xr.Dataset(output_dict,
-                             coords={'latitude': dataset_in['latitude'],
-                                     'longitude': dataset_in['longitude']},
-                             attrs=dataset_in.attrs)
-    dataset_out = restore_or_convert_dtypes(dtype, band_list, dataset_in_dtypes, dataset_out, no_data)
+    arrays = [dataset_in[data_var] for data_var in data_var_name_list]
+    
+    first_arr_data = dataset_in[data_var_name_list[0]].data
+    dataset_in = dataset_in.to_array()
+    if isinstance(first_arr_data, dask.array.core.Array):
+        dataset_in = dataset_in.chunk({'variable': -1, 'time':-1})
+    dataset_in = dataset_in.transpose('latitude', 'longitude', 'variable', 'time')
+    def mosaic_ufunc(arr, *args, **kwargs):
+        hdmedians_result = np.zeros(np.array(arr.shape)[[0,1,2]], dtype=np.float64)
+        
+        # For each pixel (lat/lon combination), find the geomedian or geomedoid across time.
+        for x in range(hdmedians_result.shape[0]):
+            for y in range(hdmedians_result.shape[1]):
+                try:
+                    hdmedians_result[x, y, :] = mosaic_func(arr[x, y, :, :], axis=1)
+                except ValueError as e:
+                    # If all bands have nan values across time, the geomedians are nans.
+                    hdmedians_result[x, y, :] = np.full((len(arrays)), np.nan)
+        return hdmedians_result
+    
+    dataset_out = xr.apply_ufunc(mosaic_ufunc, 
+                                 dataset_in,
+                                 input_core_dims=[['time']],
+                                 dask='parallelized',
+                                 output_dtypes=[float]).to_dataset('variable')
+    
     return dataset_out
 
-def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dtypes=None, dataset_out=None, no_data=-9999):
+def restore_or_convert_dtypes(dtype_for_all=None, dataset_in_dtypes=None, 
+                              dataset_out=None, no_data=-9999):
     """
     Converts datatypes of data variables in a copy of an xarray Dataset.
 
@@ -564,14 +637,12 @@ def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dty
     ----------
     dtype_for_all: str or numpy.dtype
         A string denoting a Python datatype name (e.g. int, float) or a NumPy dtype (e.g.
-        np.int16, np.float32) to convert the data to.
-    band_list: list-like
-        !! UNUSED, DEPRECATED !!
+        numpy.int16, numpy.float32) to convert the data to.
     dataset_in_dtypes: dict
-        A dictionary mapping band names to datatypes.
+        A dictionary mapping data variable names to datatypes.
         One of `dtype_for_all` or `dataset_in_dtypes` must be `None`.
-    no_data: int or float
-        The no data value.
+    no_data: int, float, or None
+        The no data value. Set to None (default) if there is no such value.
 
     Returns
     -------
@@ -583,12 +654,19 @@ def restore_or_convert_dtypes(dtype_for_all=None, band_list=None, dataset_in_dty
     if dtype_for_all is not None:
         # Integer types can't represent nan.
         if np.issubdtype(dtype_for_all, np.integer): # This also works for Python int type.
-            utilities.nan_to_num(dataset_out, no_data)
-        convert_to_dtype(dataset_out, dtype_for_all)
+            dataset_out = dataset_out.where(~xr_nan(dataset_out), no_data)
+        # Convert no_data value to nan for float types.
+        if np.issubdtype(dtype_for_all, np.float):
+            dataset_out = dataset_out.where(dataset_out!=no_data, np.nan)
+        dataset_out = dataset_out.astype(dtype_for_all)
     else:  # Restore dtypes to state before masking.
-        for band in dataset_in_dtypes:
-            band_dtype = dataset_in_dtypes[band]
-            if np.issubdtype(band_dtype, np.integer):
-                utilities.nan_to_num(dataset_out[band], no_data)
-            dataset_out[band] = dataset_out[band].astype(band_dtype)
+        for data_var in dataset_in_dtypes:
+            data_var_dtype = dataset_in_dtypes[data_var]
+            if np.issubdtype(data_var_dtype, np.integer):
+                dataset_out[data_var] = \
+                    dataset_out[data_var].where(~xr_nan(dataset_out[data_var]), no_data)
+            if np.issubdtype(dtype_for_all, np.float):
+                dataset_out[data_var] = \
+                    dataset_out[data_var].where(dataset_out[data_var]!=no_data, np.nan)
+            dataset_out[data_var] = dataset_out[data_var].astype(data_var_dtype)
     return dataset_out
