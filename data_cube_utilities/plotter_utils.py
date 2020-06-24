@@ -1360,7 +1360,6 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
         clean_masks = [xr.DataArray(np.ones(dataarray.shape, dtype=np.bool),
                                     coords=dataarray.coords, dims=dataarray.dims)
                        for dataarray in dataarrays]
-
     denoise_params = {} if denoise_params is None and denoise else \
         denoise_params
 
@@ -1413,20 +1412,20 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
         cls_no_cls_mask = baseline_cls_ever & analysis_none_mask
         cls_cls_mask = baseline_cls_ever & analysis_cls_ever
         masks += [no_cls_no_cls_mask, no_cls_cls_mask, cls_no_cls_mask, cls_cls_mask]
-
+        
     # Determine the overriding mask.
     y_x_shape = len(dataarrays[0][y_coord]), len(dataarrays[0][x_coord])
     override_mask = np.zeros(y_x_shape, dtype=np.bool) if override_mask is None else override_mask
-
+    
     # Create an array of integer-encoded change-class values.
-    cls_cng_arr = np.empty(y_x_shape, dtype=np.uint8)
+    cls_cng_arr = np.zeros(y_x_shape, dtype=np.uint8)
     for i, mask in enumerate(masks):
         cls_cng_arr[mask] = i
 
     # Denoise the class change image (optional).
     if denoise:
         cls_cng_arr = lone_object_filter(cls_cng_arr, **denoise_params)
-
+    
     # Color the image with the masks.
     # Initialize pixels as white.
     transparency_mask = np.zeros(y_x_shape, dtype=np.bool)
@@ -1438,7 +1437,7 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
     if neg_trans or pos_trans:
         color_array[transparency_mask] = [0, 0, 0, 0]
     color_array[override_mask] = override_color
-
+    
     fig_kwargs['figsize'] = fig_kwargs.get('figsize', figure_ratio(dataarrays[0], x_coord, y_coord,
                                                                    fixed_width=width))
     fig, ax = retrieve_or_create_fig_ax(fig, ax, **fig_kwargs)
@@ -1468,7 +1467,7 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
     ax.legend(**legend_kwargs)
 
     ax.imshow(color_array, **imshow_kwargs)
-
+    
     if create_stats_table or create_change_matrix:
         stats_data = []
     if create_stats_table:
