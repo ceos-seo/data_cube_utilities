@@ -68,7 +68,10 @@ def match_prods_res(dc, products, method='min'):
     return matching_res
 
 
-def match_dim_sizes(dc, products, x, y, x_y_coords=['longitude', 'latitude'], method='min'):
+def match_dim_sizes(
+    dc, products, x, y, 
+    x_y_coords=['longitude', 'latitude'], method='min',
+    load_kwargs=None):
     """
     Returns the x and y dimension sizes that match some x and y extents for some products.
     This is useful when determining an absolute resolution to scale products to with
@@ -92,6 +95,9 @@ def match_dim_sizes(dc, products, x, y, x_y_coords=['longitude', 'latitude'], me
         The method of finding a matching resolution. The options are
         ['min', 'max'], which separately determine the y and x resolutions
         as the minimum or maximum among all selected products.
+    load_kwargs: dict
+        Dictionary of product names mapping to parameter dictionaries
+        passed to `datacube.Datacube.load()` for the corresponding products.
 
     Returns
     -------
@@ -107,7 +113,12 @@ def match_dim_sizes(dc, products, x, y, x_y_coords=['longitude', 'latitude'], me
     else:
         coords = [x_y_coords] * len(products)
 
-    datasets_empty = [dc.load(product=product, lon=x, lat=y, measurements=[]) for product in products]
+    load_params = {product:dict(product=product, x=x, y=y, measurements=[]) for product in products}
+    if load_kwargs is not None:
+        for product in products:
+            load_params[product].update(**load_kwargs.get(product, {}) if load_kwargs is not None else {})
+
+    datasets_empty = [dc.load(product=product, measurements=[]) for product in products]
 
     # First check if all datasets will load with the same x and y dimension sizes.
     same_dim_sizes = True
