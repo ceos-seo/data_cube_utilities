@@ -1,11 +1,8 @@
 import itertools
 import numpy as np
 import xarray as xr
-from .clean_mask import landsat_qa_clean_mask, landsat_clean_mask_invalid
 from xarray.ufuncs import logical_and as xr_and
-from .sort import xarray_sortby_coord
-from .aggregate import xr_scale_res
-from .dc_mosaic import restore_or_convert_dtypes
+
 
 ## Misc ##
 
@@ -152,6 +149,8 @@ def xarray_concat_and_merge(*args, concat_dim='time', sort_dim='time'):
     merged: list of `xarray.Dataset`
         A tuple of the same length as `*args`, containing the merged data. 
     """
+    from .sort import xarray_sortby_coord
+
     merged = []
     for i, arg in enumerate(args):
         dataset_temp = xr.concat(arg, dim=concat_dim)
@@ -194,6 +193,8 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
     AssertionError: If no data was retrieved for any query
                     (i.e. `len(datasets_temp) == 0`).
     """
+    from .sort import xarray_sortby_coord
+    from .aggregate import xr_scale_res
 
     def xr_set_same_coords(datasets):
         first_ds = datasets[0]
@@ -300,6 +301,9 @@ def load_simple(dc, platform, product, frac_res=None, abs_res=None,
     ------
     AssertionError: If no data is retrieved for any platform query.
     """
+    from .clean_mask import landsat_qa_clean_mask, landsat_clean_mask_invalid
+    from .aggregate import xr_scale_res
+
     current_load_params = dict(platform=platform, product=product)
     current_load_params.update(load_params)
     dataset = dc.load(**current_load_params)
@@ -608,6 +612,8 @@ def reduce_on_day(ds, reduction_func=np.nanmean):
     -------
     reduced_ds: xr.Dataset
     """
+    from .dc_mosaic import restore_or_convert_dtypes
+
     # Save dtypes to convert back to them.
     dataset_in_dtypes = {}
     for band in ds.data_vars:

@@ -1,6 +1,4 @@
 from datetime import datetime
-from sklearn.manifold import TSNE
-from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN, Birch
 import numpy as np
 from collections import OrderedDict
 import xarray as xr
@@ -49,7 +47,6 @@ def clustering_pre_processing(dataset_in, bands):
 
 
 def clustering_post_processing(classified, dataset_in, bands, no_nan_mask):
-    classified_data = OrderedDict()
     shape = dataset_in[bands[0]].values.shape
 
     # Reshape the results to the original data's shape.
@@ -87,6 +84,7 @@ def kmeans_cluster_dataset(dataset_in, bands, n_clusters=4):
     classified = Birch(n_clusters=n_clusters).fit(np_array)
     classified = DBSCAN(eps=0.005, min_samples=5, n_jobs=-1).fit(np_array)
     """
+    from sklearn.cluster import KMeans
     classified = KMeans(n_clusters=n_clusters, n_jobs=-1).fit(features)
     return clustering_post_processing(classified, dataset_in, bands, no_nan_mask)
 
@@ -97,6 +95,7 @@ def birch_cluster_dataset(dataset_in, bands, n_clusters=4):
     classified = DBSCAN(eps=0.005, min_samples=5, n_jobs=-1).fit(np_array)
     classified = KMeans(n_clusters=n_clusters, n_jobs=-1).fit(np_array)
     """
+    from sklearn.cluster import Birch
     classified = Birch(n_clusters=n_clusters, threshold=0.00001).fit(features)
     return clustering_post_processing(classified, dataset_in, bands, no_nan_mask)
 

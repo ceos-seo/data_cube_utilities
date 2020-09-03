@@ -1,10 +1,6 @@
 import numpy as np
 from numpy import fft
-from scipy.optimize import curve_fit
-from scipy.interpolate import CubicSpline
-from scipy.ndimage.filters import gaussian_filter1d
 
-from .scale import np_scale
 from .plotter_utils_consts import n_pts_smooth, default_fourier_n_harm
 
 
@@ -32,6 +28,9 @@ def gaussian_fit(x, y, x_smooth=None, n_pts=n_pts_smooth):
     x_smooth, y_smooth: numpy.ndarray
         The smoothed x and y values of the curve fit.
     """
+    from scipy.optimize import curve_fit
+    from .scale import np_scale
+
     if x_smooth is None:
         x_smooth_inds = np.linspace(0, len(x), n_pts)
         x_smooth = np.interp(x_smooth_inds, np.arange(len(x)), x)
@@ -67,6 +66,9 @@ def gaussian_filter_fit(x, y, x_smooth=None, n_pts=n_pts_smooth, sigma=0.75):
     x_smooth, y_smooth: numpy.ndarray
         The smoothed x and y values of the curve fit.
     """
+    from scipy.interpolate import CubicSpline
+    from scipy.ndimage.filters import gaussian_filter1d
+
     if x_smooth is None:
         x_smooth_inds = np.linspace(0, len(x)-1, n_pts)
         x_smooth = np.interp(x_smooth_inds, np.arange(len(x)), x)

@@ -19,11 +19,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from .dc_water_classifier import wofs_classify
-from .dc_utilities import create_cfmask_clean_mask, create_bit_mask
 from datetime import datetime
-
-import scipy.ndimage.filters as conv
 import numpy as np
 
 
@@ -40,6 +36,9 @@ def compute_coastal_change(old_mosaic, new_mosaic, no_data = -9999):
         Xarray dataset containing all original data with three new variables.
 
     """
+    from .dc_water_classifier import wofs_classify
+    from .dc_utilities import create_cfmask_clean_mask, create_bit_mask
+
     # Create a combined bitmask - cfmask if it exists, otherwise pixel_qa.
     combined_mask = create_cfmask_clean_mask(old_mosaic.cf_mask) & create_cfmask_clean_mask(
         new_mosaic.cf_mask) if 'cf_mask' in old_mosaic else create_bit_mask(
@@ -116,6 +115,8 @@ def _darken_color(color, scale=0.8):
 
 
 def _coastline_classification(dataset, water_band='wofs'):
+    import scipy.ndimage.filters as conv
+
     kern = np.array([[1, 1, 1], [1, 0.001, 1], [1, 1, 1]])
     convolved = conv.convolve(dataset[water_band], kern, mode='constant') // 1
 
@@ -129,6 +130,8 @@ def _coastline_classification(dataset, water_band='wofs'):
 
 
 def _coastline_classification_2(dataset, water_band='wofs'):
+    import scipy.ndimage.filters as conv
+
     kern = np.array([[1, 1, 1], [1, 0.001, 1], [1, 1, 1]])
     convolved = conv.convolve(dataset[water_band], kern, mode='constant', cval=-999) // 1
 

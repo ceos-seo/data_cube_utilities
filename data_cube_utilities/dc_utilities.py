@@ -19,15 +19,12 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import dask
-import gdal, osr
+import gdal
 import numpy as np
 import xarray as xr
-import collections
 import os
 import math
 import datetime
-import shutil
 import uuid
 import rasterio
 import functools
@@ -99,6 +96,8 @@ def create_default_clean_mask(dataset_in):
     Throws:
         ValueError - if dataset_in is an empty xarray.Dataset.
     """
+    import dask
+
     data = None
     if isinstance(dataset_in, xr.Dataset):
         data_vars = list(dataset_in.data_vars)
@@ -126,6 +125,7 @@ def get_spatial_ref(crs):
     Output:
       ref (str) - spatial reference of given crs
     """
+    import osr
 
     crs_str = str(crs)
     epsg_code = int(crs_str.split(':')[1])
@@ -186,9 +186,11 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
 
 def clear_attrs(dataset):
     """Clear out all attributes on an xarray dataset to write to disk."""
-    dataset.attrs = collections.OrderedDict()
+    from collections import OrderedDict
+
+    dataset.attrs = OrderedDict()
     for band in dataset.data_vars:
-        dataset[band].attrs = collections.OrderedDict()
+        dataset[band].attrs = OrderedDict()
 
 
 def create_bit_mask(data_array, valid_bits, no_data=-9999):

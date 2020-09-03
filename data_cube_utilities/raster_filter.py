@@ -1,12 +1,6 @@
 import numpy as np
 import xarray as xr
-import dask
-import scipy
 from xarray.ufuncs import isnan as xr_nan
-from .clean_mask import create_circular_mask
-from skimage.filters.rank import modal
-from skimage.morphology import remove_small_objects
-from .unique import dask_array_uniques
 
 ## Selective Filters (do not necessarily apply to all pixels) ##
 
@@ -54,6 +48,12 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3,
         Andrew Lubawy (andrew.m.lubawy@ama-inc.com)\n
         John Rattz    (john.c.rattz@ama-inc.com)
     """
+    import dask
+    from .clean_mask import create_circular_mask
+    from skimage.filters.rank import modal
+    from skimage.morphology import remove_small_objects
+    from .unique import dask_array_uniques
+
     assert kernel_size % 2 == 1, "The parameter `kernel_size` must be an odd number."
     image_min, image_max = image.min(), image.max()
     image_dtype = image.dtype
@@ -201,6 +201,8 @@ def stats_filter_2d(dataarray, statistic, filter_size=3):
         The size of the filter to use. Must be positive and should be odd.
         The filter shape will be `(filter_size, filter_size)`.
     """
+    import scipy
+
     if filter_size == 1: return dataarray
 
     filter_output = dataarray.copy()

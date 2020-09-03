@@ -1,6 +1,6 @@
 import numpy as np
 import xarray as xr
-import scipy.optimize as opt  #nnls
+import scipy.optimize as opt
 
 import datacube
 

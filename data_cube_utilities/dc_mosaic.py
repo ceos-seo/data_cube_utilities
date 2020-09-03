@@ -25,7 +25,6 @@ import dask
 from functools import partial
 from xarray.ufuncs import isnan as xr_nan
 from collections import OrderedDict
-import hdmedians as hd
 
 from . import dc_utilities as utilities
 from .dc_utilities import create_default_clean_mask
@@ -582,6 +581,8 @@ def create_hdmedians_multiple_band_mosaic(dataset_in,
         coordinates: latitude, longitude
         variables: same as dataset_in
     """
+    import hdmedians as hd
+
     assert operation in ['median', 'medoid'], "Only median and medoid operations are supported."
     mosaic_func = hd.nangeomedian if operation == 'median' else hd.nanmedoid
     

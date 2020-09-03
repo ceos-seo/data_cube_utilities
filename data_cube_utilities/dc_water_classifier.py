@@ -22,12 +22,10 @@
 import gc
 import numpy as np
 import xarray as xr
-import dask
 import datacube
 
-from .dc_mosaic import restore_or_convert_dtypes
 from . import dc_utilities as utilities
-from .dc_utilities import create_default_clean_mask
+
 # Command line tool imports
 import argparse
 import os
@@ -111,6 +109,8 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
     Throws:
         ValueError - if dataset_in is an empty xarray.Dataset.
     """
+    import dask
+    from .dc_utilities import create_default_clean_mask
 
     def _band_ratio(a, b):
         """

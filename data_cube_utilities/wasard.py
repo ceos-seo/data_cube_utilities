@@ -1,20 +1,17 @@
 import datacube
 import xarray as xr
 import datetime
-import warnings; warnings.simplefilter('ignore')
+import warnings
 import numpy as np
 from datetime import datetime
 from time import time 
-from sklearn import svm
-import warnings
-warnings.filterwarnings("ignore")
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-import scipy.ndimage 
-from sklearn.externals import joblib
+
 from .dc_water_classifier import wofs_classify
 import random
 import itertools
+from sklearn import svm
+from sklearn.externals import joblib
 from sklearn.metrics import f1_score, recall_score, precision_score
 dc = datacube.Datacube(app = 'wasard_test', config = '/home/localuser/.datacube.conf')
 
@@ -28,6 +25,7 @@ class wasard_classifier:
     :attribute f1: classifier's precision score, created by taking the harmonic mean of the recall and precision scores
     :return: wasard_classifier object
     """
+
     def __init__(self, 
                  classifier         = None,
                  sar_dataset        = None, 
@@ -74,7 +72,6 @@ class wasard_classifier:
         :param sar_time_index: specific time index of landsat scene to be used to train classifier, if the user wishes to specify
         :return: LinearSVC object, which can be used to classify other sar scenes
         """
-        
         train_data, test_data = _get_train_data(sar_dataset, 
                                                 landsat_dataset, 
                                                 pct                = pct, 
@@ -540,6 +537,7 @@ def _filter_isolated_cells(array, struct, max_size):
     :param max_size: Int indicating how how small isolated blocks must be to be masked
     :return: Array with minimum region size > max_size
     """
+    import scipy
     
     filtered_array                        = np.copy(array)
     id_regions, num_ids                   = scipy.ndimage.label(filtered_array, structure=struct)

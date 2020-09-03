@@ -1,5 +1,4 @@
 import xarray as xr
-from .dc_time import _n64_datetime_to_scalar
 
 ## Data Availability ##
 
@@ -23,7 +22,8 @@ def find_gaps(data_arr, aggregation_method):
         The time gaps between True values in `data_arr`. Due to limitations of the numpy.datetime64 data type,
         the time differences are in seconds, stored as np.float64.
     """
-    time_index = 0
+    from .dc_time import _n64_datetime_to_scalar
+
     # 1. Convert time from numpy.datetime64 to scalars and broadcast along latitude and longitude.
     time = _n64_datetime_to_scalar(data_arr.time)
     time, _, _ = xr.broadcast(time, data_arr.latitude, data_arr.longitude)

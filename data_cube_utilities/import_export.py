@@ -2,7 +2,6 @@ import time
 import numpy as np
 import xarray as xr
 
-from .dc_utilities import _get_transform_from_xr
 from . import dc_utilities
 import datacube
 import rasterio
@@ -128,6 +127,8 @@ def export_xarray_to_geotiff(data, tif_path, bands=None, no_data=-9999, crs="EPS
     x_coord, y_coord: string
         The string names of the x and y dimensions.
     """
+    from .dc_utilities import _get_transform_from_xr
+
     if isinstance(data, xr.DataArray):
         height, width = data.sizes[y_coord], data.sizes[x_coord]
         count, dtype = 1, data.dtype

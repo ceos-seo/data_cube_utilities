@@ -1,4 +1,3 @@
-from .dc_water_classifier import wofs_classify
 import xarray as xr
 import numpy as np
 # This import is only for
@@ -43,6 +42,7 @@ def compute_ndvi_anomaly(baseline_data,
     Returns:
         xarray dataset with scene_ndvi, baseline_ndvi(median), ndvi_difference, and ndvi_percentage_change.
     """
+    from .dc_water_classifier import wofs_classify
 
     assert selected_scene_clear_mask is not None and baseline_clear_mask is not None, "Both the selected scene and baseline data must have associated clear mask data."
 

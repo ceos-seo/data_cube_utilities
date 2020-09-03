@@ -7,7 +7,6 @@ import shapely
 from shapely.ops import transform
 from shapely.geometry import shape
 from functools import partial
-import pyproj
 
 def get_y_x_bounds_shapefile(shapefile):
     """
@@ -45,6 +44,8 @@ def shapefile_mask(dataset: xr.Dataset, shapefile) -> np.array:
     Returns:
         A boolean mask array.
     """
+    import pyproj
+
     with fiona.open(shapefile, 'r') as src:
         collection = list(src)
         geometries = []

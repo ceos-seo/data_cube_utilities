@@ -9,18 +9,8 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from matplotlib.colors import LinearSegmentedColormap
-import seaborn as sns
-from scipy.interpolate import CubicSpline
 import time
-from scipy import stats
 import warnings
-
-from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit, fourier_fit
-from .scale import xr_scale, np_scale
-from .raster_filter import lone_object_filter
-from .dc_time import _n64_to_datetime, _n64_datetime_to_scalar, _scalar_to_n64_datetime
-
-from scipy.interpolate import interp1d
 
 from .plotter_utils_consts import n_pts_smooth, default_fourier_n_harm
 
@@ -39,6 +29,8 @@ def impute_missing_data_1D(data1D):
         suitably for at least matplotlib plotting. If formatting for other libraries such
         as seaborn or plotly is necessary, add that formatting requirement as a parameter.
     """
+    from scipy.interpolate import interp1d
+
     nan_mask = ~np.isnan(data1D)
     x = np.arange(len(data1D))
     x_no_nan = x[nan_mask]
@@ -162,6 +154,8 @@ def xarray_scatterplot_data_vars(dataset, figure_kwargs={'figsize': (12, 6)}, co
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    from scipy import stats
+
     plt.figure(**figure_kwargs)
     data_var_names = list(dataset.data_vars)
     len_dataset = dataset.time.size
@@ -345,6 +339,9 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    from .scale import np_scale
+    from .dc_time import _n64_to_datetime, _n64_datetime_to_scalar, _scalar_to_n64_datetime
+
     fig_params = {} if fig_params is None else fig_params
 
     # Lists of plot types that can and cannot accept many-to-one aggregation
@@ -611,7 +608,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                         if num_unique_times_y == 0:  # There is no data.
                             continue
                         if num_unique_times_y == 1:  # There is 1 data point.
-                            plot_type = 'scatter';
+                            plot_type = 'scatter'
                             plot_kwargs = {}
 
                         data_arr_epochs = \
@@ -819,6 +816,9 @@ def get_curvefit(x, y, fit_type, x_smooth=None, n_pts=n_pts_smooth, fit_kwargs=N
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    from scipy.interpolate import CubicSpline
+    from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit, fourier_fit
+
     interpolation_curve_fits = ['gaussian', 'gaussian_filter',
                                 'poly', 'cubic_spline']
     extrapolation_curve_filts = ['fourier']
@@ -910,6 +910,9 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=n_pts_smooth, fig_params=
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    from scipy.interpolate import CubicSpline
+    from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit, fourier_fit
+
     # Avoid modifying the original arguments.
     fig_params, plot_kwargs = fig_params.copy(), plot_kwargs.copy()
 
@@ -1356,6 +1359,8 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    from .raster_filter import lone_object_filter
+
     if clean_masks is None:
         clean_masks = [xr.DataArray(np.ones(dataarray.shape, dtype=np.bool),
                                     coords=dataarray.coords, dims=dataarray.dims)
@@ -1684,6 +1689,8 @@ def print_matrix(cell_value_mtx, cell_label_mtx=None, row_labels=None, col_label
     fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes
         The figure and axes used for the plot.
     """
+    import seaborn as sns
+
     cell_label_mtx = cell_value_mtx if cell_label_mtx is None else cell_label_mtx
     row_labels = [''] * cell_value_mtx.shape[0] if not show_row_labels \
                                                    or row_labels is None else row_labels
@@ -1998,18 +2005,18 @@ def figure_ratio(data, x_coord='longitude', y_coord='latitude',
     aspect_ratio = y_sz / x_sz
     # Determine the figure size.
     if fixed_width is not None:
-        width = fixed_width;
+        width = fixed_width
         height = width * aspect_ratio
     elif fixed_height is not None:
-        height = fixed_height;
+        height = fixed_height
         width = height / aspect_ratio
     # If both `fixed_width` and `fixed_height` are specified, treat as maximums.
     if (fixed_width is not None) and (fixed_height is not None):
         if width > fixed_width:
-            height *= fixed_width / width;
+            height *= fixed_width / width
             width = fixed_width
         if height > fixed_height:
-            width *= fixed_height / height;
+            width *= fixed_height / height
             height = fixed_height
     return [width * num_cols, height * num_rows]
 

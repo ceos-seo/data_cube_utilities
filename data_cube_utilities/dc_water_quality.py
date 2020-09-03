@@ -1,7 +1,6 @@
 import gc
 import numpy as np
 import xarray as xr
-import scipy.ndimage.filters as conv
 
 from . import dc_utilities as utilities
 from .dc_utilities import create_default_clean_mask
@@ -38,6 +37,8 @@ def tsm(dataset_in, clean_mask=None, no_data=0):
 
 
 def mask_water_quality(dataset_in, wofs):
+    import scipy.ndimage.filters as conv
+
     wofs_criteria = wofs.where(wofs > 0.8)
     wofs_criteria.values[wofs_criteria.values > 0] = 0
     kernel = np.array([[1, 1, 1], [1, 1, 1], [1, 1, 1]])

@@ -26,7 +26,6 @@ import xarray as xr
 import numpy as np
 from datetime import date
 
-
 class DataAccessApi:
     """
     Class that provides wrapper functionality for the DataCube.

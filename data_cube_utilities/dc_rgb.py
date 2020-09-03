@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 from time import time
 import numpy as np
 
-from .plotter_utils import figure_ratio, xarray_set_axes_labels, retrieve_or_create_fig_ax
 
 # Change the bands (RGB) here if you want other false color combinations
 def rgb(dataset, at_index=0, x_coord='longitude', y_coord='latitude',
@@ -55,6 +54,9 @@ def rgb(dataset, at_index=0, x_coord='longitude', y_coord='latitude',
     fig, ax: matplotlib.figure.Figure, matplotlib.axes.Axes
         The figure and axes used for the plot.
     """
+    from .plotter_utils import figure_ratio, \
+        xarray_set_axes_labels, retrieve_or_create_fig_ax
+
     imshow_kwargs = {} if imshow_kwargs is None else imshow_kwargs
 
     ### < Dataset to RGB Format, needs float values between 0-1 

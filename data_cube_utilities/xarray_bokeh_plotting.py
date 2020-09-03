@@ -1,6 +1,5 @@
 from bokeh.models.widgets import Panel, Tabs
 import numpy as np
-import importlib
 import pandas as pd
 from bokeh.models import FuncTickFormatter
 from bokeh.io import push_notebook, show, output_notebook

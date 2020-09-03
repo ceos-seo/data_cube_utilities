@@ -1,9 +1,6 @@
 import xarray as xr
 import numpy as np
 
-from .dc_time import \
-    _n64_datetime_to_scalar, _scalar_to_n64_datetime
-
 def get_bin_intervals(data, num_bins):
     """
     Returns bin intervals for 1D data.
@@ -133,6 +130,9 @@ def xr_interp(dataset, interp_config):
     :Authors:
         John Rattz (john.c.rattz@ama-inc.com)
     """
+    from .dc_time import _n64_datetime_to_scalar, \
+        _scalar_to_n64_datetime
+
     # Create the new coordinates.
     new_coords = {}
     for dim, (interp_type, interp_kwargs) in interp_config.items():
