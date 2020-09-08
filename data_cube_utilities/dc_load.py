@@ -118,7 +118,7 @@ def match_dim_sizes(
         for product in products:
             load_params[product].update(**load_kwargs.get(product, {}) if load_kwargs is not None else {})
 
-    datasets_empty = [dc.load(product=product, measurements=[]) for product in products]
+    datasets_empty = [dc.load(product=product, x=x, y=y, measurements=[]) for product in products]
 
     # First check if all datasets will load with the same x and y dimension sizes.
     same_dim_sizes = True

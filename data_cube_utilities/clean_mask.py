@@ -38,28 +38,6 @@ def xarray_values_in(data, values, data_vars=None):
 
 ## Misc ##
 
-def create_2D_mosaic_clean_mask(clean_mask):
-    """
-    The clean mask of a mosaic should be determined by the compositing function (e.g. mean 
-    mosaic, median mosaic, etc.). This is simply supposed to be a decent approximation of a 
-    clean mask for a mosaic that has no time dimension.
-    
-    Parameters
-    ----------
-    clean_mask: np.ndarray
-        The 3D clean mask used to construct the mosaic.
-    
-    Returns
-    -------
-    mosaic_clean_mask: np.ndarray
-        A 2D clean mask for a mosaic.
-    """
-    mosaic_clean_mask = clean_mask[0]
-    # Take the logical OR of clean masks through time.
-    for i in range(1, clean_mask.shape[0]):
-        mosaic_clean_mask = np.logical_or(mosaic_clean_mask, clean_mask[i])    
-    return mosaic_clean_mask
-
 def create_circular_mask(h, w, center=None, radius=None):
     """
     Creates a NumPy array mask with a circle.
