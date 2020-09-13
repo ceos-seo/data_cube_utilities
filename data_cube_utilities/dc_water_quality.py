@@ -49,7 +49,7 @@ def mask_water_quality(dataset_in, wofs):
     dataset_out = dataset_in.copy(deep=True)
     for var in dataset_out.data_vars:
         dataset_out[var].values += mask
-    utilities.nan_to_num(dataset_out, 0)
+    dataset_out.where(dataset_out != np.nan, 0)
 
     return dataset_out
 

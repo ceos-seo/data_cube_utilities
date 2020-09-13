@@ -102,8 +102,6 @@ def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='lat
       mosaic (boolean) - flag to indicate if dataset_in is a mosaic. If mosaic = False, dataset_in
         should have a time coordinate and wofs will run over each time slice; otherwise, dataset_in
         should not have a time coordinate and wofs will run over the single mosaicked image
-      enforce_float64 (boolean) - flag to indicate whether or not to enforce float64 calculations;
-        will use float32 if false
     Output:
       dataset_out (xarray.DataArray) - wofs water classification results: 0 - not water; 1 - water
     Throws:
