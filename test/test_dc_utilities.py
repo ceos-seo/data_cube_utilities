@@ -51,22 +51,22 @@ class TestDCUtilities(unittest.TestCase):
     def test_perform_timeseries_analysis(self):
         pass
 
-    def test_nan_to_num(self):
-        dataset = xr.Dataset(
-            {
-                'data': (('time', 'latitude', 'longitude'), self.sample_data)
-            },
-            coords={'time': self.times,
-                    'latitude': self.latitudes,
-                    'longitude': self.longitudes})
+    # def test_nan_to_num(self):
+    #     dataset = xr.Dataset(
+    #         {
+    #             'data': (('time', 'latitude', 'longitude'), self.sample_data)
+    #         },
+    #         coords={'time': self.times,
+    #                 'latitude': self.latitudes,
+    #                 'longitude': self.longitudes})
 
-        dataset_nan = dataset.where(dataset.data > 2)
+    #     dataset_nan = dataset.where(dataset.data > 2)
 
-        dc_utilities.nan_to_num(dataset_nan, -9999)
+    #     dc_utilities.nan_to_num(dataset_nan, -9999)
 
-        self.assertTrue((dataset_nan.data.values == np.array(
-            [[[-9999, -9999], [-9999, -9999]], [[-9999, -9999], [-9999, -9999]], [[3, 3], [3, 3]],
-             [[-9999, -9999], [-9999, -9999]], [[5, 5], [5, 5]]])).all())
+    #     self.assertTrue((dataset_nan.data.values == np.array(
+    #         [[[-9999, -9999], [-9999, -9999]], [[-9999, -9999], [-9999, -9999]], [[3, 3], [3, 3]],
+    #          [[-9999, -9999], [-9999, -9999]], [[5, 5], [5, 5]]])).all())
 
     def test_clear_attrs(self):
         dataset = xr.Dataset(

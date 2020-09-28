@@ -179,7 +179,7 @@ def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None
         dataset_out['min'] = xr.concat([dataset_out['min'], data.min(dim='time')], dim='time').min(dim='time')
         dataset_out['max'] = xr.concat([dataset_out['max'], data.max(dim='time')], dim='time').max(dim='time')
 
-    nan_to_num(dataset_out, 0)
+    dataset_out.where(dataset_out != np.nan, 0)
 
     return dataset_out
 
@@ -194,7 +194,7 @@ def clear_attrs(dataset):
 
 
 def create_bit_mask(data_array, valid_bits, no_data=-9999):
-    """Create a boolean bit mask from a list of valid bits
+    """Create a boolean bit mask from a list of valid bits.
 
     Args:
         data_array: xarray data array to extract bit information for.
