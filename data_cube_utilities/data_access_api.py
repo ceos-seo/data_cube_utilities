@@ -236,8 +236,8 @@ class DataAccessApi:
             }
 
         lon_min, lat_min, lon_max, lat_max = \
-            dataset.longitude.min().values, dataset.latitude.min().values, \
-            dataset.longitude.max().values, dataset.latitude.max().values
+            float(dataset.longitude.min().values), float(dataset.latitude.min().values), \
+            float(dataset.longitude.max().values), float(dataset.latitude.max().values)
         return {
                 'lat_extents': (lat_min, lat_max),
                 'lon_extents': (lon_min, lon_max),
