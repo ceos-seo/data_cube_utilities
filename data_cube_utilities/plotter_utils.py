@@ -633,7 +633,7 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             non_extrap_plot_last_time = data_arr_non_extrap_time_bounds[1]
                             if num_unique_times_y > 1:
                                 non_extrap_plot_last_time = \
-                                    y.sel({time_agg_str: str(data_arr_non_extrap_time_bounds[1])},
+                                    y.sel({time_agg_str: data_arr_non_extrap_time_bounds[1]},
                                           method='ffill')[time_agg_str].values
                             data_arr_non_extrap_plotting_time_bounds = [data_arr_non_extrap_time_bounds[0],
                                                                         non_extrap_plot_last_time]

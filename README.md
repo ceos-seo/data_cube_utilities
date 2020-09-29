@@ -30,5 +30,4 @@ Requirements
 * skimage
 * seaborn
 * folium
-* rasterstats
 
