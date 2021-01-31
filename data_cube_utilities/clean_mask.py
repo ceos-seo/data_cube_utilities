@@ -106,11 +106,15 @@ def landsat_clean_mask_invalid(dataset, platform, collection, level):
     invalid_mask = None
     data_arr_names = [arr_name for arr_name in list(dataset.data_vars)
                       if arr_name not in ['pixel_qa', 'radsat_qa', 'cloud_qa']]
-    
+    rng = get_range(platform, collection, level)
+    if rng is None:
+        raise ValueError(
+            f'The range is not recorded '\
+            f'(platform: {platform}, collection: {collection}, level: {level}).')
     # Only keep data where all bands are in their valid ranges.
-    for i, data_arr_name in enumerate(data_arr_names):
-        rng = get_range(platform, collection, level, data_arr_name)
-        invalid_mask_arr = (rng[0] < dataset[data_arr_name]) & (dataset[data_arr_name] < rng[1])
+    for i, data_arr_name in enumerate(rng.keys()):
+        rng_cur = rng[data_arr_name]
+        invalid_mask_arr = (rng_cur[0] < dataset[data_arr_name]) & (dataset[data_arr_name] < rng_cur[1])
         invalid_mask = invalid_mask_arr if i == 0 else (invalid_mask & invalid_mask_arr)
     return invalid_mask
 

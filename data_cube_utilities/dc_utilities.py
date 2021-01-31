@@ -57,7 +57,7 @@ def get_range(platform, collection, level):
     # if (platform, collection, level) in \
     #     [('LANDSAT_5', 'c1', 'l2'), ('LANDSAT_7', 'c1', 'l2'),
     #         ('LANDSAT_8', 'c1', 'l2')]:
-    #     return [0, 10000]
+    #     return [0, 20000]
     # elif (platform, collection, level) in \
     #     [('LANDSAT_5', 'c2', 'l2'), ('LANDSAT_7', 'c2', 'l2'),
     #         ('LANDSAT_8', 'c2', 'l2')]:
@@ -66,8 +66,8 @@ def get_range(platform, collection, level):
     if (platform, collection, level) in \
         [('LANDSAT_5', 'c1', 'l2'), ('LANDSAT_7', 'c1', 'l2'),
             ('LANDSAT_8', 'c1', 'l2')]:
-        range_dict = {'red': [0, 10000], 'green': [0, 10000], 'blue': [0, 10000],
-                      'nir': [0, 10000], 'swir1': [0, 10000], 'swir2': [0, 10000]}
+        range_dict = {'red': [0, 20000], 'green': [0, 20000], 'blue': [0, 20000],
+                      'nir': [0, 20000], 'swir1': [0, 20000], 'swir2': [0, 20000]}
     elif (platform, collection, level) in \
         [('LANDSAT_5', 'c2', 'l2'), ('LANDSAT_7', 'c2', 'l2'),
             ('LANDSAT_8', 'c2', 'l2')]:
@@ -105,10 +105,19 @@ def convert_range(dataset, from_platform, from_collection, from_level,
         raise ValueError(
             f'The destination range is not recorded '\
             f'(platform: {to_platform}, collection: {to_collection}, level: {to_level}).')
+    
+    # from celery.utils.log import get_task_logger
+    # logger = get_task_logger(__name__)
+    # logger.info(f'from_rng: {from_rng}')
+    # logger.info(f'to_rng: {to_rng}')
+    
     from celery.utils.log import get_task_logger
     logger = get_task_logger(__name__)
-    logger.info(f'from_rng: {from_rng}')
-    logger.info(f'to_rng: {to_rng}')
+    logger.info(f'dataset: {dataset}')
+    logger.info(f'dataset.min(): {dataset.min()}')
+    logger.info(f'dataset.mean(): {dataset.mean()}')
+    logger.info(f'dataset.max(): {dataset.max()}')
+
     # Determine the data variables with ranges in both 
     # the original and destination range information.
     data_vars_both = list(set(from_rng.keys()) & set(to_rng.keys()))
@@ -116,9 +125,22 @@ def convert_range(dataset, from_platform, from_collection, from_level,
     for data_var_name in data_vars_both:
         from_rng_cur = from_rng[data_var_name]
         to_rng_cur = to_rng[data_var_name]
-        from_rng_cur_spread = from_rng_cur[1] - from_rng_cur[0]
-        to_rng_cur_spread = to_rng_cur[1] - to_rng_cur[0]
-        out_dataset[data_var_name] = (((out_dataset[data_var_name] - from_rng_cur[0]) * to_rng_cur_spread) / from_rng_cur_spread) + to_rng_cur[0]
+        # from_rng_cur_spread = from_rng_cur[1] - from_rng_cur[0]
+        # to_rng_cur_spread = to_rng_cur[1] - to_rng_cur[0]
+        # out_dataset[data_var_name] = (((out_dataset[data_var_name] - from_rng_cur[0]) * to_rng_cur_spread) / from_rng_cur_spread) + to_rng_cur[0]
+        # logger.info(f'np.interp: {np.interp(out_dataset[data_var_name], from_rng_cur, to_rng_cur)}')
+        out_dataset[data_var_name].data = np.interp(out_dataset[data_var_name], from_rng_cur, to_rng_cur)
+
+        # Temporary approximate corrections - range scaling is often very inaccurate.
+        if (from_platform, from_collection, from_level) == ('LANDSAT_8', 'c2', 'l2') and \
+           to_platform in ['LANDSAT_7', 'LANDSAT_8'] and \
+           (to_collection, to_level) == ('c1', 'l2'):
+            out_dataset[data_var_name] = out_dataset[data_var_name] * 3
+    
+    logger.info(f'out_dataset.min(): {out_dataset.min()}')
+    logger.info(f'out_dataset.mean(): {out_dataset.mean()}')
+    logger.info(f'out_dataset.max(): {out_dataset.max()}')
+
     return out_dataset
 
 def reverse_array_dict(dictionary):
