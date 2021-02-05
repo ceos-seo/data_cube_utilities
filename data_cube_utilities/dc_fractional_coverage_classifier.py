@@ -23,23 +23,23 @@ csv_file_path = os.path.join(os.path.dirname(__file__), 'endmembers_landsat.csv'
 def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
                            platform='LANDSAT_8', collection='c1'):
     """
-    Performs fractional coverage algorithm on given dataset. 
+    Performs fractional coverage algorithm on given dataset.
     For Landsat, level 2 (surface reflectance) data must be used.
-    If no clean mask is given, the 'cf_mask' variable must be included 
+    If no clean mask is given, the 'cf_mask' variable must be included
     in the input dataset, as it will be used to create a clean mask.
 
-    The implemented algorithm is defined for Landsat 5/Landsat 7; for 
+    The implemented algorithm is defined for Landsat 5/Landsat 7; for
     Landsat 8, the bands should be adjusted to match Landsat 7 value ranges.
-    
+
     References:
       - Guerschman, Juan P., et al. "Assessing the effects of site heterogeneity and soil
         properties when unmixing photosynthetic vegetation, non-photosynthetic vegetation
         and bare soil fractions from Landsat and MODIS data." Remote Sensing of Environment
         161 (2015): 12-26.
-    
+
     Parameters
     ----------
-    dataset_in: xarray.Dataset 
+    dataset_in: xarray.Dataset
         dataset retrieved from the Data Cube (can be a derived
         product, such as a cloudfree mosaic; should contain
           coordinates: latitude, longitude
@@ -47,15 +47,15 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
     clean_mask: np.ndarray (optional)
         True for values user considers clean.
         If none is provided, one will be created which considers all values to be clean.
-        If user does not provide a clean_mask, 
+        If user does not provide a clean_mask,
         `dataset_in` must also include the cf_mask variable.
     platform: str
         A string denoting the platform to be used. Can be "LANDSAT_5", "LANDSAT_7", or
         "LANDSAT_8", which are for Level 2 (surface reflectance) data.
     collection: string
-        The Landsat collection of the data. 
+        The Landsat collection of the data.
         Can be any of ['c1', 'c2'] for Collection 1 or 2, respectively.
-    
+
     Returns
     -------
     dataset_out: xarray.Dataset
@@ -73,7 +73,7 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
     # logger.info(f'dataset_in.max() before scaling: {dataset_in.max()}\n')
     if (platform, collection) != ('LANDSAT_7', 'c1'):
         dataset_in = \
-            convert_range(dataset_in, from_platform=platform, 
+            convert_range(dataset_in, from_platform=platform,
                         from_collection=collection, from_level='l2',
                         to_platform='LANDSAT_7', to_collection='c1', to_level='l2')
     # logger.info(f'dataset_in.min() after scaling: {dataset_in.min()}')
@@ -162,7 +162,7 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
 
     rapp_dataset = xr.Dataset(rapp_bands, coords={'latitude': latitude, 'longitude': longitude})
 
-    logger.info(f'fractional_cover_output: {rapp_dataset}')
+    #logger.info(f'fractional_cover_output: {rapp_dataset}')
 
     return rapp_dataset
 
