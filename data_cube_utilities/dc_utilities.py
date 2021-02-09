@@ -400,51 +400,29 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
         scale: desired scale - tuple like (0, 4000) for the upper and lower bounds
 
     """
-    # from celery.utils.log import get_task_logger
-    # logger = get_task_logger(__name__)
-    # logger.info(f'png_path: {png_path}')
-    # logger.info(f'dataset: {dataset}')
-    # logger.info(f'dataset: {dataset.mean()}')
-    # logger.info(f'scale: {scale}')
-    # logger.info(f'low_res: {low_res}')
-
     assert isinstance(bands, list), "Bands must a list of strings"
     assert len(bands) == 3 and isinstance(bands[0], str), "You must supply three string bands for a PNG."
 
     tif_path = os.path.join(os.path.dirname(png_path), str(uuid.uuid4()) + ".tif")
-    # logger.info(f'tif_path: {tif_path}')
     write_geotiff_from_xr(tif_path, dataset, bands, no_data=no_data, crs=crs)
     
-    # import subprocess
-    # logger.info(subprocess.run(['ls', f'{tif_path}']))
-
     scale_string = ""
     if scale is not None and len(scale) == 2:
         scale_string = "-scale {} {} 0 255".format(scale[0], scale[1])
     elif scale is not None and len(scale) == 3:
         for index, scale_member in enumerate(scale):
             scale_string += " -scale_{} {} {} 0 255".format(index + 1, scale_member[0], scale_member[1])
-    # logger.info(f'scale_string: {scale_string}')
     outsize_string = "-outsize 25% 25%" if low_res else ""
-    # logger.info(f'outsize_string: {outsize_string}')
     cmd = "gdal_translate -ot Byte " + outsize_string + " " + scale_string + " -of PNG -b 1 -b 2 -b 3 " + tif_path + ' ' + png_path
-    # logger.info('whoami:', subprocess.check_output(['whoami']))
-    # logger.info('PATH:', subprocess.check_output(['echo', os.environ.get('PATH')]))
-    # logger.info(f'cmd1: {cmd}')
 
     os.system(cmd)
-    # logger.info('content of result dir:', subprocess.check_output(['ls', os.path.dirname(png_path)]))
 
     if png_filled_path is not None and fill_color is not None:
         cmd = "convert -transparent \"#000000\" " + png_path + " " + png_path
-        # logger.info(f'cmd2: {cmd}')
         os.system(cmd)
-        # logger.info('content of result dir:', subprocess.check_output(['ls', os.path.dirname(png_path)]))
         cmd = "convert " + png_path + " -background " + \
             fill_color + " -alpha remove " + png_filled_path
-        # logger.info(f'cmd3: {cmd}')
         os.system(cmd)
-        # logger.info('content of result dir:', subprocess.check_output(['ls', os.path.dirname(png_path)]))
 
     os.remove(tif_path)
 

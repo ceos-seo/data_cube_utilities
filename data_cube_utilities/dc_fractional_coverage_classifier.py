@@ -66,19 +66,11 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
     """
     # Ensure data variables have the range of Landsat 7 Collection 1 Level 2
     # since this function is tailored for that dataset.
-    # from celery.utils.log import get_task_logger
-    # logger = get_task_logger(__name__)
-    # logger.info(f'dataset_in.min() before scaling: {dataset_in.min()}')
-    # logger.info(f'dataset_in.mean() before scaling: {dataset_in.mean()}')
-    # logger.info(f'dataset_in.max() before scaling: {dataset_in.max()}\n')
     if (platform, collection) != ('LANDSAT_7', 'c1'):
         dataset_in = \
             convert_range(dataset_in, from_platform=platform,
                         from_collection=collection, from_level='l2',
                         to_platform='LANDSAT_7', to_collection='c1', to_level='l2')
-    # logger.info(f'dataset_in.min() after scaling: {dataset_in.min()}')
-    # logger.info(f'dataset_in.mean() after scaling: {dataset_in.mean()}')
-    # logger.info(f'dataset_in.max() after scaling: {dataset_in.max()}\n')
 
     # Default to masking nothing.
     if clean_mask is None:
