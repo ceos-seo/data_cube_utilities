@@ -54,14 +54,6 @@ def get_range(platform, collection, level):
         A dict of 2-tuples (lists) denoting the range for each data variable with a recorded range.
         `None` otherwise.
     """
-    # if (platform, collection, level) in \
-    #     [('LANDSAT_5', 'c1', 'l2'), ('LANDSAT_7', 'c1', 'l2'),
-    #         ('LANDSAT_8', 'c1', 'l2')]:
-    #     return [0, 20000]
-    # elif (platform, collection, level) in \
-    #     [('LANDSAT_5', 'c2', 'l2'), ('LANDSAT_7', 'c2', 'l2'),
-    #         ('LANDSAT_8', 'c2', 'l2')]:
-    #     return [1, 65455]
     range_dict = None
     if (platform, collection, level) in \
         [('LANDSAT_5', 'c1', 'l2'), ('LANDSAT_7', 'c1', 'l2'),
