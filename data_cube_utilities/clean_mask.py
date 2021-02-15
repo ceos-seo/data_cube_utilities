@@ -283,6 +283,20 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
         clean_mask = cover_type_clean_mask if i == 0 else (clean_mask | cover_type_clean_mask)
     return clean_mask
 
+def landsat_clean_mask_full(dc, dataset, product, platform, collection, level):
+    """
+    Returns a boolean mask denoting points in `dataset`
+    which are clean according to (1) abscense of clouds according to 
+    the pixel_qa band in `dataset`, (2) the `no_data` value, and 
+    (3) the valid range of values for Landsat (0-10000).
+    """
+    plt_col_lvl_params = dict(platform=platform, collection=collection, level=level)
+    cloud_mask = landsat_qa_clean_mask(dataset, **plt_col_lvl_params)
+    nodata_vals = dc.list_measurements().loc[product]['nodata']
+    no_data_mask = xr.merge([dataset[data_var] != nodata_vals[data_var] for data_var in dataset]).to_array().all('variable')
+    invalid_mask = landsat_clean_mask_invalid(dataset, **plt_col_lvl_params)
+    return cloud_mask & no_data_mask & invalid_mask
+
 ## End Landsat ##
 
 ## Sentinel 2 ##
