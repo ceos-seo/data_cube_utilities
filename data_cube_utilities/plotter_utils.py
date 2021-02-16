@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import re
+import copy
 
 import numpy as np
 import pandas as pd
@@ -1846,7 +1847,7 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
     # Handle display of NaN values.
     data_arr = data.values
     masked_array = np.ma.array(data_arr, mask=np.isnan(data_arr))
-    cmap = imshow_kwargs.setdefault('cmap', plt.get_cmap('viridis'))
+    cmap = imshow_kwargs.setdefault('cmap', copy.copy(plt.get_cmap('viridis')))
     cmap.set_bad(nan_color)
     # Handle kwargs for `imshow()`.
     vmin, vmax = (np.min(possible_plot_values), np.max(possible_plot_values)) \
