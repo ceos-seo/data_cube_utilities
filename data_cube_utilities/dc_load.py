@@ -260,8 +260,9 @@ def merge_datasets(datasets_temp, clean_masks_temp, masks_per_platform=None,
 ## End Combining Data ##
 
 ## Extents ##
+from .data_access_api import DataAccessApi
 
-def get_product_extents(api, platform, product, **kwargs):
+def get_product_extents(api: DataAccessApi, platform, product, **kwargs):
     """
     Returns the minimum and maximum latitude, longitude, and date range of a product.
 
