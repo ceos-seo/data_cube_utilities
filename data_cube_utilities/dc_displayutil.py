@@ -15,12 +15,12 @@ def display_at_time(cubes, time = None, color = [238,17,17], width = 3, name = N
     for x in cubes:
         if isinstance(x, tuple):
             #Overlays the not-nan values of the 'subject' on the 'canvas'.
-            canvas  = x[0].sel(time = time, method = 'nearest').isel(time=0)
-            subject = x[1].sel(time = time, method = 'nearest').isel(time=0)
+            canvas  = x[0].sel(time = time, method = 'nearest').squeeze()
+            subject = x[1].sel(time = time, method = 'nearest').squeeze()
             overlay = _overlayer(canvas, subject, color = color,on_pixel = on_pixel, mode = mode)
             lop.append(overlay)
         else:
-            selection = x.sel(time = time, method = 'nearest').isel(time=0)
+            selection = x.sel(time = time, method = 'nearest').squeeze()
             lop.append(_to_image(selection))
     _display_list_of_plottables(lop, maxwidth = width, name = name,h = h, w = w)
 
