@@ -58,8 +58,8 @@ def get_range(platform, collection, level):
     if (platform, collection, level) in \
         [('LANDSAT_5', 'c1', 'l2'), ('LANDSAT_7', 'c1', 'l2'),
             ('LANDSAT_8', 'c1', 'l2')]:
-        range_dict = {'red': [0, 20000], 'green': [0, 20000], 'blue': [0, 20000],
-                      'nir': [0, 20000], 'swir1': [0, 20000], 'swir2': [0, 20000]}
+        range_dict = {'red': [0, 10000], 'green': [0, 10000], 'blue': [0, 10000],
+                      'nir': [0, 10000], 'swir1': [0, 10000], 'swir2': [0, 10000]}
     elif (platform, collection, level) in \
         [('LANDSAT_5', 'c2', 'l2'), ('LANDSAT_7', 'c2', 'l2'),
             ('LANDSAT_8', 'c2', 'l2')]:
