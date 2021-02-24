@@ -101,11 +101,11 @@ def landsat_clean_mask_invalid(dataset, platform, collection, level):
 
     Returns
     -------
-    invalid_mask: xarray.DataArray
+    valid_mask: xarray.DataArray
         An `xarray.DataArray` with the same number and order of coordinates as in `dataset`.
         The `True` values specify what pixels are valid.
     """
-    invalid_mask = None
+    valid_mask = None
     data_arr_names = [arr_name for arr_name in list(dataset.data_vars)
                       if arr_name not in ['pixel_qa', 'radsat_qa', 'cloud_qa']]
     rng = get_range(platform, collection, level)
@@ -116,9 +116,9 @@ def landsat_clean_mask_invalid(dataset, platform, collection, level):
     # Only keep data where all bands are in their valid ranges.
     for i, data_arr_name in enumerate(set(rng.keys()).intersection(set(data_arr_names))):
         rng_cur = rng[data_arr_name]
-        invalid_mask_arr = (rng_cur[0] < dataset[data_arr_name]) & (dataset[data_arr_name] < rng_cur[1])
-        invalid_mask = invalid_mask_arr if i == 0 else (invalid_mask & invalid_mask_arr)
-    return invalid_mask
+        valid_mask_arr = (rng_cur[0] < dataset[data_arr_name]) & (dataset[data_arr_name] < rng_cur[1])
+        valid_mask = valid_mask_arr if i == 0 else (valid_mask & valid_mask_arr)
+    return valid_mask
 
 
 def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
@@ -200,29 +200,36 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
         # The `platform` value can be any of ['LANDSAT_5','LANDSAT_7','LANDSAT_8'].
         # The `collection` value can be any of ['c1', 'c2'].
         # The `level` value can be any of ['l1', 'l2'].
+        ls5_7_c1_l2_cover_types = \
+            dict(fill      = 1,   # 2**0
+                 clear     = 2,   # 2**1
+                 water     = 4,   # 2**2
+                 cld_shd   = 8,   # 2**3
+                 snow      = 16,  # 2**4
+                 cloud     = 32,  # 2**5
+                 low_conf  = 64,  # 2**6
+                 med_conf  = 128, # 2**7
+                 high_conf = 192  # 2**6 + 2**7
+                 )
+        ls5_7_c2_l2_cover_types = \
+            dict(fill               = 1,     # 2**0
+                 dilated_cloud      = 2,     # 2**1
+                 cloud              = 8,     # 2**3
+                 cld_shd            = 16, # Should be same as cld_shd_conf_high.
+                 snow               = 32,    # 2**5
+                 clear              = 64,    # 2**6
+                 water              = 128,   # 2**7
+                 cld_conf_low       = 256,   # 2**8
+                 cld_conf_med       = 512,   # 2**9
+                 cld_conf_high      = 768,   # 2**8 + 2**9
+                 cld_shd_conf_low   = 1024,  # 2**10
+                 cld_shd_conf_high  = 3072,  # 2**10 + 2**11
+                 snw_ice_conf_low   = 4096,  # 2**12
+                 snw_ice_conf_high  = 12288, # 2**12 + 2**13
+                 )
         landsat_qa_cover_types_map = {
-            ('LANDSAT_5', 'c1', 'l2'):
-                dict(fill      = 1,   # 2**0
-                     clear     = 2,   # 2**1
-                     water     = 4,   # 2**2
-                     cld_shd   = 8,   # 2**3
-                     snow      = 16,  # 2**4
-                     cloud     = 32,  # 2**5
-                     low_conf  = 64,  # 2**6
-                     med_conf  = 128, # 2**7
-                     high_conf = 192  # 2**6 + 2**7
-                    ),
-            ('LANDSAT_7', 'c1', 'l2'): # Same as LS 5 C1 L2.
-                dict(fill      = 1, # 2**0
-                     clear     = 2, # 2**1
-                     water     = 4, # 2**2
-                     cld_shd   = 8, # 2**3
-                     snow      = 16, # 2**4
-                     cloud     = 32, # 2**5
-                     low_conf  = 64, # 2**6
-                     med_conf  = 128, # 2**7
-                     high_conf = 192 # 2**6 + 2**7
-                    ),
+            ('LANDSAT_5', 'c1', 'l2'): ls5_7_c1_l2_cover_types,
+            ('LANDSAT_7', 'c1', 'l2'): ls5_7_c1_l2_cover_types,
             ('LANDSAT_8', 'c1', 'l2'):
                 dict(fill               = 1,   # 2**0
                      clear              = 2,   # 2**1
@@ -238,6 +245,8 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
                      cir_conf_high      = 768, # 2**8 + 2**9
                      terrain_occ        = 1024 # 2**10
                     ),
+            ('LANDSAT_5', 'c2', 'l2'): ls5_7_c2_l2_cover_types,
+            ('LANDSAT_7', 'c2', 'l2'): ls5_7_c2_l2_cover_types,
             ('LANDSAT_8', 'c2', 'l2'):
                 dict(fill               = 1,     # 2**0
                      dilated_cloud      = 2,     # 2**1
@@ -288,14 +297,15 @@ def landsat_clean_mask_full(dc, dataset, product, platform, collection, level):
     Returns a boolean mask denoting points in `dataset`
     which are clean according to (1) abscense of clouds according to 
     the pixel_qa band in `dataset`, (2) the `no_data` value, and 
-    (3) the valid range of values for Landsat (0-10000).
+    (3) the valid range of values for Landsat: 
+    0-10000 for collection 1, 1-65455 for collection 2.
     """
     plt_col_lvl_params = dict(platform=platform, collection=collection, level=level)
     cloud_mask = landsat_qa_clean_mask(dataset, **plt_col_lvl_params)
     nodata_vals = dc.list_measurements().loc[product]['nodata']
     no_data_mask = xr.merge([dataset[data_var] != nodata_vals[data_var] for data_var in dataset]).to_array().all('variable')
-    invalid_mask = landsat_clean_mask_invalid(dataset, **plt_col_lvl_params)
-    return cloud_mask & no_data_mask & invalid_mask
+    valid_mask = landsat_clean_mask_invalid(dataset, **plt_col_lvl_params)
+    return cloud_mask & no_data_mask & valid_mask
 
 ## End Landsat ##
 
