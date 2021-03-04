@@ -57,8 +57,9 @@ def create_local_dask_cluster(spare_mem='3Gb',
     # start up a local cluster
     num_physical_cpu = psutil.cpu_count(logical=False)
     num_logical_cpu = psutil.cpu_count(logical=True)
-    start_local_dask_kwargs['n_workers'] = num_physical_cpu - 1
-    start_local_dask_kwargs['threads_per_worker'] = int(num_logical_cpu / num_physical_cpu)
+    num_logical_per_physical = num_logical_cpu / num_physical_cpu
+    start_local_dask_kwargs.setdefault('n_workers', num_physical_cpu - 1)
+    start_local_dask_kwargs.setdefault('threads_per_worker', int(num_logical_per_physical * start_local_dask_kwargs['n_workers'])) 
     client = start_local_dask(mem_safety_margin=spare_mem, **start_local_dask_kwargs)
 
     ## Configure GDAL for s3 access
