@@ -28,7 +28,7 @@ def get_bin_intervals(data, num_bins):
 
 
 def xr_scale_res(dataset, x_coord='longitude', y_coord='latitude',
-                 frac_res=None, abs_res=None):
+                 frac_res=None, abs_res=None, val_interp_method='linear'):
     """
     Scales the resolution of an `xarray.Dataset` or `xarray.DataArray`
     to a fraction of its original resolution or an absolute resolution.
@@ -46,6 +46,10 @@ def xr_scale_res(dataset, x_coord='longitude', y_coord='latitude',
     abs_res: list-like
         A list-like of the number of pixels for the x and y axes, respectively.
         Overrides `frac_res` if specified.
+    val_interp_method: str
+          The interpolation method for the values. This is the `method` parameter
+          input to `xarray.Dataset.interp()` after the coordinates have been interpolated.
+          Can be one of ['nearest', 'linear'].
 
     Returns
     -------
@@ -65,7 +69,8 @@ def xr_scale_res(dataset, x_coord='longitude', y_coord='latitude',
         interp_param = 'num'
         x_px, y_px = abs_res
     return xr_interp(dataset, {x_coord: ('interp', {interp_param: x_px}), \
-                               y_coord: ('interp', {interp_param: y_px})})
+                               y_coord: ('interp', {interp_param: y_px})},
+                     val_interp_method=val_interp_method)
 
 
 def xr_sel_time_by_bin(dataset, num_bins, time_coord='time'):
@@ -92,7 +97,7 @@ def xr_sel_time_by_bin(dataset, num_bins, time_coord='time'):
     return xr_interp(dataset, {time_coord: ('bin', {'num': num_bins})})
 
 
-def xr_interp(dataset, interp_config):
+def xr_interp(dataset, interp_config, val_interp_method='nearest'):
     """
     Interpolates an `xarray.Dataset` or `xarray.DataArray`.
     This is often done to match dimensions between xarray objects or
@@ -100,7 +105,7 @@ def xr_interp(dataset, interp_config):
 
     First, coordinates are interpolated according to `interp_config`.
     Then the data values for those interpolated coordinates are obtained
-    through nearest neighbors interpolation.
+    through interpolation.
 
     Parameters
     ----------
@@ -121,6 +126,10 @@ def xr_interp(dataset, interp_config):
         The following is an example value:
         `{'latitude':('interp',{'frac':0.5}),'longitude':('interp',{'frac':0.5}),
           'time':('bin',{'num':20})}`.
+      val_interp_method: str
+          The interpolation method for the values. This is the `method` parameter
+          input to `xarray.Dataset.interp()` after the coordinates have been interpolated.
+          Can be one of ['nearest', 'linear'].
 
     Returns
     -------
@@ -160,7 +169,7 @@ def xr_interp(dataset, interp_config):
             interp_vals = np.array(list(map(_scalar_to_n64_datetime, interp_vals)))
         new_coords[dim] = interp_vals
     # Nearest-neighbor interpolate data values.
-    interp_data = dataset.interp(coords=new_coords, method='nearest')
+    interp_data = dataset.interp(coords=new_coords, method=val_interp_method)
     # xarray.Dataset.interp() converts to dtype float64, so cast back to the original dtypes.
     if isinstance(dataset, xr.DataArray):
         interp_data = interp_data.astype(dataset.dtype)
@@ -168,3 +177,4 @@ def xr_interp(dataset, interp_config):
         for data_var_name in interp_data.data_vars:
             interp_data[data_var_name] = interp_data[data_var_name].astype(dataset[data_var_name].dtype)
     return interp_data
+    
