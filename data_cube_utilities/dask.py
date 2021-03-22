@@ -1,5 +1,6 @@
 import os
 import psutil
+import numpy as np
 import dask
 from datacube.utils.dask import start_local_dask
 from datacube.utils.rio import configure_s3_access
@@ -57,9 +58,8 @@ def create_local_dask_cluster(spare_mem='3Gb',
     # start up a local cluster
     num_physical_cpu = psutil.cpu_count(logical=False)
     num_logical_cpu = psutil.cpu_count(logical=True)
-    num_logical_per_physical = int(num_logical_cpu / num_physical_cpu)
-    start_local_dask_kwargs.setdefault('n_workers', num_physical_cpu - 1)
-    start_local_dask_kwargs.setdefault('threads_per_worker', num_logical_per_physical)
+    start_local_dask_kwargs.setdefault('n_workers', 1)
+    start_local_dask_kwargs.setdefault('threads_per_worker', int(np.floor(num_logical_cpu/start_local_dask_kwargs['n_workers'])))
     client = start_local_dask(mem_safety_margin=spare_mem, **start_local_dask_kwargs)
 
     ## Configure GDAL for s3 access
