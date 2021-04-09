@@ -30,6 +30,8 @@ import rasterio
 import functools
 import operator
 import warnings
+import dask
+from joblib import load
 
 def get_range(platform, collection, level):
     """
@@ -68,6 +70,53 @@ def get_range(platform, collection, level):
     return range_dict
 
 
+# def convert_range(dataset, from_platform, from_collection, from_level,
+#                   to_platform, to_collection, to_level):
+#     """
+#     Converts an xarray.Dataset's range from its product's range 
+#     to that of another product's range.
+
+#     Parameters
+#     ----------
+#     dataset: xarray.Dataset
+#         The dataset to convert to another range.
+#     from_platform, from_collection, from_level: string
+#         The dataset's product's platform, collection, and level.
+#         For example, ('LANDSAT_8', 'c2', 'l2').
+#     to_platform, to_collection, to_level: string
+#         The platform, collection, and level to convert the 
+#         dataset's range to.
+#         For example, ('LANDSAT_7', 'c1', 'l2').
+#     """
+#     # Get the original and destination ranges.
+#     from_rng = get_range(from_platform, from_collection, from_level)
+#     if from_rng is None:
+#         raise ValueError(
+#             f'The original range is not recorded '\
+#             f'(platform: {from_platform}, collection: {from_collection}, level: {from_level}).')
+#     to_rng = get_range(to_platform, to_collection, to_level)
+#     if to_rng is None:
+#         raise ValueError(
+#             f'The destination range is not recorded '\
+#             f'(platform: {to_platform}, collection: {to_collection}, level: {to_level}).')
+    
+#     # Determine the data variables with ranges in both 
+#     # the original and destination range information.
+#     data_vars_both = list(set(from_rng.keys()) & set(to_rng.keys()))
+#     out_dataset = dataset.copy(deep=True)
+#     for data_var_name in data_vars_both:
+#         from_rng_cur = from_rng[data_var_name]
+#         to_rng_cur = to_rng[data_var_name]
+#         out_dataset[data_var_name].data = np.interp(out_dataset[data_var_name], from_rng_cur, to_rng_cur)
+
+#         # Temporary approximate corrections - range scaling is often very inaccurate.
+#         if (from_platform, from_collection, from_level) == ('LANDSAT_8', 'c2', 'l2') and \
+#            to_platform in ['LANDSAT_7', 'LANDSAT_8'] and \
+#            (to_collection, to_level) == ('c1', 'l2'):
+#             out_dataset[data_var_name] = out_dataset[data_var_name] * 0.1
+    
+#     return out_dataset
+
 def convert_range(dataset, from_platform, from_collection, from_level,
                   to_platform, to_collection, to_level):
     """
@@ -86,34 +135,54 @@ def convert_range(dataset, from_platform, from_collection, from_level,
         dataset's range to.
         For example, ('LANDSAT_7', 'c1', 'l2').
     """
-    # Get the original and destination ranges.
-    from_rng = get_range(from_platform, from_collection, from_level)
-    if from_rng is None:
-        raise ValueError(
-            f'The original range is not recorded '\
-            f'(platform: {from_platform}, collection: {from_collection}, level: {from_level}).')
-    to_rng = get_range(to_platform, to_collection, to_level)
-    if to_rng is None:
-        raise ValueError(
-            f'The destination range is not recorded '\
-            f'(platform: {to_platform}, collection: {to_collection}, level: {to_level}).')
+    def convert_data_var(data_arr, data_var_name):
+        """
+        Convert an xarray of values from the 'from' dataset (`dataset`) to the 'to' dataset's values.
+        
+        data_arr: xarray.DataArray
+            The data to convert.
+        data_var_name: np.ndarray
+            The name for this data variable in `dataset` to convert to the 'to' dataset (platform, collection, level) range.
+        """
+        # Load the model for the data variable.
+        model_path = model_paths[data_var_name]
+        model = load(model_path)
+        
+        # Reformat the input for the model and run it.
+        nan_mask = np.isnan(data_arr)        
+        X = dataset[[data_var_name]].to_array().stack(row=('latitude', 'longitude', 'time')).transpose('row', 'variable')
+        nan_mask_x = np.isnan(X).squeeze()
+        X = X.where(~nan_mask_x, drop=True)
+        y_pred = model.predict(X)
+        
+        # Reformat the output from the model to match the format of `data_arr`.
+        output_data_arr = xr.full_like(data_arr, np.nan, dtype=np.float32)#data_arr.copy(deep=True)
+        output_data_arr_stacked = output_data_arr.stack(row=('latitude', 'longitude', 'time'))
+        output_data_arr_stacked.values[~nan_mask.stack(row=('latitude', 'longitude', 'time')).values] = y_pred
+        output_data_arr = output_data_arr_stacked.unstack(('row'))
+        return output_data_arr
     
-    # Determine the data variables with ranges in both 
-    # the original and destination range information.
-    data_vars_both = list(set(from_rng.keys()) & set(to_rng.keys()))
-    out_dataset = dataset.copy(deep=True)
-    for data_var_name in data_vars_both:
-        from_rng_cur = from_rng[data_var_name]
-        to_rng_cur = to_rng[data_var_name]
-        out_dataset[data_var_name].data = np.interp(out_dataset[data_var_name], from_rng_cur, to_rng_cur)
-
-        # Temporary approximate corrections - range scaling is often very inaccurate.
-        if (from_platform, from_collection, from_level) == ('LANDSAT_8', 'c2', 'l2') and \
-           to_platform in ['LANDSAT_7', 'LANDSAT_8'] and \
-           (to_collection, to_level) == ('c1', 'l2'):
-            out_dataset[data_var_name] = out_dataset[data_var_name] * 0.1
-    
-    return out_dataset
+    if isinstance(dataset, xr.DataArray):
+        dataset = dataset.to_dataset()
+    # 1. Determine the data variables to convert.
+    #    (If any data variables to convert do not have models, throw an error.)
+    filepath = os.path.dirname(os.path.abspath(__file__))
+    model_paths = {data_var: f'{filepath}/models/{from_platform}_{from_collection}_{from_level}_to_{to_platform}_{to_collection}_{to_level}_{data_var}.joblib' for data_var in list(dataset.data_vars)}
+    data_vars_no_model = []
+    for data_var in dataset.data_vars:
+        model_path = model_paths[data_var]
+        if not os.path.exists(model_path):
+            data_vars_no_model.append(data_var)
+    if len(data_vars_no_model) > 0:
+        raise ValueError(f"The data variables {data_vars_no_model} in `dataset` do not have a model for this conversion.")
+    # 2. For each data variable, apply the conversion model.
+    output_dataset = dataset.copy()
+    for data_var in output_dataset.data_vars:
+        if isinstance(dataset[data_var].data, np.ndarray):
+            output_dataset[data_var] = convert_data_var(dataset[data_var], data_var)
+        elif isinstance(dataset[data_var].data, dask.array.core.Array):
+            output_dataset[data_var] = dataset[data_var].map_blocks(convert_data_var, (data_var,))
+    return output_dataset
 
 def reverse_array_dict(dictionary):
     """
@@ -180,8 +249,6 @@ def create_default_clean_mask(dataset_in):
     Throws:
         ValueError - if dataset_in is an empty xarray.Dataset.
     """
-    import dask
-
     data = None
     if isinstance(dataset_in, xr.Dataset):
         data_vars = list(dataset_in.data_vars)
