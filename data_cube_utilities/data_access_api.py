@@ -86,13 +86,16 @@ class DataAccessApi:
             query['longitude'] = longitude
             query['latitude'] = latitude
         
-        data = self.dc.load(
-            product=product,
-            measurements=measurements,
-            output_crs=output_crs,
-            resolution=resolution,
-            dask_chunks=dask_chunks,
-            **query)
+        try: 
+            data = self.dc.load(
+                product=product,
+                measurements=measurements,
+                output_crs=output_crs,
+                resolution=resolution,
+                dask_chunks=dask_chunks,
+                **query)
+        except:
+            return xr.Dataset()
         return data
 
     def get_stacked_datasets_by_extent(self,
