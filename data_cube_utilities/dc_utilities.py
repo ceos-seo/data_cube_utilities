@@ -70,53 +70,6 @@ def get_range(platform, collection, level):
     return range_dict
 
 
-# def convert_range(dataset, from_platform, from_collection, from_level,
-#                   to_platform, to_collection, to_level):
-#     """
-#     Converts an xarray.Dataset's range from its product's range 
-#     to that of another product's range.
-
-#     Parameters
-#     ----------
-#     dataset: xarray.Dataset
-#         The dataset to convert to another range.
-#     from_platform, from_collection, from_level: string
-#         The dataset's product's platform, collection, and level.
-#         For example, ('LANDSAT_8', 'c2', 'l2').
-#     to_platform, to_collection, to_level: string
-#         The platform, collection, and level to convert the 
-#         dataset's range to.
-#         For example, ('LANDSAT_7', 'c1', 'l2').
-#     """
-#     # Get the original and destination ranges.
-#     from_rng = get_range(from_platform, from_collection, from_level)
-#     if from_rng is None:
-#         raise ValueError(
-#             f'The original range is not recorded '\
-#             f'(platform: {from_platform}, collection: {from_collection}, level: {from_level}).')
-#     to_rng = get_range(to_platform, to_collection, to_level)
-#     if to_rng is None:
-#         raise ValueError(
-#             f'The destination range is not recorded '\
-#             f'(platform: {to_platform}, collection: {to_collection}, level: {to_level}).')
-    
-#     # Determine the data variables with ranges in both 
-#     # the original and destination range information.
-#     data_vars_both = list(set(from_rng.keys()) & set(to_rng.keys()))
-#     out_dataset = dataset.copy(deep=True)
-#     for data_var_name in data_vars_both:
-#         from_rng_cur = from_rng[data_var_name]
-#         to_rng_cur = to_rng[data_var_name]
-#         out_dataset[data_var_name].data = np.interp(out_dataset[data_var_name], from_rng_cur, to_rng_cur)
-
-#         # Temporary approximate corrections - range scaling is often very inaccurate.
-#         if (from_platform, from_collection, from_level) == ('LANDSAT_8', 'c2', 'l2') and \
-#            to_platform in ['LANDSAT_7', 'LANDSAT_8'] and \
-#            (to_collection, to_level) == ('c1', 'l2'):
-#             out_dataset[data_var_name] = out_dataset[data_var_name] * 0.1
-    
-#     return out_dataset
-
 def convert_range(dataset, from_platform, from_collection, from_level,
                   to_platform, to_collection, to_level):
     """
