@@ -10,7 +10,7 @@ This includes:
 * Coastline Classification
 * Coastal Change detection
 * Continuous Change Detection (CCD) 
-* Spectral Unmixing (Fractioanl Coverage) 
+* Spectral Unmixing (Fractional Coverage) 
 * Various plotting utilities
 * Cloudfree mosaicking
 * SLIP
