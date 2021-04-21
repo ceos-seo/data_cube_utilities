@@ -66,11 +66,16 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
     """
     # Ensure data variables have the range of Landsat 7 Collection 1 Level 2
     # since this function is tailored for that dataset.
-    if (platform, collection) != ('LANDSAT_7', 'c1'):
+    if collection != 'c1':
+        old_dataset = dataset_in
+        # data_vars_conv = [data_var for data_var in dataset_in.data_vars if data_var in ['red', 'green', 'blue', 'nir', 'swir1', 'swir2']]
+        data_vars_no_conv = [data_var for data_var in dataset_in.data_vars if data_var not in ['red', 'green', 'blue', 'nir', 'swir1', 'swir2']]
         dataset_in = \
-            convert_range(dataset_in, from_platform=platform,
+            convert_range(dataset_in.drop_vars(data_vars_no_conv), from_platform=platform,
                         from_collection=collection, from_level='l2',
-                        to_platform='LANDSAT_7', to_collection='c1', to_level='l2')
+                        to_platform=platform, to_collection='c1', to_level='l2')
+        for data_var in data_vars_no_conv:
+            dataset_in[data_var] = old_dataset[data_var]
 
     # Default to masking nothing.
     if clean_mask is None:

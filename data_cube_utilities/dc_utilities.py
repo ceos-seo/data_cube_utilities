@@ -150,15 +150,15 @@ def convert_range(dataset, from_platform, from_collection, from_level,
         
         # Reformat the input for the model and run it.
         nan_mask = np.isnan(data_arr)        
-        X = dataset[[data_var_name]].to_array().stack(row=('latitude', 'longitude', 'time')).transpose('row', 'variable')
+        X = dataset[[data_var_name]].stack(row=('latitude', 'longitude', ...)).to_array().transpose('row', 'variable')
         nan_mask_x = np.isnan(X).squeeze()
         X = X.where(~nan_mask_x, drop=True)
         y_pred = model.predict(X)
         
         # Reformat the output from the model to match the format of `data_arr`.
         output_data_arr = xr.full_like(data_arr, np.nan, dtype=np.float32)#data_arr.copy(deep=True)
-        output_data_arr_stacked = output_data_arr.stack(row=('latitude', 'longitude', 'time'))
-        output_data_arr_stacked.values[~nan_mask.stack(row=('latitude', 'longitude', 'time')).values] = y_pred
+        output_data_arr_stacked = output_data_arr.stack(row=('latitude', 'longitude', ...))
+        output_data_arr_stacked.values[~nan_mask.stack(row=('latitude', 'longitude', ...)).values] = y_pred
         output_data_arr = output_data_arr_stacked.unstack(('row'))
         return output_data_arr
     

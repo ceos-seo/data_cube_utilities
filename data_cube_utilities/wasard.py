@@ -93,7 +93,6 @@ class wasard_classifier:
         total_tests          = testing_truth.size 
         testing_attributes   = np.stack(testing_attributes)
         wasard_predictions   = classifier.predict(testing_attributes)
-        # print(wasard_predictions.shape)
         # wasard_predictions   = _filter_isolated_cells(wasard_predictions, struct=np.ones((3,3)), max_size = 200)
         
         # 3 metrics used to measure the effectiveness of the classifier
