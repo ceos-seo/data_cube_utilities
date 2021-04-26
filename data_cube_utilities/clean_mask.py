@@ -121,81 +121,7 @@ def landsat_clean_mask_invalid(dataset, platform, collection, level):
     return valid_mask
 
 
-def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
-                          collection=None, level=None):
-    """
-    Returns a clean_mask for `dataset` that masks out various types of terrain cover using the
-    Landsat pixel_qa band. Note that Landsat masks specify what to keep, not what to remove.
-    This means that using `cover_types=['clear', 'water']` should keep only clear land and water.
-
-    See "pixel_qa band" here: https://landsat.usgs.gov/landsat-surface-reflectance-quality-assessment
-    and Section 7 here: https://landsat.usgs.gov/sites/default/files/documents/lasrc_product_guide.pdf.
-
-    Parameters
-    ----------
-    dataset: xarray.Dataset
-        An xarray (usually produced by `datacube.load()`) that contains a `pixel_qa` data
-        variable.
-    platform: str
-        A string denoting the platform to be used. Can be
-        "LANDSAT_5", "LANDSAT_7", or "LANDSAT_8".
-    cover_types: list
-        A list of the cover types to include.
-        Adding a cover type allows it to remain in the masked data.
-
-        Here are a list of cover types, of which each combination of
-        satellite, collection, and level supports only some:
-        'fill': Removes "no_data" values, which indicates an absense of data.
-                This value is -9999 for Landsat platforms.
-        'cloud': Allows only clouds, but note that it may only select cloud boundaries.
-        'cld_shd': Allows only cloud shadows.
-        'snow': Allows only snow.
-        'clear': Allows only clear terrain.
-        'water': Allows only water.
-        'cld_conf_low':  Low cloud coverage confidence. Useful on its own for only removing clouds,
-                         however, 'clear' is usually better suited for this.
-        'cld_conf_med':  Medium cloud coverage confidence. Useful in combination with 'low_conf_cl'
-                         to allow slightly heavier cloud coverage.
-                         Note that 'med_conf_cl' and 'cloud' are very similar.
-        'cld_conf_high': High cloud coverage confidence. Useful in combination with both 'low_conf_cl'
-                         and 'med_conf_cl'.
-        'cld_shd_conf_low':  Low cloud shadow confidence.
-        'cld_shd_conf_med':  Medium cloud shadow confidence.
-        'cld_shd_conf_high': High cloud shadow confidence.
-        'snw_ice_conf_low':  Low snow/ice confidence.
-        'snw_ice_conf_high': High snow/ice confidence.
-        'cir_conf_low':  Low cirrus confidence.
-        'cir_conf_med':  Medium cirrus confidence.
-        'cir_conf_high': High cirrus confidence.
-        'terrain_occ': Allows only occluded terrain.
-        'dilated_cloud': Allows dilated clouds.
-
-        Cover types for Landsat 5 and 7 Collection 1 Level 2 include:
-        ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
-         'cld_conf_high'].
-
-        Cover types for Landsat 8 Collection 1 Level 2 include:
-        ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
-         'cld_conf_high', 'cir_conf_low', 'cir_conf_med', 'cir_conf_high', 'terrain_occ']
-
-        Cover types for Landsat 8 Collection 2 Level 2 include:
-        ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
-         'cld_conf_high', 'cld_shd_conf_low', 'cld_shd_conf_high', 'snw_ice_conf_low',
-         'snw_ice_conf_high', 'cir_conf_low', 'cir_conf_high'].
-
-    collection: string
-        The Landsat collection of the data.
-        Can be any of ['c1', 'c2'] for Collection 1 or 2, respectively.
-    level: string
-        The processing level of the Landsat data.
-        Currently only 'l2' (Level 2) is supported.
-
-    Returns
-    -------
-    clean_mask: xarray.DataArray
-        An xarray DataArray with the same number and order of coordinates as in `dataset`.
-    """
-    def ls_unpack_qa(data_array, cover_type, platform, collection, level):
+def ls_unpack_qa(data_array, cover_type, platform, collection, level):
         # A map of 3-tuples of (platform, collection, level).
         # The `platform` value can be any of ['LANDSAT_5','LANDSAT_7','LANDSAT_8'].
         # The `collection` value can be any of ['c1', 'c2'].
@@ -274,6 +200,81 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
                              f'The supported combinations are: {list(landsat_qa_cover_types_map.keys())}')
         return (data_array & cover_type_encoding[cover_type]).astype(bool).rename(cover_type + "_mask")
 
+    
+def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
+                          collection=None, level=None):
+    """
+    Returns a clean_mask for `dataset` that masks out various types of terrain cover using the
+    Landsat pixel_qa band. Note that Landsat masks specify what to keep, not what to remove.
+    This means that using `cover_types=['clear', 'water']` should keep only clear land and water.
+
+    See "pixel_qa band" here: https://landsat.usgs.gov/landsat-surface-reflectance-quality-assessment
+    and Section 7 here: https://landsat.usgs.gov/sites/default/files/documents/lasrc_product_guide.pdf.
+
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        An xarray (usually produced by `datacube.load()`) that contains a `pixel_qa` data
+        variable.
+    platform: str
+        A string denoting the platform to be used. Can be
+        "LANDSAT_5", "LANDSAT_7", or "LANDSAT_8".
+    cover_types: list
+        A list of the cover types to include.
+        Adding a cover type allows it to remain in the masked data.
+
+        Here are a list of cover types, of which each combination of
+        satellite, collection, and level supports only some:
+        'fill': Removes "no_data" values, which indicates an absense of data.
+                This value is -9999 for Landsat platforms.
+        'cloud': Allows only clouds, but note that it may only select cloud boundaries.
+        'cld_shd': Allows only cloud shadows.
+        'snow': Allows only snow.
+        'clear': Allows only clear terrain.
+        'water': Allows only water.
+        'cld_conf_low':  Low cloud coverage confidence. Useful on its own for only removing clouds,
+                         however, 'clear' is usually better suited for this.
+        'cld_conf_med':  Medium cloud coverage confidence. Useful in combination with 'low_conf_cl'
+                         to allow slightly heavier cloud coverage.
+                         Note that 'med_conf_cl' and 'cloud' are very similar.
+        'cld_conf_high': High cloud coverage confidence. Useful in combination with both 'low_conf_cl'
+                         and 'med_conf_cl'.
+        'cld_shd_conf_low':  Low cloud shadow confidence.
+        'cld_shd_conf_med':  Medium cloud shadow confidence.
+        'cld_shd_conf_high': High cloud shadow confidence.
+        'snw_ice_conf_low':  Low snow/ice confidence.
+        'snw_ice_conf_high': High snow/ice confidence.
+        'cir_conf_low':  Low cirrus confidence.
+        'cir_conf_med':  Medium cirrus confidence.
+        'cir_conf_high': High cirrus confidence.
+        'terrain_occ': Allows only occluded terrain.
+        'dilated_cloud': Allows dilated clouds.
+
+        Cover types for Landsat 5 and 7 Collection 1 Level 2 include:
+        ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
+         'cld_conf_high'].
+
+        Cover types for Landsat 8 Collection 1 Level 2 include:
+        ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
+         'cld_conf_high', 'cir_conf_low', 'cir_conf_med', 'cir_conf_high', 'terrain_occ']
+
+        Cover types for Landsat 8 Collection 2 Level 2 include:
+        ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
+         'cld_conf_high', 'cld_shd_conf_low', 'cld_shd_conf_high', 'snw_ice_conf_low',
+         'snw_ice_conf_high', 'cir_conf_low', 'cir_conf_high'].
+
+    collection: string
+        The Landsat collection of the data.
+        Can be any of ['c1', 'c2'] for Collection 1 or 2, respectively.
+    level: string
+        The processing level of the Landsat data.
+        Currently only 'l2' (Level 2) is supported.
+
+    Returns
+    -------
+    clean_mask: xarray.DataArray
+        An xarray DataArray with the same number and order of coordinates as in `dataset`.
+    """
     if collection is None:
         warnings.warn('Please specify a value for `collection`. Assuming data is collection 1.')
         collection = 'c1'
