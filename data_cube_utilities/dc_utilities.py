@@ -87,15 +87,25 @@ def convert_range(dataset, from_platform, from_collection, from_level,
         The platform, collection, and level to convert the 
         dataset's range to.
         For example, ('LANDSAT_7', 'c1', 'l2').
+    
+    Returns
+    -------
+    output_dataset: xr.Dataset
     """
     def convert_data_var(data_arr, data_var_name):
         """
         Convert an xarray of values from the 'from' dataset (`dataset`) to the 'to' dataset's values.
         
+        Parameters
+        ----------
         data_arr: xarray.DataArray
             The data to convert.
         data_var_name: np.ndarray
             The name for this data variable in `dataset` to convert to the 'to' dataset (platform, collection, level) range.
+        
+        Returns
+        -------
+        output_data_arr: xr.DataArray
         """
         # Load the model for the data variable.
         model_path = model_paths[data_var_name]
@@ -134,7 +144,7 @@ def convert_range(dataset, from_platform, from_collection, from_level,
         if isinstance(dataset[data_var].data, np.ndarray):
             output_dataset[data_var] = convert_data_var(dataset[data_var], data_var)
         elif isinstance(dataset[data_var].data, dask.array.core.Array):
-            output_dataset[data_var] = dataset[data_var].map_blocks(convert_data_var, (data_var,))
+            output_dataset[data_var] = dataset[data_var].map_blocks(convert_data_var, (data_var,), template=dataset[data_var])
     return output_dataset
 
 def reverse_array_dict(dictionary):
