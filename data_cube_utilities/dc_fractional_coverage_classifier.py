@@ -20,11 +20,11 @@ from datetime import datetime
 csv_file_path = os.path.join(os.path.dirname(__file__), 'endmembers_landsat.csv')
 
 
-def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
-                           platform='LANDSAT_8', collection='c1'):
+def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     """
     Performs fractional coverage algorithm on given dataset.
-    For Landsat, level 2 (surface reflectance) data must be used.
+    **Landsat 8 Collection 2 Level 2 (surface reflectance) data must be used.**
+    
     If no clean mask is given, the 'cf_mask' variable must be included
     in the input dataset, as it will be used to create a clean mask.
 
@@ -49,12 +49,6 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
         If none is provided, one will be created which considers all values to be clean.
         If user does not provide a clean_mask,
         `dataset_in` must also include the cf_mask variable.
-    platform: str
-        A string denoting the platform to be used. Can be "LANDSAT_5", "LANDSAT_7", or
-        "LANDSAT_8", which are for Level 2 (surface reflectance) data.
-    collection: string
-        The Landsat collection of the data.
-        Can be any of ['c1', 'c2'] for Collection 1 or 2, respectively.
 
     Returns
     -------
@@ -64,23 +58,12 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
           variables: bs, pv, npv
         where bs -> bare soil, pv -> photosynthetic vegetation, npv -> non-photosynthetic vegetation
     """
-    # Ensure data variables have the range of Landsat 7 Collection 1 Level 2
-    # since this function is tailored for that dataset.
-    if collection != 'c1':
-        old_dataset = dataset_in
-        # data_vars_conv = [data_var for data_var in dataset_in.data_vars if data_var in ['red', 'green', 'blue', 'nir', 'swir1', 'swir2']]
-        data_vars_no_conv = [data_var for data_var in dataset_in.data_vars if data_var not in ['red', 'green', 'blue', 'nir', 'swir1', 'swir2']]
-        dataset_in = \
-            convert_range(dataset_in.drop_vars(data_vars_no_conv), from_platform=platform,
-                        from_collection=collection, from_level='l2',
-                        to_platform=platform, to_collection='c1', to_level='l2')
-        for data_var in data_vars_no_conv:
-            dataset_in[data_var] = old_dataset[data_var]
-
+    dataset_in = dataset_in.compute() # Avoid using Dask to avoid a potential error.
+    
     # Default to masking nothing.
     if clean_mask is None:
         clean_mask = create_default_clean_mask(dataset_in)
-
+        
     band_stack = []
 
     mosaic_clean_mask = clean_mask.flatten()
@@ -158,8 +141,6 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999,
                                           ('npv', (['latitude', 'longitude'], npv_band))])
 
     rapp_dataset = xr.Dataset(rapp_bands, coords={'latitude': latitude, 'longitude': longitude})
-
-    #logger.info(f'fractional_cover_output: {rapp_dataset}')
 
     return rapp_dataset
 
