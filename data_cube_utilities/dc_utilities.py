@@ -127,6 +127,7 @@ def convert_range(dataset, from_platform, from_collection, from_level,
     
     if isinstance(dataset, xr.DataArray):
         dataset = dataset.to_dataset()
+    dataset = dataset.chunk(-1) # If using Dask, collapse to 1 chunk to avoid a potential error.
     # 1. Determine the data variables to convert.
     #    (If any data variables to convert do not have models, throw an error.)
     filepath = os.path.dirname(os.path.abspath(__file__))
