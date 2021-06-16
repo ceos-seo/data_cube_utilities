@@ -632,7 +632,6 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             data_arr_non_extrap_time_bounds = \
                                 [data_arr_time_bounds[0], min(data_arr_time_bounds[1],
                                                               times_not_all_nan[-1])]
-                            data_arr_non_extrap_time_bounds = list(map(_n64_to_datetime, data_arr_non_extrap_time_bounds))
                             # Because the data could be smoothed, the last
                             # non-extrapolation time is the last time before
                             # or at the last non-extrapolation time
@@ -651,7 +650,6 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             data_arr_extrap_time_bounds = [max(data_arr_time_bounds[0],
                                                                extrap_times[0]),
                                                            data_arr_time_bounds[1]]
-                            data_arr_extrap_time_bounds = list(map(_n64_to_datetime, data_arr_extrap_time_bounds))
                             # Because the data could be smoothed, the first extrapolation time
                             # is the first time after the last non-extrapolation time for the original data.
                             extrap_plot_first_time = \
