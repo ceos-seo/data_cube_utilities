@@ -122,12 +122,11 @@ def convert_range(dataset, from_platform, from_collection, from_level,
         output_data_arr = xr.full_like(data_arr, np.nan, dtype=np.float32)#data_arr.copy(deep=True)
         output_data_arr_stacked = output_data_arr.stack(row=('latitude', 'longitude', ...))
         output_data_arr_stacked.values[~nan_mask.stack(row=('latitude', 'longitude', ...)).values] = y_pred
-        output_data_arr = output_data_arr_stacked.unstack(('row'))
+        output_data_arr = output_data_arr_stacked.unstack(('row')).transpose(..., 'latitude', 'longitude')
         return output_data_arr
     
     if isinstance(dataset, xr.DataArray):
         dataset = dataset.to_dataset()
-    dataset = dataset.chunk(-1) # If using Dask, collapse to 1 chunk to avoid a potential error.
     # 1. Determine the data variables to convert.
     #    (If any data variables to convert do not have models, throw an error.)
     filepath = os.path.dirname(os.path.abspath(__file__))
@@ -145,7 +144,8 @@ def convert_range(dataset, from_platform, from_collection, from_level,
         if isinstance(dataset[data_var].data, np.ndarray):
             output_dataset[data_var] = convert_data_var(dataset[data_var], data_var)
         elif isinstance(dataset[data_var].data, dask.array.core.Array):
-            output_dataset[data_var] = dataset[data_var].map_blocks(convert_data_var, (data_var,), template=dataset[data_var])
+            # If using Dask, collapse to 1 chunk to avoid a potential error.
+            output_dataset[data_var] = dataset[data_var].chunk(-1).map_blocks(convert_data_var, (data_var,), template=dataset[data_var])
     return output_dataset
 
 def reverse_array_dict(dictionary):
