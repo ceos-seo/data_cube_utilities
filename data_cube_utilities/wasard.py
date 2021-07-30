@@ -536,7 +536,7 @@ def _filter_isolated_cells(array, struct, max_size):
     :param max_size: Int indicating how how small isolated blocks must be to be masked
     :return: Array with minimum region size > max_size
     """
-    import scipy
+    import scipy.ndimage
     
     filtered_array                        = np.copy(array)
     id_regions, num_ids                   = scipy.ndimage.label(filtered_array, structure=struct)

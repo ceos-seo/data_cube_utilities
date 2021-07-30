@@ -201,7 +201,7 @@ def stats_filter_2d(dataarray, statistic, filter_size=3):
         The size of the filter to use. Must be positive and should be odd.
         The filter shape will be `(filter_size, filter_size)`.
     """
-    import scipy
+    import scipy.ndimage, scipy.signal
 
     if filter_size == 1: return dataarray
 
