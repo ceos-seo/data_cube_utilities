@@ -6,7 +6,7 @@ import pandas as pd
 from typing import List
 
 def _degree_to_zoom_level(l1, l2, margin = 0.0):
-    
+
     degree = abs(l1 - l2) * (1 + margin)
     zoom_level_int = 0
     if degree != 0:
@@ -17,26 +17,26 @@ def _degree_to_zoom_level(l1, l2, margin = 0.0):
     return zoom_level_int
 
 def display_map(latitude = None, longitude = None, resolution = None):
-    """ Generates a folium map with a lat-lon bounded rectangle drawn on it. Folium maps can be 
-    
+    """ Generates a folium map with a lat-lon bounded rectangle drawn on it. Folium maps can be
+
     Args:
         latitude   (float,float): a tuple of latitude bounds in (min,max) format
         longitude  ((float, float)): a tuple of longitude bounds in (min,max) format
-        resolution ((float, float)): tuple in (lat,lon) format used to draw a grid on your map. Values denote   
-                                     spacing of latitude and longitude lines.  Gridding starts at top left 
-                                     corner. Default displays no grid at all.  
+        resolution ((float, float)): tuple in (lat,lon) format used to draw a grid on your map. Values denote
+                                     spacing of latitude and longitude lines.  Gridding starts at top left
+                                     corner. Default displays no grid at all.
 
     Returns:
         folium.Map: A map centered on the lat lon bounds. A rectangle is drawn on this map detailing the
         perimeter of the lat,lon bounds.  A zoom level is calculated such that the resulting viewport is the
-        closest it can possibly get to the centered bounding rectangle without clipping it. An 
-        optional grid can be overlaid with primitive interpolation.  
+        closest it can possibly get to the centered bounding rectangle without clipping it. An
+        optional grid can be overlaid with primitive interpolation.
 
     .. _Folium
         https://github.com/python-visualization/folium
 
     """
-    
+
     assert latitude is not None
     assert longitude is not None
 
@@ -44,24 +44,56 @@ def display_map(latitude = None, longitude = None, resolution = None):
 
     margin = -0.5
     zoom_bias = 0
-    
+
     lat_zoom_level = _degree_to_zoom_level(margin = margin, *latitude ) + zoom_bias
     lon_zoom_level = _degree_to_zoom_level(margin = margin, *longitude) + zoom_bias
-    zoom_level = min(lat_zoom_level, lon_zoom_level) 
+    zoom_level = min(lat_zoom_level, lon_zoom_level)
 
     ###### ###### ######   CENTER POINT        ###### ###### ######
-    
+
     center = [np.mean(latitude), np.mean(longitude)]
 
     ###### ###### ######   CREATE MAP         ###### ###### ######
-    
+
     map_hybrid = folium.Map(
+        tiles=None,
         location=center,
-        zoom_start=zoom_level, 
-        tiles=" http://mt1.google.com/vt/lyrs=y&z={z}&x={x}&y={y}",
-        attr="Google"
+        zoom_start=zoom_level,
     )
-    
+    feat_group = folium.FeatureGroup(name='ESRI World Imagery',
+                                     overlay=False)
+    feat_group.add_child(folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/'
+                                                'services/World_Imagery/MapServer/'
+                                                'tile/{z}/{y}/{x}',
+                                          attr='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, '
+                                               'USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, '
+                                               'IGN, IGP, UPR-EGP, and the GIS User Community',
+                                          name='ESRI World Imagery'))
+    feat_group.add_child(folium.TileLayer(tiles='https://stamen-tiles-{s}.a.ssl.fastly.net/'
+                                                'toner-labels/{z}/{x}/{y}{r}.png',
+                                          attr='Map tiles by <a href="http://stamen.com">'
+                                               'Stamen Design</a>, <a href="http://'
+                                               'creativecommons.org/licenses/by/3.0">CC BY 3.0'
+                                               '</a> &mdash; Map data &copy; <a href="https://'
+                                               'www.openstreetmap.org/copyright">'
+                                               'OpenStreetMap</a> contributors',
+                                          subdomains='abcd',
+                                          min_zoom=0,
+                                          max_zoom=20))
+    feat_group.add_child(folium.TileLayer(tiles='https://stamen-tiles-{s}.a.ssl.fastly.net/'
+                                                'toner-lines/{z}/{x}/{y}{r}.png',
+                                          attr='Map tiles by <a href="http://stamen.com">'
+                                               'Stamen Design</a>, <a href="http://'
+                                               'creativecommons.org/licenses/by/3.0">CC BY 3.0'
+                                               '</a> &mdash; Map data &copy; <a href="https://'
+                                               'www.openstreetmap.org/copyright">'
+                                               'OpenStreetMap</a> contributors',
+                                          subdomains='abcd',
+                                          min_zoom=0,
+                                          max_zoom=20,
+                                          opacity=0.4))
+    map_hybrid.add_child(feat_group)
+
     ###### ###### ######   RESOLUTION GRID    ###### ###### ######
 
     if resolution is not None:
@@ -74,22 +106,22 @@ def display_map(latitude = None, longitude = None, resolution = None):
         horizontal_grid = map(lambda x :([x[1],x[0][0]],[x[1],x[0][1]]),itertools.product([longitude],lats))
 
         for segment in vertical_grid:
-            folium.features.PolyLine(segment, color = 'white', opacity = 0.3).add_to(map_hybrid)    
-        
+            folium.features.PolyLine(segment, color = 'white', opacity = 0.3).add_to(map_hybrid)
+
         for segment in horizontal_grid:
-            folium.features.PolyLine(segment, color = 'white', opacity = 0.3).add_to(map_hybrid)   
-    
+            folium.features.PolyLine(segment, color = 'white', opacity = 0.3).add_to(map_hybrid)
+
     ###### ###### ######     BOUNDING BOX     ###### ###### ######
-    
+
     line_segments = [(latitude[0],longitude[0]),
                      (latitude[0],longitude[1]),
                      (latitude[1],longitude[1]),
                      (latitude[1],longitude[0]),
                      (latitude[0],longitude[0])
                     ]
-    
-    
-    
+
+
+
     map_hybrid.add_child(
         folium.features.PolyLine(
             locations=line_segments,
@@ -97,7 +129,7 @@ def display_map(latitude = None, longitude = None, resolution = None):
             opacity=0.8)
     )
 
-    map_hybrid.add_child(folium.features.LatLngPopup())        
+    map_hybrid.add_child(folium.features.LatLngPopup())
 
     return map_hybrid
 
@@ -145,10 +177,41 @@ def display_grouped_pandas_rows_as_pins(data_frame: pd.DataFrame,
 
     m = folium_map
     if m == None:
-        m = folium.Map(location=center,
-                       tiles=" http://mt1.google.com/vt/lyrs=y&z={z}&x={x}&y={y}",
-                       attr="Google",
-                       zoom_start=zoom_level)
+        m = folium.Map(
+            tiles=None,
+            location=center,
+            zoom_start=zoom_level
+            )
+        f = folium.FeatureGroup(name='ESRI World Imagery',
+                                overlay=False)
+        f.add_child(folium.TileLayer(tiles='https://server.arcgisonline.com/ArcGIS/rest/services/'
+                                           'World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                                     attr='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, '
+                                          'USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, '
+                                          'IGP, UPR-EGP, and the GIS User Community',
+                                     name='ESRI World Imagery'))
+        f.add_child(folium.TileLayer(tiles='https://stamen-tiles-{s}.a.ssl.fastly.net/toner-labels/'
+                                           '{z}/{x}/{y}{r}.png',
+                                     attr='Map tiles by <a href="http://stamen.com">'
+                                          'Stamen Design</a>, <a href="http://creativecommons.org/'
+                                          'licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; '
+                                          '<a href="https://www.openstreetmap.org/copyright">'
+                                          'OpenStreetMap</a> contributors',
+                                     subdomains='abcd',
+                                     min_zoom=0,
+                                     max_zoom=20))
+        f.add_child(folium.TileLayer(tiles='https://stamen-tiles-{s}.a.ssl.fastly.net/toner-lines/'
+                                           '{z}/{x}/{y}{r}.png',
+                                     attr='Map tiles by <a href="http://stamen.com">'
+                                          'Stamen Design</a>, <a href="http://creativecommons.org/'
+                                          'licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; '
+                                          '<a href="https://www.openstreetmap.org/copyright">'
+                                          'OpenStreetMap</a> contributors',
+                                     subdomains='abcd',
+                                     min_zoom=0,
+                                     max_zoom=20,
+                                     opacity=0.4))
+        m.add_child(f)
 
     for i in range(0, len(data_frame)):
         land_cover = data_frame.iloc[i][group_column_name]
