@@ -60,13 +60,24 @@
       <input id='timeSlider' type='range' orient='vertical' min='0' max='100' value='100'/>
     </div>
     <script type='module'>
+      // Parameters
+      const x_scale_arg = {{ x_scale|default(1, true) }};
+      const y_scale_arg = {{ y_scale|default(1, true) }};
+      const z_scale_arg = {{ z_scale|default(1, true) }};
+      const distance_scale = {{ distance_scale|default(1, true) }};
+      const initial_size = {{ initial_size|default(2, true) }};
+
       import * as THREE from 'static_url/js/lib/threejs/three.module.js';
       import { OrbitControls } from 'static_url/js/lib/threejs/OrbitControls.js';
-      import Stats from 'static_url/js/jsm/stats.module.js';
+      {% if show_stats %}
+        import Stats from 'static_url/js/jsm/stats.module.js';
+      {% endif %}
       // The default/example data
       // import { data_array } from './data/data.js';
       var data_array = {{ data_array }};
-      import { GUI } from 'static_url/js/jsm/dat.gui.module.js';
+      {% if show_controls %}
+        import { GUI } from 'static_url/js/jsm/dat.gui.module.js';
+      {% endif %}
       import { BloomPass } from 'static_url/js/jsm/BloomPass.js';
       import { UnrealBloomPass } from 'static_url/js/jsm/UnrealBloomPass.js';
 
@@ -77,20 +88,17 @@
       let date_text = document.getElementById('date_text');
 
       const print = console.log;
-      var container, stats;
+      var container;
       var camera, scene, renderer;
 
       const scale = 10.0;
       
       const base_x_scale = 2, base_y_scale = 2, base_z_scale = 4;
-      const x_scale_arg = {{ x_scale|default(1, true) }};
-      const y_scale_arg = {{ y_scale|default(1, true) }};
-      const z_scale_arg = {{ z_scale|default(1, true) }};
-      const distance_scale = {{ distance_scale|default(1, true) }};
-
       var x_scale = distance_scale*x_scale_arg*base_x_scale;
       var y_scale = distance_scale*y_scale_arg*base_y_scale;
       var z_scale = distance_scale*z_scale_arg*base_z_scale;
+
+    //   const show_stats = {{ show_stats|default(true, true) }};
 
     //   function pos(x, y, z) {
     //     return { x: x, y: y, z: z };
@@ -262,9 +270,11 @@
         };
 
         //////////////// S T A T S  O B J E C T  ///////////
-        stats = new Stats();
-        container.appendChild(stats.dom);
-
+        {% if show_stats %}
+            var stats = new Stats();
+            container.appendChild(stats.dom);
+        {% endif %}
+        
         //////////////// C O N T R O L S //////////////////
         var controls = new OrbitControls(camera, renderer.domElement);
         controls.damping = 0.2;
@@ -360,8 +370,6 @@
 
         let start = z_dims - 20;
         let end = z_dims;
-        let initial_size = {{ initial_size|default(2, true) }};
-
         let slider = document.querySelector('input');
         slider.addEventListener(
           'input',
@@ -395,7 +403,6 @@
           false
         );
 
-        const gui = new GUI({ autoPlace: true });
         const point_size = { size: initial_size };
         function set_voxel_size(value) {
             layers.forEach((layer) => {
@@ -404,17 +411,23 @@
         }
         // Initialize the voxels' size.
         set_voxel_size(initial_size);
+        {% if show_controls %}
+        const gui = new GUI({ autoPlace: true });
         // Change the voxels' size as the size slider changes value.
         gui
           .add(point_size, 'size', 0, 12)
           .step(0.25)
           .onChange(set_voxel_size);
-        }
+        gui.close();
+        {% endif %}
+    }
 
       function animate() {
         requestAnimationFrame(animate);
         render();
-        stats.update();
+        {% if show_stats %}
+            stats.update();
+        {% endif %}
       }
 
       function render() {

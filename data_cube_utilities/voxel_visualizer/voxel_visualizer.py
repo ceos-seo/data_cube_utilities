@@ -26,6 +26,12 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
         Distance scale factors for voxels the x, y, and z dimensions.
     distance_scale: numeric
         Distance scale factor for voxels in all dimensions.
+    initial_size: numeric
+        The initial size of the voxels (default is 2).
+    show_stats: bool
+        Whether to show the stats such as FPS (default is False).
+    show_controls: bool
+        Whether to show the controls (default is True).
     """
     cwd = os.getcwd()
     os.chdir(os.path.dirname(__file__))
@@ -73,6 +79,10 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
     assert isinstance(distance_scale, (int, float)), "distance_scale must be an int or float."
     initial_size = kwargs.get('initial_size', 1)
     assert isinstance(initial_size, (int, float)), "initial_size must be an int or float."
+    show_stats = kwargs.setdefault('show_stats', False)
+    assert isinstance(show_stats, bool), "show_stats must be a boolean."
+    show_controls = kwargs.setdefault('show_controls', True)
+    assert isinstance(show_controls, bool), "show_controls must be a boolean."
     filled_template = template.render(data_array=da_str, times=times_str, **kwargs)
 
     # Remove single line comments and add 
