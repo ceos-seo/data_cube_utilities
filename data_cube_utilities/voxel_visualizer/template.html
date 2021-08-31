@@ -64,8 +64,8 @@
       const x_scale_arg = {{ x_scale|default(1, true) }};
       const y_scale_arg = {{ y_scale|default(1, true) }};
       const z_scale_arg = {{ z_scale|default(1, true) }};
-      const distance_scale = {{ distance_scale|default(1, true) }};
-      const initial_size = {{ initial_size|default(2, true) }};
+      const initial_distance_scale = {{ distance_scale|default(1, true) }};
+      const initial_voxel_size = {{ voxel_size|default(2, true) }};
 
       import * as THREE from 'static_url/js/lib/threejs/three.module.js';
       import { OrbitControls } from 'static_url/js/lib/threejs/OrbitControls.js';
@@ -94,11 +94,9 @@
       const scale = 10.0;
       
       const base_x_scale = 2, base_y_scale = 2, base_z_scale = 4;
-      var x_scale = distance_scale*x_scale_arg*base_x_scale;
-      var y_scale = distance_scale*y_scale_arg*base_y_scale;
-      var z_scale = distance_scale*z_scale_arg*base_z_scale;
-
-    //   const show_stats = {{ show_stats|default(true, true) }};
+      var x_scale = initial_distance_scale*x_scale_arg*base_x_scale;
+      var y_scale = initial_distance_scale*y_scale_arg*base_y_scale;
+      var z_scale = initial_distance_scale*z_scale_arg*base_z_scale;
 
     //   function pos(x, y, z) {
     //     return { x: x, y: y, z: z };
@@ -198,9 +196,6 @@
         const z_dims = data_NJ_array.shape[0];
         const x_dims = data_NJ_array.shape[1];
         const y_dims = data_NJ_array.shape[2];
-        // console.log('z_dims: ' + z_dims)
-        // console.log('x_dims: ' + x_dims)
-        // console.log('y_dims: ' + y_dims)
 
         console.log('Finding Center Point');
         // Find Centerpoint
@@ -309,6 +304,7 @@
 
         for (let z = 0; z < z_dims; z++) {
           let vertices = [];
+          const color = new THREE.Color(scale(z / z_dims).hex());
           let colors = [];
 
           let geometry = new THREE.BufferGeometry();
@@ -322,24 +318,25 @@
               if (val == 1) {
                 count++;
 
-                let condition1 = x % 2 == 0 || y % 2 == 0;
-                let condition2 = count % 4 != 0;
+                // let condition1 = x % 2 == 0 || y % 2 == 0;
+                // let condition2 = count % 4 != 0;
 
-                if (condition2) {
-                  let x_ditter = THREE.MathUtils.randFloatSpread(coherence) - coherence / 2;
-                  let y_ditter = THREE.MathUtils.randFloatSpread(coherence) - coherence / 2;
+                // if (condition2) {
+                // let x_ditter = THREE.MathUtils.randFloatSpread(coherence) - coherence / 2;
+                // let y_ditter = THREE.MathUtils.randFloatSpread(coherence) - coherence / 2;
 
-                  let _x = x_scale * x - x_ditter;
-                  let _y = y_scale * y - y_ditter;
-                  let _z = z_scale * z;
+                // let _x = x_scale * x - x_ditter;
+                // let _y = y_scale * y - y_ditter;
+                let _x = x_scale * x;
+                let _y = y_scale * y;
+                let _z = z_scale * z;
 
-                  vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
-                  rendered++;
-                  let norm = 1;
+                vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
+                rendered++;
+                let norm = 1;
 
-                  const color = new THREE.Color(scale(z / z_dims).hex());
-                  colors.push(color.r, color.g, color.b);
-                }
+                colors.push(color.r, color.g, color.b);
+                // }
               }
             }
           }
@@ -403,22 +400,27 @@
           false
         );
 
-        const point_size = { size: initial_size };
         function set_voxel_size(value) {
             layers.forEach((layer) => {
               layer.material.size = value;
             });
         }
         // Initialize the voxels' size.
-        set_voxel_size(initial_size);
+        set_voxel_size(initial_voxel_size);
         {% if show_controls %}
-        const gui = new GUI({ autoPlace: true });
-        // Change the voxels' size as the size slider changes value.
-        gui
-          .add(point_size, 'size', 0, 12)
-          .step(0.25)
-          .onChange(set_voxel_size);
-        gui.close();
+            const gui = new GUI({ autoPlace: true });
+            // Change the voxels' size as the size slider changes value.
+            const voxel_size_control = { voxel_size: initial_voxel_size };
+            gui
+            .add(voxel_size_control, 'voxel_size', 0, 12)
+            .step(0.25)
+            .onChange(set_voxel_size);
+            // const distance_scale_control = { distance_scale: initial_distance_scale };
+            // gui
+            // .add(distance_scale_control, 'distance_scale', 0, 6)
+            // .step(0.25)
+            // .onChange(set_distance_scale);
+            // gui.close();
         {% endif %}
     }
 
