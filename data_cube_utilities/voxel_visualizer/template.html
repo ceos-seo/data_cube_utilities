@@ -81,33 +81,43 @@
       var camera, scene, renderer;
 
       const scale = 10.0;
+      
+      const base_x_scale = 2, base_y_scale = 2, base_z_scale = 4;
+      const x_scale_arg = {{ x_scale|default(1, true) }};
+      const y_scale_arg = {{ y_scale|default(1, true) }};
+      const z_scale_arg = {{ z_scale|default(1, true) }};
+      const distance_scale = {{ distance_scale|default(1, true) }};
 
-      function pos(x, y, z) {
-        return { x: x, y: y, z: z };
-      }
+      var x_scale = distance_scale*x_scale_arg*base_x_scale;
+      var y_scale = distance_scale*y_scale_arg*base_y_scale;
+      var z_scale = distance_scale*z_scale_arg*base_z_scale;
+
+    //   function pos(x, y, z) {
+    //     return { x: x, y: y, z: z };
+    //   }
 
       init();
       animate();
 
-      function generate_face(position, orientation) {
-        var material = new THREE.MeshPhongMaterial({ color: 0.7 * 0xffff0e });
-        const object = new THREE.Mesh(face_geometry, material);
+    //   function generate_face(position, orientation) {
+    //     var material = new THREE.MeshPhongMaterial({ color: 0.7 * 0xffff0e });
+    //     const object = new THREE.Mesh(face_geometry, material);
 
-        object.position.copy(position);
+    //     object.position.copy(position);
 
-        object.position.x += positional_offsets[orientation].x * scale;
-        object.position.y += positional_offsets[orientation].y * scale;
-        object.position.z += positional_offsets[orientation].z * scale;
+    //     object.position.x += positional_offsets[orientation].x * scale;
+    //     object.position.y += positional_offsets[orientation].y * scale;
+    //     object.position.z += positional_offsets[orientation].z * scale;
 
-        object.rotateX(THREE.Math.degToRad(rotational_offsets[orientation].x));
-        object.rotateY(THREE.Math.degToRad(rotational_offsets[orientation].y));
-        object.rotateZ(THREE.Math.degToRad(rotational_offsets[orientation].z));
+    //     object.rotateX(THREE.Math.degToRad(rotational_offsets[orientation].x));
+    //     object.rotateY(THREE.Math.degToRad(rotational_offsets[orientation].y));
+    //     object.rotateZ(THREE.Math.degToRad(rotational_offsets[orientation].z));
 
-        object.castShadow = true;
-        object.receiveShadow = true;
-        scene.add(object);
-        return object;
-      }
+    //     object.castShadow = true;
+    //     object.receiveShadow = true;
+    //     scene.add(object);
+    //     return object;
+    //   }
 
       function generate_spotlight() {
         var light = new THREE.SpotLight(0xffffff, 1.5);
@@ -309,11 +319,11 @@
                   let x_ditter = THREE.MathUtils.randFloatSpread(coherence) - coherence / 2;
                   let y_ditter = THREE.MathUtils.randFloatSpread(coherence) - coherence / 2;
 
-                  let _x = x * 2 - x_ditter;
-                  let _y = y * 2 - y_ditter;
-                  let _z = z * 2;
+                  let _x = x_scale * x - x_ditter;
+                  let _y = y_scale * y - y_ditter;
+                  let _z = z_scale * z;
 
-                  vertices.push(_x - 2 * center_x, _z, _y - 2 * center_y);
+                  vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
                   rendered++;
                   let norm = 1;
 
@@ -350,7 +360,7 @@
 
         let start = z_dims - 20;
         let end = z_dims;
-        let initial_size = 2;
+        let initial_size = {{ initial_size|default(2, true) }};
 
         let slider = document.querySelector('input');
         slider.addEventListener(
@@ -387,15 +397,19 @@
 
         const gui = new GUI({ autoPlace: true });
         const point_size = { size: initial_size };
-        gui
-          .add(point_size, 'size', 0, 12)
-          .step(0.25)
-          .onChange(function (value) {
+        function set_voxel_size(value) {
             layers.forEach((layer) => {
               layer.material.size = value;
             });
-          });
-      }
+        }
+        // Initialize the voxels' size.
+        set_voxel_size(initial_size);
+        // Change the voxels' size as the size slider changes value.
+        gui
+          .add(point_size, 'size', 0, 12)
+          .step(0.25)
+          .onChange(set_voxel_size);
+        }
 
       function animate() {
         requestAnimationFrame(animate);

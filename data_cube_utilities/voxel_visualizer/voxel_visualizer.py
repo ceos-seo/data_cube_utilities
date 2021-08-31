@@ -14,9 +14,18 @@ from utils.data_cube_utilities.dc_time import _n64_to_datetime, dt_to_str
 
 VOXEL_VIS_WEB_SVR_CMD = 'python3 server.py &'
 
-def voxel_visualize(da: xr.DataArray):
+def voxel_visualize(da: xr.DataArray, **kwargs):
     """
     Show a 3D visualization of a boolean xarray `xr`.
+
+    Parameters
+    ----------
+    da: xr.DataArray
+        The boolean DataArray to show in 3D.
+    x_scale, y_scale, z_scale: numeric
+        Distance scale factors for voxels the x, y, and z dimensions.
+    distance_scale: numeric
+        Distance scale factor for voxels in all dimensions.
     """
     cwd = os.getcwd()
     os.chdir(os.path.dirname(__file__))
@@ -53,12 +62,22 @@ def voxel_visualize(da: xr.DataArray):
     da_str = str(da.values.tolist())#.replace('array(', '').replace(')', '')#.replace('\n', ',').replace(',,', ',')
     times_str = str([dt_to_str(_n64_to_datetime(time), fmt='%Y-%m-%dT%H:%M:%S.%f') 
                      for time in da.time.values]).replace(',', ',\n')
-    # Render the template and ensure the 
-    # HTML is all on one line for the iframe.
-    filled_template = template.render(data_array=da_str, times=times_str)
+    # Render the template.
+    x_scale = kwargs.get('x_scale', 1)
+    assert isinstance(x_scale, (int, float)), "x_scale must be an int or float."
+    y_scale = kwargs.get('y_scale', 1)
+    assert isinstance(y_scale, (int, float)), "y_scale must be an int or float."
+    z_scale = kwargs.get('z_scale', 1)
+    assert isinstance(z_scale, (int, float)), "z_scale must be an int or float."
+    distance_scale = kwargs.get('distance_scale', 1)
+    assert isinstance(distance_scale, (int, float)), "distance_scale must be an int or float."
+    initial_size = kwargs.get('initial_size', 1)
+    assert isinstance(initial_size, (int, float)), "initial_size must be an int or float."
+    filled_template = template.render(data_array=da_str, times=times_str, **kwargs)
 
     # Remove single line comments and add 
     # line continuation characters (\ in JS).
+    # Ensure the HTML is all on one line for the iframe srcdoc.
     filled_template_no_sngl_lne_cmts = []
     for i, line in enumerate(filled_template.splitlines()):
         if re.search('^\s*//', line) is None:
