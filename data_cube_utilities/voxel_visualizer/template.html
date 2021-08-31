@@ -65,7 +65,9 @@
       const y_scale_arg = {{ y_scale|default(1, true) }};
       const z_scale_arg = {{ z_scale|default(1, true) }};
       const initial_distance_scale = {{ distance_scale|default(1, true) }};
+      var distance_scale = initial_distance_scale;
       const initial_voxel_size = {{ voxel_size|default(2, true) }};
+      var voxel_size = initial_voxel_size;
 
       import * as THREE from 'static_url/js/lib/threejs/three.module.js';
       import { OrbitControls } from 'static_url/js/lib/threejs/OrbitControls.js';
@@ -92,11 +94,7 @@
       var camera, scene, renderer;
 
       const scale = 10.0;
-      
       const base_x_scale = 2, base_y_scale = 2, base_z_scale = 4;
-      var x_scale = initial_distance_scale*x_scale_arg*base_x_scale;
-      var y_scale = initial_distance_scale*y_scale_arg*base_y_scale;
-      var z_scale = initial_distance_scale*z_scale_arg*base_z_scale;
 
     //   function pos(x, y, z) {
     //     return { x: x, y: y, z: z };
@@ -267,7 +265,7 @@
         //////////////// S T A T S  O B J E C T  ///////////
         {% if show_stats %}
             var stats = new Stats();
-            container.appendChild(stats.dom);
+            container.appendChild(stats.domElement);
         {% endif %}
         
         //////////////// C O N T R O L S //////////////////
@@ -279,79 +277,101 @@
 
         const print = console.log;
 
-        let rendered = 0;
-        let total = 0;
-        let count = 0;
         let coherence = 0.0;
 
         let scale = chroma.scale('viridis');
 
         const layers = [];
-        var pcMat = new THREE.PointsMaterial();
-        pcMat.colors = THREE.VertextColors;
-        pcMat.size = 2;
-        pcMat.vertexColors = true;
-
+        // Don't try to optimize by creating a single 
+        // PointsMaterial. This function is necessary.
         function generate_point_cloud_material() {
-          var pcMat = new THREE.PointsMaterial();
-          pcMat.colors = THREE.VertextColors;
-          pcMat.size = 2;
-          pcMat.vertexColors = true;
-          return pcMat;
+            var pcMat = new THREE.PointsMaterial();
+            pcMat.colors = THREE.VertextColors;
+            pcMat.size = 2;
+            pcMat.vertexColors = true;
+            return pcMat
         }
 
-        const material = new THREE.PointsMaterial({ color: THREE.VertexColors, size: 1 });
+        function add_layers_to_scene() {
+            layers.forEach((point_cloud) => {
+                scene.add(point_cloud);
+            });
+        }
+        function remove_layers_from_scene() {
+            layers.forEach((point_cloud) => {
+                scene.remove(point_cloud);
+            });
+        }
 
-        for (let z = 0; z < z_dims; z++) {
-          let vertices = [];
-          const color = new THREE.Color(scale(z / z_dims).hex());
-          let colors = [];
+        var geometries = [];
+        function voxels_initialize() {
+            var x_scale = distance_scale*x_scale_arg*base_x_scale;
+            var y_scale = distance_scale*y_scale_arg*base_y_scale;
+            var z_scale = distance_scale*z_scale_arg*base_z_scale;
+            for (let z = 0; z < z_dims; z++) {
+                let vertices = [];
+                const color = new THREE.Color(scale(z / z_dims).hex());
+                let colors = [];
+                let geometry = new THREE.BufferGeometry();
 
-          let geometry = new THREE.BufferGeometry();
-          // geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( vertices, 3 ) );
-          // geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( colors, 3 ) );
+                for (let x = 0; x < x_dims; x++) {
+                    for (let y = 0; y < y_dims; y++) {
+                        var val = data_array[z][x][y];
+                        if (val == 1) {
 
-          for (let x = 0; x < x_dims; x++) {
-            for (let y = 0; y < y_dims; y++) {
-              total++;
-              var val = data_array[z][x][y];
-              if (val == 1) {
-                count++;
+                            let _x = x_scale * x;
+                            let _y = y_scale * y;
+                            let _z = z_scale * z;
 
-                // let condition1 = x % 2 == 0 || y % 2 == 0;
-                // let condition2 = count % 4 != 0;
+                            vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
+                            colors.push(color.r, color.g, color.b);
+                        }
+                    }
+                }
 
-                // if (condition2) {
-                // let x_ditter = THREE.MathUtils.randFloatSpread(coherence) - coherence / 2;
-                // let y_ditter = THREE.MathUtils.randFloatSpread(coherence) - coherence / 2;
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometries.push(geometry);
 
-                // let _x = x_scale * x - x_ditter;
-                // let _y = y_scale * y - y_ditter;
-                let _x = x_scale * x;
-                let _y = y_scale * y;
-                let _z = z_scale * z;
+                var layer = new THREE.Points(geometry, generate_point_cloud_material());
+                layer.sizeAttenuation = true;
+                layer.sortPoints = true;
 
-                vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
-                rendered++;
-                let norm = 1;
-
-                colors.push(color.r, color.g, color.b);
-                // }
-              }
+                layers.push(layer);
             }
-          }
-          // print('Layer ' + z + ' colors:')
-          // print('len: ' + colors.length/3)
-          // print('colors:' + colors);
+            add_layers_to_scene();
+        }
+        voxels_initialize();
 
-          geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-          geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        function voxels_update() {
+            remove_layers_from_scene();
+            var x_scale = distance_scale*x_scale_arg*base_x_scale;
+            var y_scale = distance_scale*y_scale_arg*base_y_scale;
+            var z_scale = distance_scale*z_scale_arg*base_z_scale;
+            for (let z = 0; z < z_dims; z++) {
+                let vertices = [];
 
-          var pc = new THREE.Points(geometry, generate_point_cloud_material());
-          pc.sizeAttenuation = true;
-          pc.sortPoints = true;
+                for (let x = 0; x < x_dims; x++) {
+                    for (let y = 0; y < y_dims; y++) {
+                        var val = data_array[z][x][y];
+                        if (val == 1) {
 
-          layers.push(pc);
+                            let _x = x_scale * x;
+                            let _y = y_scale * y;
+                            let _z = z_scale * z;
+
+                            vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
+                        }
+                    }
+                }
+
+                let geometry = geometries[z];
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+
+                var layer = new THREE.Points(geometry, generate_point_cloud_material());
+                layers[z] = layer;
+            }
+            add_layers_to_scene();
         }
 
         // console.log('Vertices Length:  ' + vertices.length + ' Colors Length:' + colors.length)
@@ -361,9 +381,7 @@
 
         // pcMat.blending = THREE.AdditiveBlending;
 
-        layers.forEach((point_cloud) => {
-          scene.add(point_cloud);
-        });
+        // add_layers_to_scene();
 
         let start = z_dims - 20;
         let end = z_dims;
@@ -372,7 +390,7 @@
           'input',
           function (value) {
             let rounded_index = Math.floor((slider.value * (layers.length - 1)) / 100);
-              
+            
             let date = dates[rounded_index];
 
             date_text.innerText = formatDate(date);
@@ -401,26 +419,32 @@
         );
 
         function set_voxel_size(value) {
+            voxel_size = value;
             layers.forEach((layer) => {
-              layer.material.size = value;
+              layer.material.size = voxel_size;
             });
         }
         // Initialize the voxels' size.
         set_voxel_size(initial_voxel_size);
+        function set_distance_scale(value) {
+            distance_scale = value;
+            voxels_update();
+        }
         {% if show_controls %}
             const gui = new GUI({ autoPlace: true });
-            // Change the voxels' size as the size slider changes value.
+            // Change the voxels' size with a slider.
             const voxel_size_control = { voxel_size: initial_voxel_size };
             gui
             .add(voxel_size_control, 'voxel_size', 0, 12)
             .step(0.25)
             .onChange(set_voxel_size);
-            // const distance_scale_control = { distance_scale: initial_distance_scale };
-            // gui
-            // .add(distance_scale_control, 'distance_scale', 0, 6)
-            // .step(0.25)
-            // .onChange(set_distance_scale);
-            // gui.close();
+            // Change the voxels' distance (spacing) with a slider.
+            const distance_scale_control = { distance_scale: initial_distance_scale };
+            gui
+            .add(distance_scale_control, 'distance_scale', 0, 6)
+            .step(0.25)
+            .onChange(set_distance_scale);
+            gui.close();
         {% endif %}
     }
 
