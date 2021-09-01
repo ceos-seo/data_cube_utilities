@@ -61,13 +61,14 @@
     </div>
     <script type='module'>
       // Parameters
-      const x_scale_arg = {{ x_scale|default(1, true) }};
-      const y_scale_arg = {{ y_scale|default(1, true) }};
-      const z_scale_arg = {{ z_scale|default(1, true) }};
+      var x_scale_arg = {{ x_scale|default(1, true) }};
+      var y_scale_arg = {{ y_scale|default(1, true) }};
+      var z_scale_arg = {{ z_scale|default(1, true) }};
       const initial_distance_scale = {{ distance_scale|default(1, true) }};
       var distance_scale = initial_distance_scale;
-      const initial_voxel_size = {{ voxel_size|default(2, true) }};
+      const initial_voxel_size = {{ voxel_size|default(3, true) }};
       var voxel_size = initial_voxel_size;
+      var voxel_opacity = {{ voxel_opacity|default(0.5, true) }};;
 
       import * as THREE from 'static_url/js/lib/threejs/three.module.js';
       import { OrbitControls } from 'static_url/js/lib/threejs/OrbitControls.js';
@@ -94,7 +95,7 @@
       var camera, scene, renderer;
 
       const scale = 10.0;
-      const base_x_scale = 2, base_y_scale = 2, base_z_scale = 4;
+      const base_x_scale = 2, base_y_scale = 2, base_z_scale = 2;
 
     //   function pos(x, y, z) {
     //     return { x: x, y: y, z: z };
@@ -303,11 +304,11 @@
             });
         }
 
+        var x_scale = distance_scale*x_scale_arg*base_x_scale;
+        var y_scale = distance_scale*y_scale_arg*base_y_scale;
+        var z_scale = distance_scale*z_scale_arg*base_z_scale;
         var geometries = [];
         function voxels_initialize() {
-            var x_scale = distance_scale*x_scale_arg*base_x_scale;
-            var y_scale = distance_scale*y_scale_arg*base_y_scale;
-            var z_scale = distance_scale*z_scale_arg*base_z_scale;
             for (let z = 0; z < z_dims; z++) {
                 let vertices = [];
                 const color = new THREE.Color(scale(z / z_dims).hex());
@@ -336,6 +337,9 @@
                 var layer = new THREE.Points(geometry, generate_point_cloud_material());
                 layer.sizeAttenuation = true;
                 layer.sortPoints = true;
+                layer.material.transparent = true;
+                layer.material.opacity = voxel_opacity;
+                layer.material.vertexColors = true;
 
                 layers.push(layer);
             }
@@ -345,9 +349,9 @@
 
         function voxels_update() {
             remove_layers_from_scene();
-            var x_scale = distance_scale*x_scale_arg*base_x_scale;
-            var y_scale = distance_scale*y_scale_arg*base_y_scale;
-            var z_scale = distance_scale*z_scale_arg*base_z_scale;
+            x_scale = distance_scale*x_scale_arg*base_x_scale;
+            y_scale = distance_scale*y_scale_arg*base_y_scale;
+            z_scale = distance_scale*z_scale_arg*base_z_scale;
             for (let z = 0; z < z_dims; z++) {
                 let vertices = [];
 
@@ -381,7 +385,25 @@
 
         // pcMat.blending = THREE.AdditiveBlending;
 
-        // add_layers_to_scene();
+        function update_layers_opacity() {
+            for (let layer_index = 0; layer_index < layers.length; layer_index++) {
+                let point_cloud = layers[layer_index];
+
+                // print(layer_index/layers.length)
+                // print(value/100);
+                if (layer_index / layers.length < slider.value / 100) {
+                    // point_cloud.material.transparent = false;
+                    point_cloud.material.transparent = true;
+                    point_cloud.material.opacity = voxel_opacity;
+                    point_cloud.material.vertexColors = true;
+                } else {
+                    point_cloud.material.transparent = true;
+                    // point_cloud.material.opacity = 0.025;
+                    point_cloud.material.opacity = 0.25 * voxel_opacity;
+                    point_cloud.material.vertexColors = false;
+                }
+            }
+        }
 
         let start = z_dims - 20;
         let end = z_dims;
@@ -398,22 +420,7 @@
 //             print('!!!!!');
 //             print(formatDate(date));
 
-            for (let layer_index = 0; layer_index < layers.length; layer_index++) {
-              let point_cloud = layers[layer_index];
-
-              // print(layer_index/layers.length)
-              // print(value/100);
-              if (layer_index / layers.length < slider.value / 100) {
-                point_cloud.material.transparent = false;
-                point_cloud.material.vertexColors = true;
-              } else {
-                point_cloud.material.transparent = true;
-                point_cloud.material.opacity = 0.025;
-                point_cloud.material.vertexColors = false;
-              }
-            }
-
-            // console.log(slider.value);
+            update_layers_opacity();
           },
           false
         );
@@ -426,10 +433,22 @@
         }
         // Initialize the voxels' size.
         set_voxel_size(initial_voxel_size);
+        
+        function set_voxel_opacity(value) {
+            voxel_opacity = value;
+            update_layers_opacity();
+        }
+
         function set_distance_scale(value) {
             distance_scale = value;
             voxels_update();
         }
+
+        function set_z_scale_arg(value) {
+            z_scale_arg = value;
+            voxels_update();
+        }
+        
         {% if show_controls %}
             const gui = new GUI({ autoPlace: true });
             // Change the voxels' size with a slider.
@@ -438,12 +457,24 @@
             .add(voxel_size_control, 'voxel_size', 0, 12)
             .step(0.25)
             .onChange(set_voxel_size);
+            // Change the voxels' opacity with a slider.
+            const voxel_opacity_control = { voxel_opacity: voxel_opacity };
+            gui
+            .add(voxel_opacity_control, 'voxel_opacity', 0, 1)
+            .step(0.05)
+            .onChange(set_voxel_opacity);
             // Change the voxels' distance (spacing) with a slider.
-            const distance_scale_control = { distance_scale: initial_distance_scale };
+            const distance_scale_control = { distance_scale: distance_scale };
             gui
             .add(distance_scale_control, 'distance_scale', 0, 6)
             .step(0.25)
             .onChange(set_distance_scale);
+            // Change the voxels' z distance (spacing) with a slider.
+            const z_scale_arg_control = { z_scale: z_scale_arg };
+            gui
+            .add(z_scale_arg_control, 'z_scale', 0, 6)
+            .step(0.25)
+            .onChange(set_z_scale_arg);
             gui.close();
         {% endif %}
     }

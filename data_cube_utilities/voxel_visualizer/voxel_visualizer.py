@@ -27,11 +27,13 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
     distance_scale: numeric
         Distance scale factor for voxels in all dimensions.
     voxel_size: numeric
-        The initial size of the voxels (default is 2).
+        The initial size of the voxels (default is 3).
     show_stats: bool
         Whether to show the stats such as FPS (default is False).
     show_controls: bool
         Whether to show the controls (default is True).
+    voxel_opacity: float
+        The opacity of the voxels (default 0.5).
     """
     cwd = os.getcwd()
     os.chdir(os.path.dirname(__file__))
@@ -79,6 +81,8 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
     assert isinstance(distance_scale, (int, float)), "distance_scale must be an int or float."
     voxel_size = kwargs.get('voxel_size', 1)
     assert isinstance(voxel_size, (int, float)), "voxel_size must be an int or float."
+    voxel_opacity = kwargs.get('voxel_opacity', 1)
+    assert isinstance(voxel_opacity, (int, float)), "voxel_opacity must be an int or float."
     show_stats = kwargs.setdefault('show_stats', False)
     assert isinstance(show_stats, bool), "show_stats must be a boolean."
     show_controls = kwargs.setdefault('show_controls', True)
