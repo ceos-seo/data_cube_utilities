@@ -292,13 +292,13 @@
         }
 
         function add_layers_to_scene() {
-            layers.forEach((point_cloud) => {
-                scene.add(point_cloud);
+            layers.forEach((layer) => {
+                scene.add(layer);
             });
         }
         function remove_layers_from_scene() {
-            layers.forEach((point_cloud) => {
-                scene.remove(point_cloud);
+            layers.forEach((layer) => {
+                scene.remove(layer);
             });
         }
 
@@ -306,6 +306,38 @@
             layers.forEach((layer) => {
               layer.material.size = voxel_size;
             });
+        }
+
+        function set_layer_opacity_std(layer) {
+            layer.material.opacity = voxel_opacity;
+            layer.material.vertexColors = true;
+        }
+
+        function set_layer_opacity_light(layer) {
+            layer.material.opacity = 0.25 * voxel_opacity;
+            layer.material.vertexColors = false;
+        }
+
+        function init_voxels_opacity() {
+            // This function sets opacity 
+            // before the slider initializes.
+            layers.forEach((layer) => {
+                set_layer_opacity_std(layer);
+            });
+        }
+
+        function set_voxels_opacity() {
+            for (let layer_index = 0; layer_index < layers.length; layer_index++) {
+                let layer = layers[layer_index];
+
+                layer.material.transparent = true;
+
+                if (layer_index / layers.length < slider.value / 100) {
+                    set_layer_opacity_std(layer);
+                } else {
+                    set_layer_opacity_light(layer);
+                }
+            }
         }
 
         function get_x_scale() {
@@ -359,14 +391,15 @@
             }
             add_layers_to_scene();
             set_voxels_size();
+            init_voxels_opacity();
         }
         voxels_initialize();
 
         function voxels_update() {
             remove_layers_from_scene();
-            x_scale = distance_scale*x_scale_arg*base_x_scale;
-            y_scale = distance_scale*y_scale_arg*base_y_scale;
-            z_scale = distance_scale*z_scale_arg*base_z_scale;
+            x_scale = get_x_scale();
+            y_scale = get_y_scale();
+            z_scale = get_z_scale();
             for (let z = 0; z < z_dims; z++) {
                 let vertices = [];
 
@@ -390,15 +423,15 @@
                 var layer = new THREE.Points(geometry, generate_point_cloud_material());
                 layer.sizeAttenuation = true;
                 layer.sortPoints = true;
-                layer.material.transparent = true;
-                layer.material.opacity = voxel_opacity;
-                layer.material.vertexColors = true;
-                layer.material.size = voxel_size;
+                // layer.material.transparent = true;
+                // layer.material.opacity = voxel_opacity;
+                // layer.material.vertexColors = true;
+                // layer.material.size = voxel_size;
                 layers[z] = layer;
             }
             add_layers_to_scene();
-            set_layers_opacity();
-            
+            set_voxels_size();
+            set_voxels_opacity();
         }
 
         // console.log('Vertices Length:  ' + vertices.length + ' Colors Length:' + colors.length)
@@ -407,26 +440,6 @@
         // var pcMat = new THREE.PointsMaterial(geometry);
 
         // pcMat.blending = THREE.AdditiveBlending;
-
-        function set_layers_opacity() {
-            for (let layer_index = 0; layer_index < layers.length; layer_index++) {
-                let point_cloud = layers[layer_index];
-
-                // print(layer_index/layers.length)
-                // print(value/100);
-                if (layer_index / layers.length < slider.value / 100) {
-                    // point_cloud.material.transparent = false;
-                    point_cloud.material.transparent = true;
-                    point_cloud.material.opacity = voxel_opacity;
-                    point_cloud.material.vertexColors = true;
-                } else {
-                    point_cloud.material.transparent = true;
-                    // point_cloud.material.opacity = 0.025;
-                    point_cloud.material.opacity = 0.25 * voxel_opacity;
-                    point_cloud.material.vertexColors = false;
-                }
-            }
-        }
 
         let start = z_dims - 20;
         let end = z_dims;
@@ -443,7 +456,7 @@
 //             print('!!!!!');
 //             print(formatDate(date));
 
-            set_layers_opacity();
+            set_voxels_opacity();
           },
           false
         );
@@ -457,15 +470,15 @@
         
         function update_voxel_opacity(value) {
             voxel_opacity = value;
-            set_layers_opacity();
+            set_voxels_opacity();
         }
 
-        function set_distance_scale(value) {
+        function update_distance_scale(value) {
             distance_scale = value;
             voxels_update();
         }
 
-        function set_z_scale_arg(value) {
+        function update_z_scale_arg(value) {
             z_scale_arg = value;
             voxels_update();
         }
@@ -489,13 +502,13 @@
             gui
             .add(distance_scale_control, 'distance_scale', 0, 6)
             .step(0.25)
-            .onChange(set_distance_scale);
+            .onChange(update_distance_scale);
             // Change the voxels' z distance (spacing) with a slider.
             const z_scale_arg_control = { z_scale: z_scale_arg };
             gui
             .add(z_scale_arg_control, 'z_scale', 0, 12)
             .step(0.25)
-            .onChange(set_z_scale_arg);
+            .onChange(update_z_scale_arg);
             gui.close();
         {% endif %}
     }

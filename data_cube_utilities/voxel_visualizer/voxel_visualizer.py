@@ -23,17 +23,17 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
     da: xr.DataArray
         The boolean DataArray to show in 3D.
     x_scale, y_scale, z_scale: numeric
-        Distance scale factors for voxels the x, y, and z dimensions.
+        Distance scale factors for voxels the x, y, and z dimensions (default 1).
     distance_scale: numeric
-        Distance scale factor for voxels in all dimensions.
+        Distance scale factor for voxels in all dimensions (default 1).
     voxel_size: numeric
-        The initial size of the voxels (default is 3).
-    show_stats: bool
-        Whether to show the stats such as FPS (default is False).
-    show_controls: bool
-        Whether to show the controls (default is True).
+        The initial size of the voxels (default 3).
     voxel_opacity: float
-        The opacity of the voxels (default 0.5).
+        The opacity of the voxels (range: [0,1], default 0.5).
+    show_stats: bool
+        Whether to show the stats such as FPS (default False).
+    show_controls: bool
+        Whether to show the controls (default True).
     """
     cwd = os.getcwd()
     os.chdir(os.path.dirname(__file__))
