@@ -7,6 +7,9 @@ from xarray.ufuncs import logical_and as xr_and
 ## Misc ##
 
 def is_dataset_empty(ds:xr.Dataset) -> bool:
+    """
+    Returns True if an xarray.Dataset is empty.
+    """
     checks_for_empty = [
                         lambda x: len(x.dims) == 0,      # Dataset has no dimensions
                         lambda x: len(x.data_vars) == 0, # Dataset has no variables
@@ -73,9 +76,9 @@ def match_dim_sizes(
     x_y_coords=['longitude', 'latitude'], method='min',
     load_kwargs=None):
     """
-    Returns the x and y dimension sizes that match some x and y extents for some products.
-    This is useful when determining an absolute resolution to scale products to with
-    `xr_scale_res()` in the `aggregate.py` utility file.
+    Returns the x and y dimension sizes that match some x and y extents for some products -
+    useful when determining an absolute resolution to scale products to with
+    `xr_scale_res()`.
 
     Parameters
     ----------
@@ -394,7 +397,7 @@ def group_dates_by_day(dates):
 
 def reduce_on_day(ds, reduction_func=np.nanmean):
     """
-    Combine data in an `xarray.Dataset` for dates with the same day
+    Combine data in an `xarray.Dataset` for dates with the same day.
 
     Parameters
     ----------

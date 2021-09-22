@@ -33,15 +33,20 @@ def get_y_x_bounds_shapefile(shapefile):
         x[1], y[1] = shp_geom.bounds[2:4]
         return y, x
 
-def shapefile_mask(dataset: xr.Dataset, shapefile) -> np.array:
+def shapefile_mask(dataset: xr.Dataset, shapefile) -> np.ndarray:
     """
-    Extracts a mask from a shapefile using dataset latitude and longitude extents.
+    Extracts a mask from an `xarray.Dataset` using a shapefile and the latitude and longitude extents of the xarray.
 
-    Args:
-        dataset (xarray.Dataset): The dataset with latitude and longitude extents.
-        shapefile (string): The shapefile to be used.
+    Parameters
+    ----------
+    dataset: xarray.Dataset
+        The dataset with latitude and longitude extents.
+    shapefile: string
+        The path to the shapefile to be used.
 
-    Returns:
+    Returns
+    -------
+    out: np.ndarray
         A boolean mask array.
     """
     import pyproj

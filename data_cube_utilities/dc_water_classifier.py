@@ -89,32 +89,44 @@ def NDWI(data, normalize=False, band_pair=0):
 def wofs_classify(dataset_in, clean_mask=None, x_coord='longitude', y_coord='latitude',
                   time_coord='time', no_data=-9999, mosaic=False):
     """
-    Description:
-      Performs WOfS algorithm on given dataset.
-    Assumption:
-      - The WOfS algorithm is defined for Landsat 5/Landsat 7
+    Performs WOfS (Water Observations from Space) algorithm on given dataset.
+    
+    The WOfS algorithm is defined for Landsat 5/7 Collection 1 Level 2 data.
+    It can also be used on Landsat 8 Collection 1 data with good accuracy.
+    
     References:
-      - Mueller, et al. (2015) "Water observations from space: Mapping surface water from
-        25 years of Landsat imagery across Australia." Remote Sensing of Environment.
-      - https://github.com/GeoscienceAustralia/eo-tools/blob/stable/eotools/water_classifier.py
-    -----
-    Inputs:
-      dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube; should contain
+    - Mueller, et al. (2015) "Water observations from space: Mapping surface water from
+    25 years of Landsat imagery across Australia." Remote Sensing of Environment.
+    - https://github.com/GeoscienceAustralia/eo-tools/blob/stable/eotools/water_classifier.py
+    
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset 
+        dataset retrieved from the Data Cube; should contain
         coordinates: time, latitude, longitude
         variables: blue, green, red, nir, swir1, swir2
-    x_coord, y_coord, time_coord: (str) - Names of DataArrays in `dataset_in` to use as x, y,
+    x_coord, y_coord, time_coord: str
+        Names of DataArrays in `dataset_in` to use as x, y,
         and time coordinates.
-    Optional Inputs:
-      clean_mask (nd numpy array with dtype boolean) - true for values user considers clean;
+    clean_mask: np.ndarray
+        numpy array with dtype boolean - true for values user considers clean;
         if user does not provide a clean mask, all values will be considered clean
-      no_data (int/float) - no data pixel value; default: -9999
-      mosaic (boolean) - flag to indicate if dataset_in is a mosaic. If mosaic = False, dataset_in
+    no_data: numeric
+        no data pixel value; default: -9999
+    mosaic: bool
+        flag to indicate if dataset_in is a mosaic. If mosaic = False, dataset_in
         should have a time coordinate and wofs will run over each time slice; otherwise, dataset_in
         should not have a time coordinate and wofs will run over the single mosaicked image
-    Output:
-      dataset_out (xarray.DataArray) - wofs water classification results: 0 - not water; 1 - water
-    Throws:
-        ValueError - if dataset_in is an empty xarray.Dataset.
+    
+    Returns
+    -------
+    dataset_out: xarray.DataArray
+        wofs water classification results: 0 - not water; 1 - water
+    
+    Raises
+    ------
+    ValueError
+        if dataset_in is an empty xarray.Dataset.
     """
 
     def _band_ratio(a, b):

@@ -14,17 +14,24 @@ def _tsmi(dataset):
 
 def tsm(dataset_in, clean_mask=None, no_data=0):
     """
-    Inputs:
-        dataset_in (xarray.Dataset)
-            Dataset retrieved from the Data Cube.
-            Must have 'red' and 'green' data variables.
-    Optional Inputs:
-        clean_mask (numpy.ndarray with dtype boolean)
-            True for values considered clean;
-            if no clean mask is supplied, all values will be considered clean
-        no_data (int/float) - no data pixel value; default: -9999
-    Throws:
-        ValueError - if dataset_in is an empty xarray.Dataset.
+    Calculate Total Suspended Matter (TSM) for water.
+
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        Dataset retrieved from the Data Cube.
+        Must have 'red' and 'green' data variables.
+    clean_mask: np.ndarray 
+        A NumPy array with dtype boolean
+        True for values considered clean;
+        if no clean mask is supplied, all values will be considered clean
+    no_data: numeric
+        no data pixel value; default: -9999
+    
+    Raises
+    ------
+    ValueError
+        if dataset_in is an empty xarray.Dataset.
     """
     assert 'red' in dataset_in and 'green' in dataset_in, "Red and Green bands are required for the TSM analysis."
     # Default to masking nothing.

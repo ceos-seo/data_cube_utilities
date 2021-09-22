@@ -17,24 +17,31 @@ def _degree_to_zoom_level(l1, l2, margin = 0.0):
     return zoom_level_int
 
 def display_map(latitude = None, longitude = None, resolution = None):
-    """ Generates a folium map with a lat-lon bounded rectangle drawn on it. Folium maps can be
+    """
+    Generates a Folium map with a latlon bounded rectangle drawn on it.
 
-    Args:
-        latitude   (float,float): a tuple of latitude bounds in (min,max) format
-        longitude  ((float, float)): a tuple of longitude bounds in (min,max) format
-        resolution ((float, float)): tuple in (lat,lon) format used to draw a grid on your map. Values denote
-                                     spacing of latitude and longitude lines.  Gridding starts at top left
-                                     corner. Default displays no grid at all.
+    Parameters
+    ----------
+    latitude: tuple
+        A 2-tuple of latitude bounds (floats) in (min,max) format.
+    longitude: tuple
+        A 2-tuple of longitude bounds (floats) in (min,max) format.
+    resolution: tuple
+        A 2-tuple of floats in (lat,lon) format used to draw a grid on your map. 
+        Values denote spacing of latitude and longitude lines.  
+        Gridding starts at the top left corner. 
+        By default, displays no grid.
 
-    Returns:
-        folium.Map: A map centered on the lat lon bounds. A rectangle is drawn on this map detailing the
-        perimeter of the lat,lon bounds.  A zoom level is calculated such that the resulting viewport is the
-        closest it can possibly get to the centered bounding rectangle without clipping it. An
-        optional grid can be overlaid with primitive interpolation.
-
-    .. _Folium
-        https://github.com/python-visualization/folium
-
+    Returns
+    -------
+    map: folium.Map
+        A map centered on the lat lon bounds. 
+        A rectangle is drawn on this map detailing the 
+        perimeter of the lat,lon bounds. 
+        A zoom level is calculated such that the resulting 
+        viewport is the closest it can possibly get to the 
+        centered bounding rectangle without clipping it. 
+        An optional grid can be overlaid with primitive interpolation.
     """
 
     assert latitude is not None

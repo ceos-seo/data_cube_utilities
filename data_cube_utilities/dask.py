@@ -11,11 +11,11 @@ def create_local_dask_cluster(spare_mem='3Gb',
                               start_local_dask_kwargs=None,
                               configure_s3_access_kwargs=None):
     """
+    Using the datacube utils function 'datacube.utils.dask.start_local_dask', generate
+    a local dask cluster.
+
     Credit belongs to Digital Earth Africa:
     https://github.com/digitalearthafrica/deafrica-sandbox-notebooks/blob/master/Scripts/deafrica_dask.py
-    
-    Using the datacube utils function 'start_local_dask', generate
-    a local dask cluster.
     
     Example use :
         

@@ -93,14 +93,14 @@ def lone_object_filter(image, min_size=2, connectivity=1, kernel_size=3,
 
 def apply_filter(statistic, filter_output, padded_arr, filter_shape):
     """
-    Creates a mean, median, or standard deviation filtered version
+    Creates a mean, median, or standard deviation kernel-filtered version
     of an `xarray.DataArray`.
 
     Parameters
     ----------
     filter_output: xarray.DataArray
         The `xarray.DataArray` to store the filtered values in.
-        Must contain the values to filter. This object is modified.**
+        Must contain the values to filter. This object is modified.
     statistic: string
         The name of the statistic to use for the filter.
         The possible values are ['mean', 'median', 'std'].
@@ -127,7 +127,7 @@ def apply_filter(statistic, filter_output, padded_arr, filter_shape):
 def stats_filter_3d_composite_2d(dataarray, statistic, filter_size=1,
                                  time_dim='time'):
     """
-    Returns a mean, median, or standard deviation filter composite
+    Returns a mean, median, or standard deviation kernel-filtered 2D composite
     of a 3D `xarray.DataArray` with a time dimension. This makes a 2D composite
     of a 3D array by stretching the filter kernel across time.
     This function is more accurate than using SciPy or scikit-image methods, because
@@ -182,7 +182,7 @@ def stats_filter_3d_composite_2d(dataarray, statistic, filter_size=1,
 
 def stats_filter_2d(dataarray, statistic, filter_size=3):
     """
-    Returns a mean, median, or standard deviation filter of a 2D `xarray.DataArray`.
+    Returns a mean, median, or standard deviation kernel-filtered 2D `xarray.DataArray`.
     This function is more accurate than using SciPy or scikit-image methods, because
     those don't handle the extremities ideally (edges and corners).
     Specifically, only values actually inside the filter should be considered,

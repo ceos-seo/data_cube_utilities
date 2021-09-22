@@ -121,9 +121,6 @@ def xarray_plot_data_vars_over_time(dataset, colors=['orange', 'blue']):
     colors: list
         A list of strings denoting colors for each data variable's points.
         For example, 'red' or 'blue' are acceptable.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     data_var_names = sorted(list(dataset.data_vars))
     len_dataset = dataset.time.size
@@ -158,9 +155,6 @@ def xarray_scatterplot_data_vars(dataset, figure_kwargs={'figsize': (12, 6)}, co
         For example, 'r' is red and 'b' is blue.
     markersize: float
         The size of markers in the scatterplot.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     from scipy import stats
 
@@ -200,9 +194,6 @@ def xarray_plot_ndvi_boxplot_wofs_lineplot_over_time(dataset, resolution=None, c
     colors: list
         A list of strings denoting colors for each data variable's points.
         For example, 'red' or 'blue' are acceptable.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     plotting_data = dataset.stack(lat_lon=('latitude', 'longitude'))
     time_agg_str = 'weekofyear' if resolution is not None and resolution == 'weekly' else 'time'
@@ -256,10 +247,9 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
                             fig=None, ax=None, show_legend=True, title=None,
                             max_times_per_plot=None, max_cols=1):
     """
-    Plot data variables in an xarray.Dataset together in one figure, with different
-    plot types for each (e.g. box-and-whisker plot, line plot, scatter plot), and
-    optional curve fitting to aggregations along time. Handles data binned with
-    xarray.Dataset methods resample() and groupby(). That is, it handles data
+    Plot data variables in an `xarray.Dataset` with different
+    plot types and optional curve fits. Handles data binned with
+    `xarray.Dataset` methods `resample()` and `groupby()`. That is, it handles data
     binned along time (e.g. by week) or across years (e.g. by week of year).
 
     Parameters
@@ -282,33 +272,32 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
         Plot types can be any of
         ['scatter', 'line', 'box', 'gaussian', 'gaussian_filter', 'poly', 'cubic_spline', 'fourier'].
         Here are the required arguments, with format {plot_type: {arg_name: (data_type[, description]}}:
-        {'poly':
-            {'degree': (int, "the degree of the polynomial to fit.")}}
+        {'poly': {'degree': (int, "the degree of the polynomial to fit.")}}
         Here are the optional arguments, with format {plot_type: {arg_name: (data_type[, description]}}:
-        {'box': # See matplotlib.axes.Axes.boxplot() for more information.
-            {'boxprops': dict, 'flierprops': dict, 'showfliers': bool},
-         'gaussian_filter': # See gaussian_filter_fit() in data_cube_utilities/curve_fitting.py for more information.
-             {'sigma': numeric},
-         'fourier':
-            {'extrap_time': (string, "a positive integer followed by Y, M, or D -
-                                      year, month, or day - specifying the
-                                      amount of time to extrapolate over."),
-             'extrap_color': (matplotlib color, "a matplotlib color to color the extrapolated data with.")}}
+        # See matplotlib.axes.Axes.boxplot() for more information.
+        {'box': {'boxprops': dict, 'flierprops': dict, 'showfliers': bool},
+        # See gaussian_filter_fit() in data_cube_utilities/curve_fitting.py for more information.
+        'gaussian_filter': {'sigma': numeric},
+        'fourier':
+        {'extrap_time': (string, "a positive integer followed by Y, M, or D -
+        year, month, or day - specifying the amount of time to extrapolate over."),
+        'extrap_color': (matplotlib color, "a matplotlib color to color the extrapolated data with.")
+        }}
         Additionally, all of the curve fits (['gaussian', 'gaussian_filter', 'poly',
         'cubic_spline', 'fourier']) support an optional 'smooth' boolean parameter.
         If true, the curve fit is smoothed, otherwise it will look no smoother than the original data.
 
         Here is an example:
-        {'ndvi':{'mean':[{'line':{'color':'forestgreen', 'alpha':alpha}}],
-                 'none':[{'box':{'boxprops':{'facecolor':'forestgreen','alpha':alpha},
-                                 'showfliers':False}}]}}
+        {'ndvi':
+        {'mean':[{'line':{'color':'forestgreen', 'alpha':alpha}}],
+        'none':[{'box':{'boxprops':{'facecolor':'forestgreen','alpha':alpha},'showfliers':False}}]}}
         This example will create a green line plot of the mean of the 'ndvi' band
         as well as a green box plot of the 'ndvi' band.
     x_coord, y_coord: str
         Names of the x and y coordinates in `dataset`.
     fig_params: dict
         Figure parameters dictionary (e.g. {'figsize':(12,6)}). Used to create a Figure
-        ``if fig is None and ax is None`.
+        `if fig is None and ax is None`.
     fig: matplotlib.figure.Figure
         The figure to use for the plot.
         If only `fig` is supplied, the Axes object used will be the first. This
@@ -343,9 +332,6 @@ def xarray_time_series_plot(dataset, plot_descs, x_coord='longitude',
     ------
     ValueError:
         If an aggregation type is not possible for a plot type
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     fig_params = {} if fig_params is None else fig_params
 
@@ -786,8 +772,9 @@ def get_curvefit(x, y, fit_type, x_smooth=None, n_pts=n_pts_smooth, fit_kwargs=N
     y: np.ndarray
         A 1D NumPy array. The y values to fit to.
     fit_type: str
-        The type of curve to fit. One of ['gaussian', 'gaussian_filter', 'poly',
-                                          'cubic_spline', 'fourier'].
+        The type of curve to fit. One of 
+        ['gaussian', 'gaussian_filter', 'poly', 
+        'cubic_spline', 'fourier'].
         The option 'gaussian' creates a Gaussian fit.
         The option 'gaussian_filter' creates a Gaussian filter fit.
         The option 'poly' creates a polynomial fit.
@@ -817,9 +804,6 @@ def get_curvefit(x, y, fit_type, x_smooth=None, n_pts=n_pts_smooth, fit_kwargs=N
         If there are no non-NaN values in `y`, these will be filled with `n_pts` NaNs.
         If there is only 1 non-NaN value in `y`, these will be filled with
         their corresponding values (y or x value) for that point to a length of `n_pts`.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     from scipy.interpolate import CubicSpline
     from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit, fourier_fit
@@ -911,9 +895,6 @@ def plot_curvefit(x, y, fit_type, x_smooth=None, n_pts=n_pts_smooth, fig_params=
     -------
     lines: matplotlib.lines.Line2D
         Can be used as a handle for a matplotlib legend (i.e. plt.legend(handles=...)) among other things.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     from scipy.interpolate import CubicSpline
     from .curve_fitting import gaussian_fit, gaussian_filter_fit, poly_fit, fourier_fit
@@ -1077,7 +1058,7 @@ def create_discrete_color_map(data_range=None, colors=None, cmap=None,
                               th=None, pts=None, cmap_name='my_cmap',
                               data_range_fmt=None, pts_fmt=None):
     """
-    Creates a discrete matplotlib LinearSegmentedColormap with thresholds for color changes.
+    Creates a discrete `matplotlib.colors.LinearSegmentedColormap` with thresholds for color changes.
     Exclusively either `colors` or `cmap` must be specified (i.e. one and only one).
     At least one of the parameters `th` or `pts` may be specified, but not both.
 
@@ -1110,9 +1091,6 @@ def create_discrete_color_map(data_range=None, colors=None, cmap=None,
     pts_fmt: list-like
         A mutable container intended to hold the midpoints of the thresholds. This must have the same length
         as the number of points specified by `pts` or have a length of `len(th)+1`.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     assert (colors is None) ^ (cmap is None), \
         "Exclusively either `colors` or `cmap` must be specified."
@@ -1188,7 +1166,8 @@ def create_discrete_color_map(data_range=None, colors=None, cmap=None,
 
 def create_gradient_color_map(data_range, colors, positions=None, cmap_name='my_cmap'):
     """
-    Creates a gradient colormap with a LinearSegmentedColormap. Currently only creates linear gradients.
+    Creates a gradient colormap with a `matplotlib.colors.LinearSegmentedColormap`. 
+    Currently only creates linear gradients.
 
     Parameters
     ----------
@@ -1249,14 +1228,16 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
                              create_stats_table=True, create_change_matrix=True,
                              denoise=True, denoise_params=None):
     """
-    Creates a figure showing one of the following, depending on the format of arguments:
-        1. The change in the extents of a binary pixel classification in a region over time.
-           Pixels are colored based on never, sometimes, or always being a member of the class.
-           In this case, there are 3 regions - never, sometimes, and always.
-        2. The change in the extents of a binary pixel classification in a region over time between
-           two time periods. Pixels are colored based on a change in having zero or more than zero
-           times in which they are members of the class between the time periods.
-           In this case, there are 4 regions - (never,never),(never,some),(some,never),(some,some).
+    Creates a figure showing one of the following, depending on the format of arguments.
+    
+    1. The change in the extents of a binary pixel classification in a region over time.
+    Pixels are colored based on never, sometimes, or always being a member of the class.
+    In this case, there are 3 regions - never, sometimes, and always.
+    
+    2. The change in the extents of a binary pixel classification in a region over time between
+    two time periods. Pixels are colored based on a change in having zero or more than zero
+    times in which they are members of the class between the time periods.
+    In this case, there are 4 regions - (never,never),(never,some),(some,never),(some,some).
 
     Parameters
     ----------
@@ -1348,10 +1329,10 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
         the number and percent of pixels in each category of membership,
         with the categories depending on whether `dataarrays` contains one or two DataArrays.
         * If `dataarrays` contains one DataArray, there are 4 rows for never, sometimes,
-          always, and unknown (due to `clean_masks`) class membership.
+        always, and unknown (due to `clean_masks`) class membership.
         * If `dataarrays` contains two DataArrays, there are 6 rows for the transitions
-          (never,never), (never,some), (some,never), (some,some), the net change
-          ((never,some) + (some,never)), and unknown.
+        (never,never), (never,some), (some,never), (some,some), the net change
+        ((never,some) + (some,never)), and unknown.
 
         If `len(dataarrays == 2) and create_change_matrix == True`, `stats` includes
         an `xarray.Dataset` containing the number and percent of pixels in each possible
@@ -1360,9 +1341,6 @@ def binary_class_change_plot(dataarrays, clean_masks=None, x_coord='longitude', 
         data variable of the `xarray.Dataset`.
 
         If a stats table and a change matrix are both created, they will be returned in that order.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     from .raster_filter import lone_object_filter
 
@@ -1748,7 +1726,7 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
                   y_tick_label_kwargs=None, title=None, title_kwargs=None,
                   possible_plot_values=None):
     """
-    Shows a heatmap of an xarray DataArray with only latitude and longitude dimensions.
+    Shows a heatmap of an `xarray.DataArray` with only latitude and longitude dimensions.
     Unlike matplotlib `imshow()` or `data.plot.imshow()`, this sets axes ticks and labels.
     It also simplifies creating a colorbar and legend.
 
@@ -1811,9 +1789,6 @@ def xarray_imshow(data, x_coord='longitude', y_coord='latitude', width=10,
                        matplotlib.image.AxesImage,  matplotlib.colorbar.Colorbar
         The figure and axes used as well as the image returned by `pyplot.imshow()` and the colorbar.
         If `use_colorbar == False`, `cbar` will be `None`.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -1931,9 +1906,6 @@ def xarray_set_axes_labels(data, ax, x_coord='longitude', y_coord='latitude',
     x_tick_label_kwargs, y_tick_label_kwargs: dict
         Dictionaries of keyword arguments passed to `ax.set_xticklabels()`
         and `ax.set_yticklabels()`, respectively.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     import string
     # Avoid modifying the original arguments.
@@ -2237,7 +2209,7 @@ def xr_animation(ds,
     
     """
     Takes an `xarray` timeseries and animates the data as either a 
-    three-band (e.g. true or false colour) or single-band animation, 
+    three-band (true or false colour) or single-band animation, 
     allowing changes in the landscape to be compared across time.
     
     Animations can be customised to include text and date annotations 
@@ -2299,12 +2271,12 @@ def xr_animation(ds,
         the GeoDataFrame that define the time range used to plot each 
         feature. Dates can be provided in any string format that can be 
         converted using the `pandas.to_datetime()`. e.g.
-         `gdf['end_time'] = ['2001', '2005-01', '2009-01-01']`    
+        `gdf['end_time'] = ['2001', '2005-01', '2009-01-01']`    
     show_date : string or bool, optional
         An optional string or bool that defines how (or if) to plot 
         date annotations for each animation frame. Defaults to 
         '%d %b %Y'; can be customised to any format understood by 
-        strftime (https://strftime.org/). Set to False to remove date 
+        strftime. Set to False to remove date 
         annotations completely.       
     show_text : str or list of strings, optional
         An optional string or list of strings with a length equal to 
@@ -2324,13 +2296,13 @@ def xr_animation(ds,
     annotation_kwargs : dict, optional
         An optional dict of keyword arguments for controlling the 
         appearance of  text annotations. Keyword arguments are passed 
-        to `matplotlib`'s `plt.annotate` 
+        to `matplotlib.pyplot.annotate`
         (see https://matplotlib.org/api/_as_gen/matplotlib.pyplot.annotate.html 
         for options). For example, `annotation_kwargs={'fontsize':20, 
-        'color':'red', 'family':'serif'}.  
+        'color':'red', 'family':'serif'}`.
     imshow_kwargs : dict, optional
         An optional dict of keyword arguments for controlling the 
-        appearance of arrays passed to `matplotlib`'s `plt.imshow` 
+        appearance of arrays passed to `matplotlib.pyplot.imshow` 
         (see https://matplotlib.org/api/_as_gen/matplotlib.pyplot.imshow.html 
         for options). For example, a green colour scheme and custom
         stretch could be specified using: 
@@ -2350,8 +2322,7 @@ def xr_animation(ds,
         An optional integer specifying how many animation frames to 
         render (e.g. `limit=50` will render the first 50 frames). This
         can be useful for quickly testing animations without rendering 
-        the entire time-series.    
-            
+        the entire time-series.
     """
 
     def _start_end_times(gdf, ds):

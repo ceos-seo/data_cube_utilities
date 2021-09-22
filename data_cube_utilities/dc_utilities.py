@@ -36,7 +36,7 @@ from joblib import load
 def get_range(platform, collection, level):
     """
     Obtain the "valid" value range for a given combination of platform, 
-    collection, level, and data_var (does vary by data variable for some products).
+    collection, level, and data variable (does vary by data variable for some products).
 
     Parameters
     ----------
@@ -73,8 +73,8 @@ def get_range(platform, collection, level):
 def convert_range(dataset, from_platform, from_collection, from_level,
                   to_platform, to_collection, to_level):
     """
-    Converts an xarray.Dataset's range from its product's range 
-    to that of another product's range.
+    Converts an xarray.Dataset range from its product range 
+    to that of another product.
 
     Parameters
     ----------
@@ -180,14 +180,18 @@ def check_for_float(array):
 
 def create_cfmask_clean_mask(cfmask):
     """
-    Description:
-      Create a clean mask for clear land/water pixels,
-      i.e. mask out shadow, snow, cloud, and no data
-    -----
-    Input:
-      cfmask (xarray) - cf_mask from the ledaps products
-    Output:
-      clean_mask (boolean numpy array) - clear land/water mask
+    Create a clean mask for clear land/water pixels,
+    i.e. mask out shadow, snow, cloud, and no data
+    
+    Parameters
+    ----------
+    cfmask: xarray.DataArray
+        cf_mask from the ledaps products
+    
+    Returns
+    -------
+    clean_mask: np.ndarray 
+        boolean numpy array - clear land/water mask
     """
 
     #########################
@@ -205,13 +209,17 @@ def create_cfmask_clean_mask(cfmask):
 
 def create_default_clean_mask(dataset_in):
     """
-    Description:
-        Creates a data mask that masks nothing.
-    -----
-    Inputs:
-        dataset_in (xarray.Dataset) - dataset retrieved from the Data Cube.
-    Throws:
-        ValueError - if dataset_in is an empty xarray.Dataset.
+    Creates a data mask that masks nothing.
+    
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        dataset retrieved from the Data Cube.
+    
+    Raises
+    ------
+    ValueError
+        if dataset_in is an empty xarray.Dataset.
     """
     data = None
     if isinstance(dataset_in, xr.Dataset):
@@ -232,13 +240,17 @@ def create_default_clean_mask(dataset_in):
 
 def get_spatial_ref(crs):
     """
-    Description:
-      Get the spatial reference of a given crs
-    -----
-    Input:
-      crs (datacube.model.CRS) - Example: CRS('EPSG:4326')
-    Output:
-      ref (str) - spatial reference of given crs
+    Get the spatial reference of a given crs.
+    
+    Parameters
+    ----------
+    crs: datacube.model.CRS
+        Example: CRS('EPSG:4326')
+    
+    Returns
+    -------
+    ref: str 
+        spatial reference of given crs
     """
     import osr
 
@@ -250,16 +262,20 @@ def get_spatial_ref(crs):
 
 def perform_timeseries_analysis(dataset_in, band_name, intermediate_product=None, no_data=-9999, operation="mean"):
     """
-    Description:
-
-    -----
-    Input:
-      dataset_in (xarray.DataSet) - dataset with one variable to perform timeseries on
-      band_name: name of the band to create stats for.
-      intermediate_product: result of this function for previous data, to be combined here
-    Output:
-      dataset_out (xarray.DataSet) - dataset containing
-        variables: normalized_data, total_data, total_clean
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        dataset with one variable to perform timeseries on
+    band_name: str
+        name of the band to create stats for.
+    intermediate_product: xarray.Dataset
+        result of this function for previous data, to be combined here
+    
+    Returns
+    -------
+    dataset_out: xarray.Dataset
+        dataset containing variables: 
+        normalized_data, total_data, total_clean
     """
 
     assert operation in ['mean', 'max', 'min'], "Please enter a valid operation."
@@ -309,16 +325,22 @@ def clear_attrs(dataset):
 
 
 def create_bit_mask(data_array, valid_bits, no_data=-9999):
-    """Create a boolean bit mask from a list of valid bits.
+    """
+    Create a boolean bit mask from a list of valid bits.
 
-    Args:
-        data_array: xarray data array to extract bit information for.
-        valid_bits: array of ints representing what bits should be considered valid.
-        no_data: no_data value for the data array.
+    Parameters
+    ----------
+    data_array: xarray.DataArray
+        DataArray to extract bit information for.
+    valid_bits: np.ndarray
+        ints representing what bits should be considered valid.
+    no_data: int
+        no_data value for the data array.
 
-    Returns:
-        Boolean mask signifying valid data.
-
+    Returns
+    -------
+    out: np.ndarray
+        NumPy array boolean mask signifying valid data.
     """
     assert isinstance(valid_bits, list) and isinstance(valid_bits[0], int), "Valid bits must be a list of integer bits"
     #do bitwise and on valid mask - all zeros means no intersection e.g. invalid else return a truthy value?
@@ -328,7 +350,8 @@ def create_bit_mask(data_array, valid_bits, no_data=-9999):
 
 
 def add_timestamp_data_to_xr(dataset):
-    """Add timestamp data to an xarray dataset using the time dimension.
+    """
+    Add timestamp data to an xarray dataset using the time dimension.
 
     Adds both a timestamp and a human readable date int to a dataset - int32 format required.
     modifies the dataset in place.
@@ -410,17 +433,25 @@ def write_geotiff_from_xr(tif_path, data, bands=None, no_data=-9999, crs="EPSG:4
 
 def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color='red', scale=None, low_res=False,
                       no_data=-9999, crs="EPSG:4326"):
-    """Write a rgb png from an xarray dataset.
+    """
+    Write a rgb png from an xarray dataset.
     Note that using `low_res==True` currently causes the file(s)
     for `png_path` and `png_filled_path` to not be created.
 
-    Args:
-        png_path: path for the png to be written to.
-        dataset: dataset to use for the png creation.
-        bands: a list of three strings representing the bands and their order
-        png_filled_path: optional png with no_data values filled
-        fill_color: color to use as the no_data fill
-        scale: desired scale - tuple like (0, 4000) for the upper and lower bounds
+    Parameters
+    ----------
+    png_path: str
+        path for the png to be written to.
+    dataset: xarray.Dataset
+        dataset to use for the png creation.
+    bands: list
+        a list of three strings representing the bands and their order
+    png_filled_path: str
+        optional png with no_data values filled
+    fill_color:
+        color to use as the no_data fill
+    scale: tuple
+        desired scale - tuple like (0, 4000) for the upper and lower bounds
 
     """
     assert isinstance(bands, list), "Bands must a list of strings"
@@ -452,16 +483,23 @@ def write_png_from_xr(png_path, dataset, bands, png_filled_path=None, fill_color
 
 def write_single_band_png_from_xr(png_path, dataset, band, color_scale=None, fill_color=None, interpolate=True,
                                   no_data=-9999, crs="EPSG:4326"):
-    """Write a pseudocolor png from an xarray dataset.
+    """
+    Write a pseudocolor png from an xarray dataset.
 
-    Args:
-        png_path: path for the png to be written to.
-        dataset: dataset to use for the png creation.
-        band: The band to write to a png
-        png_filled_path: optional png with no_data values filled
-        fill_color: color to use as the no_data fill
-        color_scale: path to a color scale compatible with gdal.
-
+    Parameters
+    ----------
+    png_path: str
+        path for the png to be written to.
+    dataset: xarray.Dataset
+        dataset to use for the png creation.
+    band: str
+        The band to write to a png
+    png_filled_path: str
+        optional png with no_data values filled
+    fill_color: 
+        color to use as the no_data fill
+    color_scale: str
+        path to a color scale compatible with gdal.
     """
     assert os.path.exists(color_scale), "Color scale must be a path to a text file containing a gdal compatible scale."
     assert isinstance(band, str), "Band must be a string."

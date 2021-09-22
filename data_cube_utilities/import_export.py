@@ -64,7 +64,9 @@ def export_xarray_to_netcdf(data, path):
 
 def export_slice_to_geotiff(ds, path, x_coord='longitude', y_coord='latitude'):
     """
-    Exports a single slice of an xarray.Dataset as a GeoTIFF.
+    NOTE: Instead of this function, please use `import_export.export_xarray_to_geotiff()`.
+    
+    Exports a 2D slice of an xarray.Dataset as a GeoTIFF.
 
     ds: xarray.Dataset
         The Dataset to export. Must have exactly 2 dimensions - 'latitude' and 'longitude'.

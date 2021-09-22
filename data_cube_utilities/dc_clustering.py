@@ -76,7 +76,7 @@ def kmeans_cluster_dataset(dataset_in, bands, n_clusters=4):
         called "classification", which are the numeric class labels in range [0, n_clusters-1].
 
     clustered: xarray.DataArray
-        A DataArrau of the same shape as `dataset_in`, containing the numberic class labels in range [0, n_clusters-1].
+        A DataArray of the same shape as `dataset_in`, containing the numberic class labels in range [0, n_clusters-1].
     """
     features, no_nan_mask = clustering_pre_processing(dataset_in, bands)
     """
@@ -89,6 +89,25 @@ def kmeans_cluster_dataset(dataset_in, bands, n_clusters=4):
     return clustering_post_processing(classified, dataset_in, bands, no_nan_mask)
 
 def birch_cluster_dataset(dataset_in, bands, n_clusters=4):
+    """
+    Clusters a dataset with BIRCH clustering.
+
+    Parameters
+    ----------
+    dataset_in: xarray.Dataset
+        A Dataset containing the bands listed in `bands`.
+    bands: list of str
+        A list of names of the bands in `dataset_in` to cluster with.
+
+    Returns
+    -------
+    clustered: xarray.Dataset
+        A Dataset of the same shape as `dataset_in`, containing a single data variable
+        called "classification", which are the numeric class labels in range [0, n_clusters-1].
+
+    clustered: xarray.DataArray
+        A DataArray of the same shape as `dataset_in`, containing the numberic class labels in range [0, n_clusters-1].
+    """
     features, no_nan_mask = clustering_pre_processing(dataset_in, bands)
     """
     classified = AgglomerativeClustering(n_clusters=n_clusters).fit(np_array)

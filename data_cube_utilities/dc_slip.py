@@ -3,15 +3,22 @@ import xarray as xr
 
 
 def compute_slip(baseline_data, target_data, dem_data, no_data=-9999):
-    """Compute the SLIP product for a baseline and target dataset
+    """
+    Compute the SLIP product for a baseline and target dataset.
 
-    Args:
-        baseline_data: single timeslice dataset with dims lat, lon
-        target_data: single timeslice dataset with dims lat, lon
-        dem_data: dem dataset for the above datasets with corresponding lat, lon indices
+    Parameters
+    ----------
+    baseline_data: 
+        single timeslice dataset with dims lat, lon
+    target_data: 
+        single timeslice dataset with dims lat, lon
+    dem_data: 
+        DEM dataset for the above datasets with corresponding lat, lon indices
 
-    Returns:
-        xarray dataarray containing slip mask
+    Returns
+    -------
+    out: xarray.Dataset
+        SLIP mask
     """
 
     required_measurements = ['red', 'nir', 'swir1']

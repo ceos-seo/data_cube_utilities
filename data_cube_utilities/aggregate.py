@@ -119,13 +119,13 @@ def xr_interp(dataset, interp_config, val_interp_method='nearest'):
         The parameters, with supported interpolation types annotated to their
         left, are as follow:
         ('interp', 'bin'): 'frac':
-            The fraction of the original size to use. Exclusive with 'num'.
+        - The fraction of the original size to use. Exclusive with 'num'.
         ('interp', 'bin'): 'num':
-            The number of points in the output. Exclusive with 'frac'.
-            Either 'frac' or 'num' must be in the interpolation parameters.
+        - The number of points in the output. Exclusive with 'frac'.
+        - Either 'frac' or 'num' must be in the interpolation parameters.
         The following is an example value:
         `{'latitude':('interp',{'frac':0.5}),'longitude':('interp',{'frac':0.5}),
-          'time':('bin',{'num':20})}`.
+        'time':('bin',{'num':20})}`.
       val_interp_method: str
           The interpolation method for the values. This is the `method` parameter
           input to `xarray.Dataset.interp()` after the coordinates have been interpolated.
@@ -135,9 +135,6 @@ def xr_interp(dataset, interp_config, val_interp_method='nearest'):
     -------
     interp_data: xarray.Dataset or xarray.DataArray
         The specified interpolation of `dataset`.
-
-    :Authors:
-        John Rattz (john.c.rattz@ama-inc.com)
     """
     from .dc_time import _n64_datetime_to_scalar, \
         _scalar_to_n64_datetime

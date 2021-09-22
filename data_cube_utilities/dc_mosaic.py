@@ -37,7 +37,7 @@ Compositing Functions
 def create_min_max_var_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, 
                               var=None, min_max=None):
     """
-    Creates a minimum or maximum mosaic for a specified data variable in `dataset_in`.
+    Creates a minimum or maximum mosaic for a specified data variable of an xarray.Dataset.
 
     Parameters
     ----------
@@ -186,7 +186,7 @@ def create_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None,
 
 def create_mean_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=None, **kwargs):
     """
-    Method for calculating the mean pixel value for a given dataset.
+    Creates a mean mosaic for an xarray.Dataset.
 
     Parameters
     ----------
@@ -418,14 +418,19 @@ def create_min_ndvi_mosaic(dataset_in, clean_mask=None, no_data=-9999, dtype=Non
 
 def unpack_bits(land_cover_endcoding, data_array, cover_type):
     """
-    Description:
-        Unpack bits for end of ls7 and ls8 functions 
-    -----
-    Input:
-        land_cover_encoding(dict hash table) land cover endcoding provided by ls7 or ls8
-        data_array( xarray DataArray)
-        cover_type(String) type of cover
-    Output:
+    Unpack bits for end of ls7 and ls8 functions 
+    
+    Parameters
+    ----------
+    land_cover_encoding: dict
+        land cover endcoding provided by ls7 or ls8
+    data_array: xarray.DataArray
+    cover_type: str 
+        type of cover
+    
+    Returns
+    -------
+    out: xarray.DataArray
         unpacked DataArray
     """
     data = data_array.data
@@ -466,18 +471,18 @@ def ls8_oli_unpack_qa(data_array, cover_type):
     For more information, see this: https://landsat.usgs.gov/collectionqualityband
     The most relevant section for this function is titled
     "Landsat 8 OLI/ OLI-TIRS Level-1 Possible Attributes,
-     Pixel Values, and Pixel Value Interpretations".
+    Pixel Values, and Pixel Value Interpretations".
 
     Parameters
     ----------
     data_array: xarray.DataArray
         A DataArray of the QA band.
     cover_type: string
-        A string in the set [fill, terrain_occ, clear, rad_sat_1_2,
-                             rad_sat_3_4, rad_sat_5_pls, cloud, low_conf_cl,
-                             med_conf_cl, high_conf_cl, high_cl_shdw,
-                             high_snow_ice, low_conf_cir, high_conf_cir].
-
+        A string in the set 
+        [fill, terrain_occ, clear, rad_sat_1_2, rad_sat_3_4, rad_sat_5_pls, 
+        cloud, low_conf_cl, med_conf_cl, high_conf_cl, high_cl_shdw,
+        high_snow_ice, low_conf_cir, high_conf_cir].
+        
         'fill' removes "no_data" values, which indicates an absence of data. This value is -9999 for Landsat platforms.
         Generally, don't use 'fill'.
         'terrain_occ' allows only occluded terrain.

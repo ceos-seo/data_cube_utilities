@@ -172,25 +172,31 @@ def _chunk_iterable(_iterable, chunk_size):
 
 
 def generate_baseline(_iterable, window_length):
-    """Generate a sliding baseline of an iterable
+    """
+    Generate a sliding baseline of an iterable
 
     Creates a list of sliding baselines for the iterable. e.g. if you pass in
     a list of len==5 with a baseline length of 2, we will generate:
     [
-        [elem0 (first element), elem1, elem2],
-        [elem1, elem2, elem3],
-        [elem2, elem3, elem4(last element)]
+    [elem0 (first element), elem1, elem2],
+    [elem1, elem2, elem3],
+    [elem2, elem3, elem4(last element)]
     ]
 
     The first element in each list is the element that the baseline is created for, followed by
     window_length number of elements as the baseline.
 
-    Args:
-        _iterable: iterable to create baselines for
-        window_length: Number of elements to form a baseline
+    Parameters
+    ----------
+    _iterable: 
+        iterable to create baselines for
+    window_length: 
+        Number of elements to form a baseline
 
-    Returns:
-        list like [[window_1], [window_2], [window_3] ...]
+    Returns
+    -------
+    out: 
+        list-like [[window_1], [window_2], [window_3] ...]
     """
     if len(_iterable) <= window_length:
         return [_iterable]

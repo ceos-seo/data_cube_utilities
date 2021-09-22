@@ -226,19 +226,19 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
         Here are a list of cover types, of which each combination of
         satellite, collection, and level supports only some:
         'fill': Removes "no_data" values, which indicates an absense of data.
-                This value is -9999 for Landsat platforms.
+        This value is -9999 for Landsat platforms.
         'cloud': Allows only clouds, but note that it may only select cloud boundaries.
         'cld_shd': Allows only cloud shadows.
         'snow': Allows only snow.
         'clear': Allows only clear terrain.
         'water': Allows only water.
         'cld_conf_low':  Low cloud coverage confidence. Useful on its own for only removing clouds,
-                         however, 'clear' is usually better suited for this.
+        however, 'clear' is usually better suited for this.
         'cld_conf_med':  Medium cloud coverage confidence. Useful in combination with 'low_conf_cl'
-                         to allow slightly heavier cloud coverage.
-                         Note that 'med_conf_cl' and 'cloud' are very similar.
+        to allow slightly heavier cloud coverage.
+        Note that 'med_conf_cl' and 'cloud' are very similar.
         'cld_conf_high': High cloud coverage confidence. Useful in combination with both 'low_conf_cl'
-                         and 'med_conf_cl'.
+        and 'med_conf_cl'.
         'cld_shd_conf_low':  Low cloud shadow confidence.
         'cld_shd_conf_med':  Medium cloud shadow confidence.
         'cld_shd_conf_high': High cloud shadow confidence.
@@ -252,16 +252,16 @@ def landsat_qa_clean_mask(dataset, platform, cover_types=['clear', 'water'],
 
         Cover types for Landsat 5 and 7 Collection 1 Level 2 include:
         ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
-         'cld_conf_high'].
+        'cld_conf_high'].
 
         Cover types for Landsat 8 Collection 1 Level 2 include:
         ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
-         'cld_conf_high', 'cir_conf_low', 'cir_conf_med', 'cir_conf_high', 'terrain_occ']
+        'cld_conf_high', 'cir_conf_low', 'cir_conf_med', 'cir_conf_high', 'terrain_occ']
 
         Cover types for Landsat 8 Collection 2 Level 2 include:
         ['fill', 'cloud', 'cld_shd', 'snow', 'clear', 'water', 'cld_conf_low', 'cld_conf_med',
-         'cld_conf_high', 'cld_shd_conf_low', 'cld_shd_conf_high', 'snw_ice_conf_low',
-         'snw_ice_conf_high', 'cir_conf_low', 'cir_conf_high'].
+        'cld_conf_high', 'cld_shd_conf_low', 'cld_shd_conf_high', 'snw_ice_conf_low',
+        'snw_ice_conf_high', 'cir_conf_low', 'cir_conf_high'].
 
     collection: string
         The Landsat collection of the data.

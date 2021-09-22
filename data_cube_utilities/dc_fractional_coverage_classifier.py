@@ -32,18 +32,18 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     Landsat 8, the bands should be adjusted to match Landsat 7 value ranges.
 
     References:
-      - Guerschman, Juan P., et al. "Assessing the effects of site heterogeneity and soil
-        properties when unmixing photosynthetic vegetation, non-photosynthetic vegetation
-        and bare soil fractions from Landsat and MODIS data." Remote Sensing of Environment
-        161 (2015): 12-26.
+    - Guerschman, Juan P., et al. "Assessing the effects of site heterogeneity and soil
+    properties when unmixing photosynthetic vegetation, non-photosynthetic vegetation
+    and bare soil fractions from Landsat and MODIS data." Remote Sensing of Environment
+    161 (2015): 12-26.
 
     Parameters
     ----------
     dataset_in: xarray.Dataset
         dataset retrieved from the Data Cube (can be a derived
         product, such as a cloudfree mosaic; should contain
-          coordinates: latitude, longitude
-          variables: blue, green, red, nir, swir1, swir2
+        - coordinates: latitude, longitude
+        - variables: blue, green, red, nir, swir1, swir2
     clean_mask: np.ndarray (optional)
         True for values user considers clean.
         If none is provided, one will be created which considers all values to be clean.
@@ -54,8 +54,8 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
     -------
     dataset_out: xarray.Dataset
         Fractional coverage results with no_data = -9999; containing
-          coordinates: latitude, longitude
-          variables: bs, pv, npv
+        - coordinates: latitude, longitude
+        - variables: bs, pv, npv
         where bs -> bare soil, pv -> photosynthetic vegetation, npv -> non-photosynthetic vegetation
     """
     dataset_in = dataset_in.compute() # Avoid using Dask to avoid a potential error.
@@ -147,20 +147,10 @@ def frac_coverage_classify(dataset_in, clean_mask=None, no_data=-9999):
 
 def main(platform, product_type, min_lon, max_lon, min_lat, max_lat, start_date, end_date, dc_config):
     """
-    Description:
-      Command-line fractional coverage tool - TODO
+    Command-line fractional coverage tool - TODO
+    
     Assumptions:
-      The command-line tool assumes there is a measurement called cf_mask
-    Inputs:
-      platform (str)
-      product_type (str)
-      min_lon (str)
-      max_lon (str)
-      min_lat (str)
-      max_lat (str)
-      start_date (str)
-      end_date (str)
-      dc_config (str)
+    - The command-line tool assumes there is a measurement called cf_mask
     """
 
     # Initialize data cube object
