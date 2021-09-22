@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang='en'>
+  <!-- Jinja2 -->
+  <head>
+    <title>Point Cloud Visualizer</title>
+    <meta charset='utf-8' />
+    <!-- <meta
+      name='viewport'
+      content='width=device-width, height=device-height, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'
+    /> -->
+    
+
+    <script src='https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.0/chroma.min.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js'></script>
+    <link href='https://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' />
+    <style>
+      body {
+        background-color: #333333;
+        color: #444;
+        font-family: 'Roboto';
+        font-size: 22px;
+        overflow: hidden;
+      }
+
+      a {
+        color: #08f;
+      }
+
+      #date_and_slider_holder {
+        position: absolute;
+        left: 10%;
+        top: 30%;
+      }
+      
+      /* Formatting for the vertical sliders (for now, just the date slider). */
+      input[type='range'][orient='vertical'] {
+        writing-mode: bt-lr; /* IE */
+        -webkit-appearance: slider-vertical; /* WebKit */
+        width: 8px;
+        height: 35%;
+        padding: 0;
+      }
+
+      /* Formatting for the element containing the date string. */
+      #date_text {
+        font-size: 80%;
+        height: 4%;
+        color: #efefef;
+        margin-bottom: 0
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id='container'></div>
+    <div id='date_and_slider_holder'>
+      <!-- No bottom margin to flush with timeSlider. -->
+      <p id='date_text'></p>
+      <input id='timeSlider' type='range' orient='vertical' min='0' max='100' value='100'/>
+    </div>
+    <script type='module'>
+      // Parameters
+      var x_scale_arg = {{ x_scale|default(1, true) }};
+      var y_scale_arg = {{ y_scale|default(1, true) }};
+      var z_scale_arg = {{ z_scale|default(1, true) }};
+      var distance_scale = {{ distance_scale|default(1, true) }};
+      var voxel_size = {{ voxel_size|default(3, true) }};
+      var voxel_opacity = {{ voxel_opacity|default(0.5, true) }};
+
+      import * as THREE from 'static_url/js/lib/threejs/three.module.js';
+      import { OrbitControls } from 'static_url/js/lib/threejs/OrbitControls.js';
+      {% if show_stats %}
+        import Stats from 'static_url/js/jsm/stats.module.js';
+      {% endif %}
+      // The default/example data
+      // import { data_array } from './data/data.js';
+      var data_array = {{ data_array }};
+      {% if show_controls %}
+        import { GUI } from 'static_url/js/jsm/dat.gui.module.js';
+      {% endif %}
+      import { BloomPass } from 'static_url/js/jsm/BloomPass.js';
+      import { UnrealBloomPass } from 'static_url/js/jsm/UnrealBloomPass.js';
+
+      import { RenderPass } from 'static_url/js/jsm/RenderPass.js';
+
+      import { EffectComposer } from 'static_url/js/jsm/EffectComposer.js';
+
+      let date_text = document.getElementById('date_text');
+
+      const print = console.log;
+      var container;
+      var camera, scene, renderer;
+
+      const scale = 10.0;
+      const base_x_scale = 2, base_y_scale = 2, base_z_scale = 2;
+
+    //   function pos(x, y, z) {
+    //     return { x: x, y: y, z: z };
+    //   }
+
+      init();
+      animate();
+
+    //   function generate_face(position, orientation) {
+    //     var material = new THREE.MeshPhongMaterial({ color: 0.7 * 0xffff0e });
+    //     const object = new THREE.Mesh(face_geometry, material);
+
+    //     object.position.copy(position);
+
+    //     object.position.x += positional_offsets[orientation].x * scale;
+    //     object.position.y += positional_offsets[orientation].y * scale;
+    //     object.position.z += positional_offsets[orientation].z * scale;
+
+    //     object.rotateX(THREE.Math.degToRad(rotational_offsets[orientation].x));
+    //     object.rotateY(THREE.Math.degToRad(rotational_offsets[orientation].y));
+    //     object.rotateZ(THREE.Math.degToRad(rotational_offsets[orientation].z));
+
+    //     object.castShadow = true;
+    //     object.receiveShadow = true;
+    //     scene.add(object);
+    //     return object;
+    //   }
+
+      function generate_spotlight() {
+        var light = new THREE.SpotLight(0xffffff, 1.5);
+        light.position.set(0, 2 * 1500, 200);
+        light.angle = Math.PI * 0.2;
+        light.castShadow = true;
+        light.shadow.camera.near = 200;
+        light.shadow.camera.far = 2000;
+        light.shadow.bias = -0.000222;
+        light.shadow.mapSize.width = 1024;
+        light.shadow.mapSize.height = 1024;
+        return light;
+      }
+
+      function init() {
+        function getDates() {
+          const dates = {{ times }};
+          
+          // The default/example data times
+        //   const dates = [
+        //     '2014-02-10T07:49:28.833114000',
+        //     '2014-02-10T07:49:52.749567000',
+        //     '2014-02-26T07:49:16.056611000',
+        //     '2014-02-26T07:49:39.968828000',
+        //     '2014-03-14T07:49:05.166093000',
+        //     '2014-03-30T07:48:47.896778000',
+        //     '2014-03-30T07:49:11.808995000',
+        //     '2014-04-15T07:48:56.044301000',
+        //     '2014-05-01T07:48:18.098958000',
+        //     '2014-05-01T07:48:42.015411000',
+        //     '2014-05-17T07:48:05.687234000',
+        //     '2014-06-02T07:48:11.057618000',
+        //     '2014-06-02T07:48:34.982543000',
+        //     '2014-06-18T07:48:16.911472000',
+        //     '2014-06-18T07:48:40.832161000',
+        //     '2014-07-04T07:48:46.266883000',
+        //     '2014-07-20T07:48:26.625544000',
+        //     '2014-07-20T07:48:50.541997000',
+        //     '2014-08-05T07:48:34.681110000',
+        //     '2014-08-05T07:48:58.597563000',
+        //     '2014-08-21T07:48:38.755017000',
+        //     '2014-08-21T07:49:02.675706000',
+        //     '2014-09-06T07:48:41.986433002',
+        //     '2014-09-06T07:49:05.907122000',
+        //     '2014-09-22T07:48:39.940028000',
+        //     '2014-09-22T07:49:03.860717000',
+        //     '2014-10-08T07:48:45.947356000',
+        //     '2014-10-24T07:48:47.243876000',
+        //     '2014-10-24T07:49:11.156093000',
+        //     '2014-11-09T07:48:48.169206000',
+        //     '2014-11-09T07:49:12.085659000',
+        //     '2014-11-25T07:48:45.282986000',
+        //     '2014-11-25T07:49:09.203675000',
+        //     '2014-12-11T07:48:38.834411000',
+        //     '2014-12-11T07:49:02.755100000',
+        //   ];
+          return dates.reverse();
+        }
+
+        var formatDate = (x) => moment(x).format('MMM, DD, YYYY');
+
+        let dates = getDates();
+
+        date_text.innerText = formatDate(dates[dates.length - 1]);
+        // console.log(dates);
+
+        // console.log(moment(dates[0]).format('MMM Do YYYY'));
+
+        var data_NJ_array = nj.array(data_array);
+        const z_dims = data_NJ_array.shape[0];
+        const x_dims = data_NJ_array.shape[1];
+        const y_dims = data_NJ_array.shape[2];
+
+        console.log('Finding Center Point');
+        // Find Centerpoint
+        let xs = [];
+        let ys = [];
+        let zs = [];
+        for (let z = 0; z < z_dims; z++) {
+          for (let y = 0; y < y_dims; y++) {
+            for (let x = 0; x < x_dims; x++) {
+              if (data_array[z][x][y] == 1) {
+                xs.push(x);
+                ys.push(y);
+                zs.push(z);
+              }
+            }
+          }
+        }
+        function sum(arr) {
+          return arr.reduce((a, b) => a + b, 0);
+        }
+
+        const center_x = sum(xs) / xs.length;
+        const center_y = sum(ys) / ys.length;
+        const center_z = sum(zs) / zs.length;
+
+        container = document.getElementById('container');
+
+        let factor = 1;
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x333333);
+        scene.fog = new THREE.FogExp2(0x333333, 0.00025 * factor);
+
+        //////////////// C A M E R A        //////////////////////////
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
+        camera.position.set(0, 250, 1000);
+        scene.add(camera);
+
+        //////////////// S P O T L I G H T  ////////////////////////
+        var light = generate_spotlight();
+        scene.add(light);
+
+        //////////////// G R I D  H E L P E R  ///////////////////
+        var helper = new THREE.GridHelper(
+          Math.max(x_dims, y_dims) * 20,
+          Math.max(x_dims, y_dims) / 5
+        );
+        helper.position.y = -40;
+        helper.material.opacity = 0.25;
+        helper.material.transparent = true;
+        scene.add(helper);
+
+        //////////////// R E N D E R E R  ///////////////////
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        container.appendChild(renderer.domElement);
+
+        const pointLight = new THREE.PointLight(0xffffff, 1);
+        camera.add(pointLight);
+
+        const params = {
+          exposure: 1,
+          bloomStrength: 1.5,
+          bloomThreshold: 0,
+          bloomRadius: 0,
+        };
+
+        //////////////// S T A T S  O B J E C T  ///////////
+        {% if show_stats %}
+            var stats = new Stats();
+            container.appendChild(stats.domElement);
+        {% endif %}
+        
+        //////////////// C O N T R O L S //////////////////
+        var controls = new OrbitControls(camera, renderer.domElement);
+        controls.damping = 0.2;
+        controls.addEventListener('change', render);
+
+        ///////////////////////////////////////////////////
+
+        const print = console.log;
+
+        let coherence = 0.0;
+
+        let scale = chroma.scale('viridis');
+
+        const layers = [];
+        // Don't try to optimize by creating a single 
+        // PointsMaterial. This function is necessary.
+        function generate_point_cloud_material() {
+            var pcMat = new THREE.PointsMaterial();
+            pcMat.colors = THREE.VertextColors;
+            pcMat.size = 2;
+            pcMat.vertexColors = true;
+            return pcMat
+        }
+
+        function add_layers_to_scene() {
+            layers.forEach((layer) => {
+                scene.add(layer);
+            });
+        }
+        function remove_layers_from_scene() {
+            layers.forEach((layer) => {
+                scene.remove(layer);
+            });
+        }
+
+        function set_voxels_size() {
+            layers.forEach((layer) => {
+              layer.material.size = voxel_size;
+            });
+        }
+
+        function set_layer_opacity_std(layer) {
+            layer.material.opacity = voxel_opacity;
+            layer.material.vertexColors = true;
+        }
+
+        function set_layer_opacity_light(layer) {
+            layer.material.opacity = 0.25 * voxel_opacity;
+            layer.material.vertexColors = false;
+        }
+
+        function init_voxels_opacity() {
+            // This function sets opacity 
+            // before the slider initializes.
+            layers.forEach((layer) => {
+                set_layer_opacity_std(layer);
+            });
+        }
+
+        function set_voxels_opacity() {
+            for (let layer_index = 0; layer_index < layers.length; layer_index++) {
+                let layer = layers[layer_index];
+
+                layer.material.transparent = true;
+
+                if (layer_index / layers.length < slider.value / 100) {
+                    set_layer_opacity_std(layer);
+                } else {
+                    set_layer_opacity_light(layer);
+                }
+            }
+        }
+
+        function get_x_scale() {
+            return distance_scale*x_scale_arg*base_x_scale;
+        }
+        function get_y_scale() {
+            return distance_scale*y_scale_arg*base_y_scale;
+        }
+        function get_z_scale() {
+            return distance_scale*z_scale_arg*base_z_scale;
+        }
+
+        var x_scale = get_x_scale();
+        var y_scale = get_y_scale();
+        var z_scale = get_z_scale();
+        var geometries = [];
+        function voxels_initialize() {
+            for (let z = 0; z < z_dims; z++) {
+                let vertices = [];
+                const color = new THREE.Color(scale(z / z_dims).hex());
+                let colors = [];
+                let geometry = new THREE.BufferGeometry();
+
+                for (let x = 0; x < x_dims; x++) {
+                    for (let y = 0; y < y_dims; y++) {
+                        var val = data_array[z][x][y];
+                        if (val == 1) {
+
+                            let _x = x_scale * x;
+                            let _y = y_scale * y;
+                            let _z = z_scale * z;
+
+                            vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
+                            colors.push(color.r, color.g, color.b);
+                        }
+                    }
+                }
+
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometries.push(geometry);
+
+                var layer = new THREE.Points(geometry, generate_point_cloud_material());
+                layer.sizeAttenuation = true;
+                layer.sortPoints = true;
+                layer.material.transparent = true;
+                layer.material.opacity = voxel_opacity;
+                layer.material.vertexColors = true;
+
+                layers.push(layer);
+            }
+            add_layers_to_scene();
+            set_voxels_size();
+            init_voxels_opacity();
+        }
+        voxels_initialize();
+
+        function voxels_update() {
+            remove_layers_from_scene();
+            x_scale = get_x_scale();
+            y_scale = get_y_scale();
+            z_scale = get_z_scale();
+            for (let z = 0; z < z_dims; z++) {
+                let vertices = [];
+
+                for (let x = 0; x < x_dims; x++) {
+                    for (let y = 0; y < y_dims; y++) {
+                        var val = data_array[z][x][y];
+                        if (val == 1) {
+
+                            let _x = x_scale * x;
+                            let _y = y_scale * y;
+                            let _z = z_scale * z;
+
+                            vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
+                        }
+                    }
+                }
+
+                let geometry = geometries[z];
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+
+                var layer = new THREE.Points(geometry, generate_point_cloud_material());
+                layer.sizeAttenuation = true;
+                layer.sortPoints = true;
+                // layer.material.transparent = true;
+                // layer.material.opacity = voxel_opacity;
+                // layer.material.vertexColors = true;
+                // layer.material.size = voxel_size;
+                layers[z] = layer;
+            }
+            add_layers_to_scene();
+            set_voxels_size();
+            set_voxels_opacity();
+        }
+
+        // console.log('Vertices Length:  ' + vertices.length + ' Colors Length:' + colors.length)
+        // geometry.colors = colors;
+        // geometry.computeBoundingBox();
+        // var pcMat = new THREE.PointsMaterial(geometry);
+
+        // pcMat.blending = THREE.AdditiveBlending;
+
+        let start = z_dims - 20;
+        let end = z_dims;
+        let slider = document.querySelector('input');
+        slider.addEventListener(
+          'input',
+          function (value) {
+            let rounded_index = Math.floor((slider.value * (layers.length - 1)) / 100);
+            
+            let date = dates[rounded_index];
+
+            date_text.innerText = formatDate(date);
+
+//             print('!!!!!');
+//             print(formatDate(date));
+
+            set_voxels_opacity();
+          },
+          false
+        );
+
+        function update_voxel_size(value) {
+            voxel_size = value;
+            set_voxels_size();
+        }
+        // Initialize the voxels' size.
+        // update_voxel_size(initial_voxel_size);
+        
+        function update_voxel_opacity(value) {
+            voxel_opacity = value;
+            set_voxels_opacity();
+        }
+
+        function update_distance_scale(value) {
+            distance_scale = value;
+            voxels_update();
+        }
+
+        function update_z_scale_arg(value) {
+            z_scale_arg = value;
+            voxels_update();
+        }
+        
+        {% if show_controls %}
+            const gui = new GUI({ autoPlace: true });
+            // Change the voxels' size with a slider.
+            const voxel_size_control = { voxel_size: voxel_size };
+            gui
+            .add(voxel_size_control, 'voxel_size', 0, 12)
+            .step(0.25)
+            .onChange(update_voxel_size);
+            // Change the voxels' opacity with a slider.
+            const voxel_opacity_control = { voxel_opacity: voxel_opacity };
+            gui
+            .add(voxel_opacity_control, 'voxel_opacity', 0, 1)
+            .step(0.05)
+            .onChange(update_voxel_opacity);
+            // Change the voxels' distance (spacing) with a slider.
+            const distance_scale_control = { distance_scale: distance_scale };
+            gui
+            .add(distance_scale_control, 'distance_scale', 0, 6)
+            .step(0.25)
+            .onChange(update_distance_scale);
+            // Change the voxels' z distance (spacing) with a slider.
+            const z_scale_arg_control = { z_scale: z_scale_arg };
+            gui
+            .add(z_scale_arg_control, 'z_scale', 0, 12)
+            .step(0.25)
+            .onChange(update_z_scale_arg);
+            gui.close();
+        {% endif %}
+    }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        render();
+        {% if show_stats %}
+            stats.update();
+        {% endif %}
+      }
+
+      function render() {
+        renderer.render(scene, camera);
+      }
+    </script>
+  </body>
+</html>
