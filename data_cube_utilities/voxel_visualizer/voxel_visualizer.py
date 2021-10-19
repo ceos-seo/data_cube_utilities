@@ -128,18 +128,21 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
     # width=600, height=350
     vox_vis_server_port = os.environ['VOXEL_VISUALIZER_PORT']
     iframe = HTML(f"""
-    <!-- <div id='wrap', style='aspect-ratio:3;'>
-    </div> -->
+    <!-- display:table-cell; -->
+    <div id='wrap', style='width:100%; aspect-ratio:2;'>
     <iframe id='voxel_vis_iframe', sandbox='allow-same-origin allow-scripts',
-        style='aspect-ratio:2; 
-            width:99%;' scrolling='no';
-            transform: scale(0.50);
+        style='display: block; 
+            height:100%; width:99%;' scrolling='no';
             transform-origin: top left;
-            padding-top: 75%;
             onload='resizeVoxelVisIframeContentToFit'
             ></iframe>
+            <!-- resize: both; 
+            overflow: hidden; -->
+            <!-- padding-top: 75%; -->
+            <!-- transform: scale(0.50); -->
             <!-- onload='this.contentWindow.document.body.height=iframe.offsetHeight;'; -->
             <!-- frameborder=\"0\"; -->
+    </div>
     <script>
       var hostname = window.location.hostname;
       var static_url = 'http://' + hostname + ':{vox_vis_server_port}/static';
@@ -148,17 +151,20 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
       voxel_vis_iframe = document.getElementById('voxel_vis_iframe');
       voxel_vis_iframe.srcdoc = srcdoc;
       
+      
+
       // Handle resizing of the content to match the iframe (particular handling for Three.js in the iframe).
       var voxel_vis_iframe = document.getElementById('voxel_vis_iframe')
       function resizeVoxelVisIframeContentToFit() {
         // console.log('resizing voxel vis iframe');
-        console.log('iframe:' + voxel_vis_iframe.offsetHeight)
-        console.log('iframe contents:' + voxel_vis_iframe.contentWindow.document.body.height)
+        // console.log('iframe:' + voxel_vis_iframe.offsetHeight)
+        // console.log('iframe contents:' + voxel_vis_iframe.contentWindow.document.body.height)
         voxel_vis_iframe.contentWindow.document.body.height = voxel_vis_iframe.offsetHeight;
       }
       // voxel_vis_iframe.onload = resizeVoxelVisIframeContentToFit;
       window.addEventListener("message", onMessage, false);
       function onMessage(event) {
+          console.log('message:' + event.data.message)
           if (event.data.message = 'resizeVoxelVisIframeContentToFit')
               resizeVoxelVisIframeContentToFit();
       } 
