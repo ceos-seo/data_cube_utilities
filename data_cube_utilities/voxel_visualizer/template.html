@@ -228,7 +228,7 @@
 
         //////////////// C A M E R A        //////////////////////////
         camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
-        camera.position.set(0, 250, 1000);
+        camera.position.set(2*x_dims, 2*y_dims, 0);
         scene.add(camera);
 
         //////////////// S P O T L I G H T  ////////////////////////
@@ -510,7 +510,8 @@
         {% endif %}
     }
     
-      const baseBodyStyle = document.body.getAttribute('style');
+    // Derived from this SO answer:
+    // https://stackoverflow.com/a/45046955/5449970
       function resizeCanvasToDisplaySize() {
         const canvas = renderer.domElement;
         // look up the size the canvas is being displayed
