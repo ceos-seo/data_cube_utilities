@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang='en'>
+<html lang='en', width='100%', height='100%'>
+    <!-- , width='100%', height='100%' -->
   <!-- Jinja2 -->
   <head>
     <title>Point Cloud Visualizer</title>
@@ -8,7 +9,6 @@
       name='viewport'
       content='width=device-width, height=device-height, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'
     /> -->
-    
 
     <script src='https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js'></script>
     <script src='https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.1.0/chroma.min.js'></script>
@@ -21,6 +21,8 @@
         font-family: 'Roboto';
         font-size: 22px;
         overflow: hidden;
+        padding: 0;
+        margin: 0
       }
 
       a {
@@ -52,8 +54,16 @@
     </style>
   </head>
 
-  <body>
-    <div id='container'></div>
+  <body id='container', width='95%', height='95%'>
+    <!-- , width='95%', height='95%' -->
+    <canvas></canvas>
+    <!-- style='margin:0' -->
+    <!-- div -->
+    <!-- <div, width='100%', height='100%'> -->
+        <!-- , width='100%', height='100%' -->
+        <!-- <canvas></canvas> -->
+        <!-- style='display:block', width='100%', height='100%' -->
+    <!-- </div> -->
     <div id='date_and_slider_holder'>
       <!-- No bottom margin to flush with timeSlider. -->
       <p id='date_text'></p>
@@ -100,7 +110,8 @@
     //   }
 
       init();
-      animate();
+    //   animate();
+      requestAnimationFrame(animate);
 
     //   function generate_face(position, orientation) {
     //     var material = new THREE.MeshPhongMaterial({ color: 0.7 * 0xffff0e });
@@ -245,11 +256,12 @@
         scene.add(helper);
 
         //////////////// R E N D E R E R  ///////////////////
-        renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-
-        container.appendChild(renderer.domElement);
+        renderer = new THREE.WebGLRenderer({antialias: true, canvas: document.querySelector('canvas')});
+        // , canvas: document.querySelector('canvas')
+        // renderer.setPixelRatio(window.devicePixelRatio);
+        // renderer.setSize(window.innerWidth, window.innerHeight);
+        // container.appendChild(renderer.domElement);
+        // var canvas = document.querySelector('canvas')
 
         const pointLight = new THREE.PointLight(0xffffff, 1);
         camera.add(pointLight);
@@ -314,7 +326,7 @@
         }
 
         function set_layer_opacity_light(layer) {
-            layer.material.opacity = 0.25 * voxel_opacity;
+            layer.material.opacity = 0.125 * voxel_opacity;
             layer.material.vertexColors = false;
         }
 
@@ -512,18 +524,79 @@
             gui.close();
         {% endif %}
     }
+    
+      function resizeCanvasToDisplaySize() {
+        const canvas = renderer.domElement;
+        // look up the size the canvas is being displayed
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        // const width = container.clientWidth-5;
+        // const height = container.clientHeight-5;
+        // canvas.width = width;
+        // canvas.height = height;
+        // console.log(width, height)
+
+        // adjust displayBuffer size to match
+        if (canvas.width !== width || canvas.height !== height) {
+            // renderer.setPixelRatio(window.devicePixelRatio);
+            // you must pass false here or three.js sadly fights the browser
+            renderer.setSize(width, height, false);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+
+            // update any render target sizes here
+        }
+      }
 
       function animate() {
-        requestAnimationFrame(animate);
+        // time *= 0.001
+        // requestAnimationFrame(animate);
+
+        resizeCanvasToDisplaySize();
+
         render();
         {% if show_stats %}
             stats.update();
         {% endif %}
+
+        requestAnimationFrame(animate);
       }
+
+    //   function animate(time) {
+    //     requestAnimationFrame(animate);
+
+    //     resizeCanvasToDisplaySize();
+
+    //     render();
+    //     {% if show_stats %}
+    //         stats.update();
+    //     {% endif %}
+    //   }
 
       function render() {
         renderer.render(scene, camera);
       }
+    
+    //   requestAnimationFrame();
+
+    //   const resizeObserver = new ResizeObserver(resizeCanvasToDisplaySize);
+    //   resizeObserver.observe(renderer.domElement, {box: 'content-box'});
+
+    window.parent.postMessage({
+        'message': 'resizeVoxelVisIframeContentToFit'
+    }, '*');
+    // window.addEventListener(
+    //       'onload',
+    //       function () {
+    //         if (typeof parent.resizeVoxelVisIframeContentToFit == 'function')
+    //             parent.resizeVoxelVisIframeContentToFit()
+    //       },
+    //       false
+    //     );
+    // function rescaleContainingIframeIfExists() {
+    //     if (typeof resizeVoxelVisIframeContentToFit == 'function')
+    //         resizeVoxelVisIframeContentToFit()
+    // }
     </script>
   </body>
 </html>
