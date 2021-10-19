@@ -30,8 +30,8 @@
 
       #date_and_slider_holder {
         position: absolute;
-        left: 10%;
-        top: 30%;
+        left: 0%;
+        top:  10%;
       }
       
       /* Formatting for the vertical sliders (for now, just the date slider). */
@@ -56,9 +56,11 @@
   <body id='container'>
     <canvas></canvas>
     <div id='date_and_slider_holder'>
-      <!-- No bottom margin to flush with timeSlider. -->
+      <!-- No bottom margin to flush with slider. -->
       <p id='date_text'></p>
-      <input id='timeSlider' type='range' orient='vertical' min='0' max='100' value='100'/>
+      <button id='sliderModeButton' 
+        style='width:100px; height:100px; transform: translateY(-100%);'></button>
+      <input id='slider' type='range' orient='vertical' min='0' max='100' value='100'/>
     </div>
     <script type='module'>
       // Parameters
@@ -329,7 +331,9 @@
 
                 layer.material.transparent = true;
 
-                if (layer_index / layers.length < slider.value / 100) {
+                if (sliderMode === 'Range' ? 
+                    (layer_index / layers.length < slider.value / 100) :
+                    layer_index == rounded_index) {
                     set_layer_opacity_std(layer);
                 } else {
                     set_layer_opacity_light(layer);
@@ -440,24 +444,32 @@
 
         let start = z_dims - 20;
         let end = z_dims;
-        let slider = document.querySelector('input');
-        slider.addEventListener(
-          'input',
-          function (value) {
-            let rounded_index = Math.floor((slider.value * (layers.length - 1)) / 100);
-            
+        var slider = document.querySelector('input');
+        var sliderMode = 'Range';
+        function getSliderRoundedIndex() {
+            return Math.floor((slider.value * (layers.length - 1)) / 100)
+        }
+        var rounded_index = getSliderRoundedIndex();
+        var sliderEventHandler = function (value) {
+            rounded_index = getSliderRoundedIndex();
             let date = dates[rounded_index];
-
             date_text.innerText = formatDate(date);
-
-//             print('!!!!!');
-//             print(formatDate(date));
-
             set_voxels_opacity();
-          },
-          false
+        };
+        slider.addEventListener(
+                'input',
+                sliderEventHandler,
+                false
         );
-
+        function toggleSliderMode() {
+            sliderMode = sliderMode === 'Range' ? 'Select' : 'Range';
+            sliderModeButton.innerHTML = 'Change Slider Mode (Current: ' + sliderMode + ')';
+            sliderEventHandler();
+        };
+        var sliderModeButton = document.getElementById('sliderModeButton');
+        sliderModeButton.innerHTML = 'Change Slider Mode (Current: ' + sliderMode + ')';
+        sliderModeButton.addEventListener('click', toggleSliderMode);
+        
         function update_voxel_size(value) {
             voxel_size = value;
             set_voxels_size();

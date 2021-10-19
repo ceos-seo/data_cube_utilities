@@ -134,7 +134,6 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
         style='display: block; 
             height:100%; width:99%;' scrolling='no';
             transform-origin: top left;
-            onload='resizeVoxelVisIframeContentToFit'
             ></iframe>
             <!-- resize: both; 
             overflow: hidden; -->
@@ -151,22 +150,9 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
       voxel_vis_iframe = document.getElementById('voxel_vis_iframe');
       voxel_vis_iframe.srcdoc = srcdoc;
       
-      
-
-      // Handle resizing of the content to match the iframe (particular handling for Three.js in the iframe).
-      var voxel_vis_iframe = document.getElementById('voxel_vis_iframe')
-      function resizeVoxelVisIframeContentToFit() {
-        // console.log('resizing voxel vis iframe');
-        // console.log('iframe:' + voxel_vis_iframe.offsetHeight)
-        // console.log('iframe contents:' + voxel_vis_iframe.contentWindow.document.body.height)
-        voxel_vis_iframe.contentWindow.document.body.height = voxel_vis_iframe.offsetHeight;
-      }
-      // voxel_vis_iframe.onload = resizeVoxelVisIframeContentToFit;
       window.addEventListener("message", onMessage, false);
       function onMessage(event) {
           console.log('message:' + event.data.message)
-          if (event.data.message = 'resizeVoxelVisIframeContentToFit')
-              resizeVoxelVisIframeContentToFit();
       } 
     </script>
     """)
