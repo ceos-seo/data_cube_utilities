@@ -1,7 +1,5 @@
 <!DOCTYPE html>
 <html lang='en' style='width:100%; height:100%'>
-    <!-- resize: both; overflow: hidden; -->
-  <!-- , width='100%', height='100%' -->
   <!-- Jinja2 -->
   <head>
     <title>Point Cloud Visualizer</title>
@@ -21,11 +19,8 @@
         color: #444;
         font-family: 'Roboto';
         font-size: 22px;
-        /* resize: both; */
-        /* overflow: hidden; */
         width: 100%;
         height: 100%;
-        /* display: table; */
         margin: 0
       }
 
@@ -59,15 +54,7 @@
   </head>
 
   <body id='container'>
-    <!-- , width='95%', height='95%' -->
     <canvas></canvas>
-    <!-- style='margin:0' -->
-    <!-- div -->
-    <!-- <div, width='100%', height='100%'> -->
-        <!-- , width='100%', height='100%' -->
-        <!-- <canvas></canvas> -->
-        <!-- style='display:block', width='100%', height='100%' -->
-    <!-- </div> -->
     <div id='date_and_slider_holder'>
       <!-- No bottom margin to flush with timeSlider. -->
       <p id='date_text'></p>
@@ -201,7 +188,6 @@
 
         date_text.innerText = formatDate(dates[dates.length - 1]);
         // console.log(dates);
-
         // console.log(moment(dates[0]).format('MMM Do YYYY'));
 
         var data_NJ_array = nj.array(data_array);
@@ -261,11 +247,6 @@
 
         //////////////// R E N D E R E R  ///////////////////
         renderer = new THREE.WebGLRenderer({antialias: true, canvas: document.querySelector('canvas')});
-        // , canvas: document.querySelector('canvas')
-        // renderer.setPixelRatio(window.devicePixelRatio);
-        // renderer.setSize(window.innerWidth, window.innerHeight);
-        // container.appendChild(renderer.domElement);
-        // var canvas = document.querySelector('canvas')
 
         const pointLight = new THREE.PointLight(0xffffff, 1);
         camera.add(pointLight);
@@ -531,40 +512,10 @@
     
       const baseBodyStyle = document.body.getAttribute('style');
       function resizeCanvasToDisplaySize() {
-        // If in an iframe, first resize this document to the iframe's size.
-        if (window.parent == top) {
-          //   window.parent.postMessage({
-          //     'message': 'hi:' + window.parent.document.getElementById('voxel_vis_iframe')
-          //   }, '*');
-          //   voxel_vis_iframe = window.parent.document.getElementById('voxel_vis_iframe');
-          let voxel_vis_iframe = window.frameElement;
-        //   document.body.style.height = voxel_vis_iframe.clientHeight;
-        //   document.body.style.width = voxel_vis_iframe.clientWidth;
-        //   document.body.style.height = voxel_vis_iframe.clientHeight + 'px';
-        //   document.body.setAttribute('style', 
-        //     baseBodyStyle +
-        //     ', display:block, ' + 
-        //     'height:' + voxel_vis_iframe.clientHeight + 'px, ' +
-        //     'width:' + voxel_vis_iframe.clientWidth + 'px');
-        // document.body.setAttribute('height', 
-        //     voxel_vis_iframe.clientHeight)
-        // document.body.setAttribute('width', 
-        //     voxel_vis_iframe.clientWidth);
-          // window.parent.postMessage({
-          //     'message': 'hi, iframe size is:' + voxel_vis_iframe.clientWidth + ', ' + voxel_vis_iframe.clientHeight +
-          //         ' body size is:' + document.body.style.clientWidth + ', ' + document.body.style.clientHeight
-          // }, '*');
-        }
-
         const canvas = renderer.domElement;
         // look up the size the canvas is being displayed
-        // const width = canvas.clientWidth;
-        // const height = canvas.clientHeight;
         const width = container.clientWidth;
         const height = container.clientHeight;
-        // canvas.width = width;
-        // canvas.height = height;
-        // console.log(width, height)
 
         // adjust displayBuffer size to match
         if (canvas.width !== width || canvas.height !== height) {
@@ -577,20 +528,6 @@
             // update any render target sizes here
         }
       }
-
-    //   function animate() {
-    //     // time *= 1
-    //     // requestAnimationFrame(animate);
-
-    //     resizeCanvasToDisplaySize();
-
-    //     render();
-    //     {% if show_stats %}
-    //         stats.update();
-    //     {% endif %}
-
-    //     requestAnimationFrame(animate);
-    //   }
 
       function animate(time) {
         // time *= 1
@@ -607,42 +544,6 @@
       function render() {
         renderer.render(scene, camera);
       }
-
-    //   requestAnimationFrame();
-
-    //   const resizeObserver = new ResizeObserver(resizeCanvasToDisplaySize);
-    //   resizeObserver.observe(renderer.domElement, {box: 'content-box'});
-    // document.onload = function () {
-    //   if (window.parent == top) {
-    //     //   window.parent.postMessage({
-    //     //     'message': 'hi:' + window.parent.document.getElementById('voxel_vis_iframe')
-    //     //   }, '*');
-    //     //   voxel_vis_iframe = window.parent.document.getElementById('voxel_vis_iframe');
-    //     let voxel_vis_iframe = window.frameElement;
-    //     //   document.body.height = voxel_vis_iframe.clientHeight;
-    //     //   document.body.style.height = voxel_vis_iframe.clientHeight + 'px';
-    //     document.body.setAttribute('style', 
-    //         'height:' + voxel_vis_iframe.clientHeight + 'px' +
-    //         'width:' + voxel_vis_iframe.clientWidth + 'px');
-    //     // window.parent.postMessage({
-    //     //     'message': 'hi, iframe size is:' + voxel_vis_iframe.clientWidth + ', ' + voxel_vis_iframe.clientHeight +
-    //     //         ' body size is:' + document.body.style.clientWidth + ', ' + document.body.style.clientHeight
-    //     // }, '*');
-    //   }
-    // }
-
-    // window.addEventListener(
-    //       'onload',
-    //       function () {
-    //         if (typeof parent.resizeVoxelVisIframeContentToFit == 'function')
-    //             parent.resizeVoxelVisIframeContentToFit()
-    //       },
-    //       false
-    //     );
-    // function rescaleContainingIframeIfExists() {
-    //     if (typeof resizeVoxelVisIframeContentToFit == 'function')
-    //         resizeVoxelVisIframeContentToFit()
-    // }
     </script>
   </body>
 </html>
