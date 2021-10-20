@@ -16,7 +16,7 @@
     <style>
       body {
         background-color: #333333;
-        color: #444;
+        color: white;
         font-family: 'Roboto';
         font-size: 22px;
         width: 100%;
@@ -72,13 +72,13 @@
     <div id='date_and_slider_holder'>
       <!-- No bottom margin to flush with slider. -->
       <p id='date_text'></p>
-      <button id='sliderModeButton' 
-        style='width:100px; height:100px; transform: translateY(-100%);'></button>
+      <div style='float:left; padding-right:1vw'>
+          <label style='display:block'><input id='sliderModeRangeOpt' name='sliderMode' type='radio' value='Range' checked>Range</label>
+          <label style='display:block'><input id='sliderModeSelectOpt' name='sliderMode' type='radio' value='Select'>Select</label>
+      </div>
       <input id='slider' type='range' orient='vertical' min='0' max='100' value='100'/>
     </div>
-    <!-- display:inline; -->
     <div id='button_controls_holder' >
-        <!-- style='display: flex; justify-content: center;' -->
         <div id='up_button_div' style='display: block;'>
             <button class='control_button' id='rotate_left_button'>
                 <img src='static_url/imgs/rotate-left-icon.png' width=100% height=100%/>
@@ -486,10 +486,22 @@
 
         // pcMat.blending = THREE.AdditiveBlending;
 
+        /* Slider mode selection */
+        let sliderMode = 'Range';
+        let sliderRadioElems = document.getElementsByName('sliderMode');
+        for (let sliderRadioElem of sliderRadioElems) {
+            if (sliderRadioElem) {
+                sliderRadioElem.addEventListener('change',
+                    setSliderMode,
+                    false
+                );
+            }
+        }
+
+        /* Slider */
         let start = z_dims - 20;
         let end = z_dims;
-        var slider = document.querySelector('input');
-        var sliderMode = 'Range';
+        var slider = document.querySelector('#slider');
         function getSliderRoundedIndex() {
             return Math.floor((slider.value * (layers.length - 1)) / 100)
         }
@@ -505,14 +517,10 @@
                 sliderEventHandler,
                 false
         );
-        function toggleSliderMode() {
-            sliderMode = sliderMode === 'Range' ? 'Select' : 'Range';
-            sliderModeButton.innerHTML = 'Change Slider Mode (Current: ' + sliderMode + ')';
+        function setSliderMode() {
+            sliderMode = this.value;
             sliderEventHandler();
         };
-        var sliderModeButton = document.getElementById('sliderModeButton');
-        sliderModeButton.innerHTML = 'Change Slider Mode (Current: ' + sliderMode + ')';
-        sliderModeButton.addEventListener('click', toggleSliderMode);
         
         function update_voxel_size(value) {
             voxel_size = value;
