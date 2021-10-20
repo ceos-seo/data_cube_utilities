@@ -324,6 +324,8 @@
         let scale = chroma.scale('viridis');
 
         const layers = [];
+        const layers_non_empty = [];
+        const layer_outlines = [];
         // Don't try to optimize by creating a single 
         // PointsMaterial. This function is necessary.
         function generate_point_cloud_material() {
@@ -343,6 +345,13 @@
             layers.forEach((layer) => {
                 scene.remove(layer);
             });
+        }
+
+        function add_layer_outline_to_scene(layer_index) {
+            scene.add(layer_outlines[layer_index]);
+        }
+        function remove_layer_outline_from_scene(layer_index) {
+            scene.remove(layer_outlines[layer_index]);
         }
 
         function set_voxels_size() {
@@ -370,17 +379,30 @@
         }
 
         function set_voxels_opacity() {
+            // if(typeof set_voxels_opacity.prev_outlined_layer_index !== 'undefined') {
+            //     remove_layer_outline_from_scene(set_voxels_opacity.prev_outlined_layer_index);
+            // }
             for (let layer_index = 0; layer_index < layers.length; layer_index++) {
                 let layer = layers[layer_index];
 
                 layer.material.transparent = true;
+
+                // window.parent.postMessage({
+                //     'message': '' + layer
+                // }, '*');
 
                 if (sliderMode === 'Range' ? 
                     (layer_index / layers.length < slider.value / 100) :
                     layer_index == rounded_index) {
                     set_layer_opacity_std(layer);
                 } else {
-                    set_layer_opacity_light(layer);
+                    if (layers_non_empty[layer_index]) {
+                        set_layer_opacity_light(layer);
+                        // add_layer_outline_to_scene(layer_index);
+                    } else {
+                        set_voxels_opacity.prev_outlined_layer_index = layer_index;
+                        add_layer_outline_to_scene(layer_index);
+                    }
                 }
             }
         }
@@ -406,10 +428,12 @@
                 let colors = [];
                 let geometry = new THREE.BufferGeometry();
 
+                let layer_non_empty = false;
                 for (let x = 0; x < x_dims; x++) {
                     for (let y = 0; y < y_dims; y++) {
                         var val = data_array[z][x][y];
                         if (val == 1) {
+                            layer_non_empty = true;
 
                             let _x = x_scale * x;
                             let _y = y_scale * y;
@@ -420,6 +444,7 @@
                         }
                     }
                 }
+                layers_non_empty.push(layer_non_empty);
 
                 geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -433,6 +458,15 @@
                 layer.material.vertexColors = true;
 
                 layers.push(layer);
+                
+                // TODO: Get a bounding box of this layer.
+                // var bbox = new THREE.Box3().setFromObject(layer);
+                const layer_outline = new THREE.BoxHelper(layer, '#ff0000');
+                // window.parent.postMessage({
+                //     'message': '' + geometry.boundingBox
+                //     // layer.geometry.boundingBox
+                // }, '*');
+                layer_outlines.push(layer_outline);
             }
             add_layers_to_scene();
             set_voxels_size();
@@ -505,9 +539,16 @@
         function getSliderRoundedIndex() {
             return Math.floor((slider.value * (layers.length - 1)) / 100)
         }
-        var rounded_index = getSliderRoundedIndex();
+        let rounded_index = getSliderRoundedIndex();
         var sliderEventHandler = function (value) {
-            rounded_index = getSliderRoundedIndex();
+            let new_rounded_index = getSliderRoundedIndex();
+            if (new_rounded_index == rounded_index) {
+                return
+            }
+            rounded_index = new_rounded_index;
+            // window.postMessage({
+            //     'message': '' + rounded_index
+            // }, '*');
             let date = dates[rounded_index];
             date_text.innerText = formatDate(date);
             set_voxels_opacity();
