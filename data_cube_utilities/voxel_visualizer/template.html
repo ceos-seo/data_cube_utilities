@@ -43,6 +43,20 @@
         padding: 0;
       }
 
+      #button_controls_holder {
+        position: absolute;
+        right: 0%;
+        bottom: 10%;
+      }
+
+      .control_button {
+          /* width: 30px;
+          height: 30px; */
+          width: 6vw;
+          height: 6vw;
+          padding: 0px;
+      }
+
       /* Formatting for the element containing the date string. */
       #date_text {
         font-size: 80%;
@@ -61,6 +75,32 @@
       <button id='sliderModeButton' 
         style='width:100px; height:100px; transform: translateY(-100%);'></button>
       <input id='slider' type='range' orient='vertical' min='0' max='100' value='100'/>
+    </div>
+    <!-- display:inline; -->
+    <div id='button_controls_holder' >
+        <!-- style='display: flex; justify-content: center;' -->
+        <div id='up_button_div' style='display: block;'>
+            <button class='control_button' id='rotate_left_button'>
+                <img src='static_url/imgs/rotate-left-icon.png' width=100% height=100%/>
+            </button>
+            <button class='control_button' id='up_button'>
+                <img src='static_url/imgs/arrow-up-icon.png' width=100% height=100%/>
+            </button>
+            <button class='control_button' id='rotate_right_button'>
+                <img src='static_url/imgs/rotate-right-icon.png' width=100% height=100%/>
+            </button>
+        </div>
+      <div style='display: block'>
+        <button class='control_button' id='left_button'>
+            <img src='static_url/imgs/arrow-left-icon.png' width=100% height=100%/>
+        </button>
+        <button class='control_button' id='down_button'>
+            <img src='static_url/imgs/arrow-down-icon.png' width=100% height=100%/>
+        </button>
+        <button class='control_button' id='right_button'>
+            <img src='static_url/imgs/arrow-right-icon.png' width=100% height=100%/>
+        </button>
+      </div>
     </div>
     <script type='module'>
       // Parameters
@@ -267,9 +307,13 @@
         {% endif %}
         
         //////////////// C O N T R O L S //////////////////
+        // arrow controls (up/down/left/right/zoom)
         var controls = new OrbitControls(camera, renderer.domElement);
         controls.damping = 0.2;
         controls.addEventListener('change', render);
+        // container.appendChild(controls)
+
+        
 
         ///////////////////////////////////////////////////
 
