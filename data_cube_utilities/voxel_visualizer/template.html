@@ -324,7 +324,12 @@
         let scale = chroma.scale('viridis');
 
         const layers = [];
+        // booleans denoting which layers are non-empty.
         const layers_non_empty = [];
+        // Layers matching the full extent (taking all points to have data).
+        // This is used to draw bounding boxes when the 
+        // date slider is in "Select" mode.
+        const layers_incl_no_data = [];
         const layer_outlines = [];
         // Don't try to optimize by creating a single 
         // PointsMaterial. This function is necessary.
@@ -379,30 +384,29 @@
         }
 
         function set_voxels_opacity() {
-            // if(typeof set_voxels_opacity.prev_outlined_layer_index !== 'undefined') {
-            //     remove_layer_outline_from_scene(set_voxels_opacity.prev_outlined_layer_index);
-            // }
+            if(typeof set_voxels_opacity.prev_outlined_layer_index !== 'undefined') {
+                remove_layer_outline_from_scene(set_voxels_opacity.prev_outlined_layer_index);
+                set_voxels_opacity.prev_outlined_layer_index = undefined;
+            }
             for (let layer_index = 0; layer_index < layers.length; layer_index++) {
                 let layer = layers[layer_index];
 
                 layer.material.transparent = true;
 
-                // window.parent.postMessage({
-                //     'message': '' + layer
-                // }, '*');
-
+                // If this layer is on or after the date in 'Range' mode
+                // or on the selected date in 'Select' mode.
                 if (sliderMode === 'Range' ? 
-                    (layer_index / layers.length < slider.value / 100) :
+                    layer_index <= rounded_index :
                     layer_index == rounded_index) {
-                    set_layer_opacity_std(layer);
-                } else {
                     if (layers_non_empty[layer_index]) {
-                        set_layer_opacity_light(layer);
-                        // add_layer_outline_to_scene(layer_index);
+                        set_layer_opacity_std(layer);
                     } else {
                         set_voxels_opacity.prev_outlined_layer_index = layer_index;
-                        add_layer_outline_to_scene(layer_index);
+                        if (sliderMode === 'Select')
+                            add_layer_outline_to_scene(layer_index);
                     }
+                } else {
+                    set_layer_opacity_light(layer);
                 }
             }
         }
@@ -421,27 +425,38 @@
         var y_scale = get_y_scale();
         var z_scale = get_z_scale();
         var geometries = [];
+        var geometries_incl_no_data = [];
         function voxels_initialize() {
             for (let z = 0; z < z_dims; z++) {
                 let vertices = [];
+                let vertices_incl_no_data = [];
+                
                 const color = new THREE.Color(scale(z / z_dims).hex());
                 let colors = [];
                 let geometry = new THREE.BufferGeometry();
+                let geometry_incl_no_data = new THREE.BufferGeometry();
 
+                // Create the layer in Three.js.
                 let layer_non_empty = false;
                 for (let x = 0; x < x_dims; x++) {
                     for (let y = 0; y < y_dims; y++) {
                         var val = data_array[z][x][y];
+                        let _x = x_scale * x;
+                        let _y = y_scale * y;
+                        let _z = z_scale * z;
+                        
+                        let x_coord = _x - x_scale * center_x;
+                        let y_coord = _y - y_scale * center_y;
+                        let z_coord = _z;
+
+                        // Add this point to this layer.
                         if (val == 1) {
                             layer_non_empty = true;
 
-                            let _x = x_scale * x;
-                            let _y = y_scale * y;
-                            let _z = z_scale * z;
-
-                            vertices.push(_x - x_scale * center_x, _z, _y - y_scale * center_y);
+                            vertices.push(x_coord, z_coord, y_coord);
                             colors.push(color.r, color.g, color.b);
                         }
+                        vertices_incl_no_data.push(x_coord, z_coord, y_coord);
                     }
                 }
                 layers_non_empty.push(layer_non_empty);
@@ -450,22 +465,28 @@
                 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
                 geometries.push(geometry);
 
+                geometry_incl_no_data.setAttribute('position', new THREE.Float32BufferAttribute(vertices_incl_no_data, 3));
+                geometry_incl_no_data.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                geometries_incl_no_data.push(geometry_incl_no_data);
+
                 var layer = new THREE.Points(geometry, generate_point_cloud_material());
                 layer.sizeAttenuation = true;
                 layer.sortPoints = true;
                 layer.material.transparent = true;
                 layer.material.opacity = voxel_opacity;
                 layer.material.vertexColors = true;
-
                 layers.push(layer);
-                
-                // TODO: Get a bounding box of this layer.
-                // var bbox = new THREE.Box3().setFromObject(layer);
-                const layer_outline = new THREE.BoxHelper(layer, '#ff0000');
-                // window.parent.postMessage({
-                //     'message': '' + geometry.boundingBox
-                //     // layer.geometry.boundingBox
-                // }, '*');
+
+                var layer_incl_no_data = new THREE.Points(geometry_incl_no_data, generate_point_cloud_material());
+                layer_incl_no_data.sizeAttenuation = true;
+                layer_incl_no_data.sortPoints = true;
+                layer_incl_no_data.material.transparent = true;
+                layer_incl_no_data.material.opacity = voxel_opacity;
+                layer_incl_no_data.material.vertexColors = true;
+                layers_incl_no_data.push(layer_incl_no_data);
+
+                // Get an outline of this layer.
+                const layer_outline = new THREE.BoxHelper(layer_incl_no_data, '#ff0000');
                 layer_outlines.push(layer_outline);
             }
             add_layers_to_scene();
@@ -522,6 +543,7 @@
 
         /* Slider mode selection */
         let sliderMode = 'Range';
+        let oldSliderMode;
         let sliderRadioElems = document.getElementsByName('sliderMode');
         for (let sliderRadioElem of sliderRadioElems) {
             if (sliderRadioElem) {
@@ -542,13 +564,11 @@
         let rounded_index = getSliderRoundedIndex();
         var sliderEventHandler = function (value) {
             let new_rounded_index = getSliderRoundedIndex();
-            if (new_rounded_index == rounded_index) {
+            if (sliderMode === oldSliderMode && 
+                new_rounded_index === rounded_index) {
                 return
             }
             rounded_index = new_rounded_index;
-            // window.postMessage({
-            //     'message': '' + rounded_index
-            // }, '*');
             let date = dates[rounded_index];
             date_text.innerText = formatDate(date);
             set_voxels_opacity();
@@ -559,6 +579,7 @@
                 false
         );
         function setSliderMode() {
+            oldSliderMode = sliderMode;
             sliderMode = this.value;
             sliderEventHandler();
         };

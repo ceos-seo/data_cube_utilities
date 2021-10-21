@@ -73,20 +73,28 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
     # Render the template.
     x_scale = kwargs.get('x_scale', 1)
     assert isinstance(x_scale, (int, float)), "x_scale must be an int or float."
+    kwargs['x_scale'] = x_scale
     y_scale = kwargs.get('y_scale', 1)
     assert isinstance(y_scale, (int, float)), "y_scale must be an int or float."
+    kwargs['y_scale'] = x_scale
     z_scale = kwargs.get('z_scale', 1)
     assert isinstance(z_scale, (int, float)), "z_scale must be an int or float."
+    kwargs['z_scale'] = z_scale
     distance_scale = kwargs.get('distance_scale', 1)
     assert isinstance(distance_scale, (int, float)), "distance_scale must be an int or float."
-    voxel_size = kwargs.get('voxel_size', 1)
+    kwargs['distance_scale'] = distance_scale
+    voxel_size = kwargs.get('voxel_size', 4)
     assert isinstance(voxel_size, (int, float)), "voxel_size must be an int or float."
+    kwargs['voxel_size'] = voxel_size
     voxel_opacity = kwargs.get('voxel_opacity', 1)
     assert isinstance(voxel_opacity, (int, float)), "voxel_opacity must be an int or float."
+    kwargs['voxel_opacity'] = voxel_opacity
     show_stats = kwargs.setdefault('show_stats', False)
     assert isinstance(show_stats, bool), "show_stats must be a boolean."
+    kwargs['show_stats'] = show_stats
     show_controls = kwargs.setdefault('show_controls', True)
     assert isinstance(show_controls, bool), "show_controls must be a boolean."
+    kwargs['show_controls'] = show_controls
     filled_template = template.render(data_array=da_str, times=times_str, **kwargs)
 
     # Remove single line comments and add 
