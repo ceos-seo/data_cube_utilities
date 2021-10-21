@@ -57,6 +57,12 @@
           padding: 0px;
       }
 
+      #button_controls_hider {
+        width: 100%;
+        height: 3vw;
+        font-size: 1.6vw;
+      }
+
       /* Formatting for the element containing the date string. */
       #date_text {
         font-size: 80%;
@@ -78,29 +84,35 @@
       </div>
       <input id='slider' type='range' orient='vertical' min='0' max='100' value='100'/>
     </div>
-    <div id='button_controls_holder' >
-        <div id='up_button_div' style='display: block;'>
-            <button class='control_button' id='rotate_left_button'>
-                <img src='static_url/imgs/rotate-left-icon.png' width=100% height=100%/>
-            </button>
-            <button class='control_button' id='up_button'>
-                <img src='static_url/imgs/arrow-up-icon.png' width=100% height=100%/>
-            </button>
-            <button class='control_button' id='rotate_right_button'>
-                <img src='static_url/imgs/rotate-right-icon.png' width=100% height=100%/>
-            </button>
+    <div id='button_controls_holder'>
+      <div id='button_controls_button_holder'>
+        <div id='top_buttons_div'>
+        
         </div>
-      <div style='display: block'>
-        <button class='control_button' id='left_button'>
+        <div id='middle_buttons_div'>
+          <button class='control_button' id='rotate_left_button'>
+            <img src='static_url/imgs/rotate-left-icon.png' width=100% height=100%/>
+          </button>
+          <button class='control_button' id='up_button'>
+            <img src='static_url/imgs/arrow-up-icon.png' width=100% height=100%/>
+          </button>
+          <button class='control_button' id='rotate_right_button'>
+            <img src='static_url/imgs/rotate-right-icon.png' width=100% height=100%/>
+          </button>
+        </div>
+        <div id='bottom_buttons_div'>
+          <button class='control_button' id='left_button'>
             <img src='static_url/imgs/arrow-left-icon.png' width=100% height=100%/>
-        </button>
-        <button class='control_button' id='down_button'>
+          </button>
+          <button class='control_button' id='down_button'>
             <img src='static_url/imgs/arrow-down-icon.png' width=100% height=100%/>
-        </button>
-        <button class='control_button' id='right_button'>
+          </button>
+          <button class='control_button' id='right_button'>
             <img src='static_url/imgs/arrow-right-icon.png' width=100% height=100%/>
-        </button>
+          </button>
+        </div>
       </div>
+      <button id='button_controls_hider'></button>
     </div>
     <script type='module'>
       // Parameters
@@ -307,13 +319,25 @@
         {% endif %}
         
         //////////////// C O N T R O L S //////////////////
-        // arrow controls (up/down/left/right/zoom)
+        // keyboard controls (up/down/left/right/zoom)
         var controls = new OrbitControls(camera, renderer.domElement);
         controls.damping = 0.2;
         controls.addEventListener('change', render);
-        // container.appendChild(controls)
-
-        
+        // button controls
+        let button_controls_hider = document.getElementById('button_controls_hider');
+        let button_controls_button_holder = document.getElementById('button_controls_button_holder');
+        button_controls_button_holder.style.visibility = 'visible';
+        button_controls_hider.innerHTML = 'Hide Camera Controls';
+        button_controls_hider.addEventListener('click', function () {
+            if (button_controls_button_holder.style.visibility == '' || 
+                button_controls_button_holder.style.visibility == 'visible') {
+                button_controls_button_holder.style.visibility = 'hidden';
+                button_controls_hider.innerHTML = 'Show Camera Controls';
+            } else {
+                button_controls_button_holder.style.visibility = 'visible';
+                button_controls_hider.innerHTML = 'Hide Camera Controls';
+            }
+        }, false);
 
         ///////////////////////////////////////////////////
 
