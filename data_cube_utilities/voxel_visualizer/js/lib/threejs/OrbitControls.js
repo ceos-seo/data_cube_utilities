@@ -93,6 +93,12 @@ var OrbitControls = function ( object, domElement ) {
 	// public methods
 	//
 
+    // this.getCenter = function() {
+    //     cent = new THREE.Vector3();
+    //     cent.copy( this.center );
+    //     return cent;
+    // };
+
 	this.getPolarAngle = function () {
 
 		return spherical.phi;

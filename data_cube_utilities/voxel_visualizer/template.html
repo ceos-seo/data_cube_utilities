@@ -28,6 +28,11 @@
         color: #08f;
       }
 
+      img {
+        width: 100%;
+        height: 100%;
+      }
+
       #date_and_slider_holder {
         position: absolute;
         left: 0%;
@@ -86,29 +91,34 @@
     </div>
     <div id='button_controls_holder'>
       <div id='button_controls_button_holder'>
-        <div id='top_buttons_div'>
-        
+        <div id='top_buttons_div' style='width:100%;'>
+          <button class='control_button' id='zoom_in_button'>
+            <img src='static_url/imgs/zoom-in-icon.png'/>
+          </button>
+          <button class='control_button' id='zoom_out_button'>
+            <img src='static_url/imgs/zoom-out-icon.png'/>
+          </button>
         </div>
         <div id='middle_buttons_div'>
           <button class='control_button' id='rotate_left_button'>
-            <img src='static_url/imgs/rotate-left-icon.png' width=100% height=100%/>
+            <img src='static_url/imgs/rotate-left-icon.png'/>
           </button>
           <button class='control_button' id='up_button'>
-            <img src='static_url/imgs/arrow-up-icon.png' width=100% height=100%/>
+            <img src='static_url/imgs/arrow-up-icon.png'/>
           </button>
           <button class='control_button' id='rotate_right_button'>
-            <img src='static_url/imgs/rotate-right-icon.png' width=100% height=100%/>
+            <img src='static_url/imgs/rotate-right-icon.png'/>
           </button>
         </div>
         <div id='bottom_buttons_div'>
           <button class='control_button' id='left_button'>
-            <img src='static_url/imgs/arrow-left-icon.png' width=100% height=100%/>
+            <img src='static_url/imgs/arrow-left-icon.png'/>
           </button>
           <button class='control_button' id='down_button'>
-            <img src='static_url/imgs/arrow-down-icon.png' width=100% height=100%/>
+            <img src='static_url/imgs/arrow-down-icon.png'/>
           </button>
           <button class='control_button' id='right_button'>
-            <img src='static_url/imgs/arrow-right-icon.png' width=100% height=100%/>
+            <img src='static_url/imgs/arrow-right-icon.png'/>
           </button>
         </div>
       </div>
@@ -146,6 +156,7 @@
       const print = console.log;
       var container;
       var camera, scene, renderer;
+      const cameraLookDir = new THREE.Vector3;
 
       const scale = 10.0;
       const base_x_scale = 2, base_y_scale = 2, base_z_scale = 2;
@@ -319,11 +330,12 @@
         {% endif %}
         
         //////////////// C O N T R O L S //////////////////
-        // keyboard controls (up/down/left/right/zoom)
+        /* keyboard controls (up/down/left/right/zoom) */
         var controls = new OrbitControls(camera, renderer.domElement);
         controls.damping = 0.2;
         controls.addEventListener('change', render);
-        // button controls
+        /* button controls */
+        /** hider button **/
         let button_controls_hider = document.getElementById('button_controls_hider');
         let button_controls_button_holder = document.getElementById('button_controls_button_holder');
         button_controls_button_holder.style.visibility = 'visible';
@@ -338,6 +350,202 @@
                 button_controls_hider.innerHTML = 'Hide Camera Controls';
             }
         }, false);
+        /** button click handlers **/
+        /*** zoom handlers ***/
+        function getFov() {
+            return Math.floor(
+                (2 *
+                Math.atan(camera.getFilmHeight() / 2 / 
+                camera.getFocalLength()) *
+                180) /
+                Math.PI
+                );
+        }
+
+        // function clickZoom(zoomType) {
+        //     window.parent.postMessage({
+        //         'message': '' + camera.getFov()
+        //     },'*');
+        //     if (value >= 20 && zoomType === "zoomIn") {
+        //         return value - 5;
+        //     } else if (value <= 75 && zoomType === "zoomOut") {
+        //         return value + 5;
+        //     } else {
+        //         return value;
+        //     }
+        // }
+
+        function clickZoom(zoomType) {
+            // const diff = (zoomType == 'zoomIn' ? 10 : -10);
+            const diff = (zoomType == 'zoomIn' ? 10 : -10);
+            
+            // window.parent.postMessage({
+            //     'message': '' + controls.target
+            // },'*');
+            // [tgt_x, tgt_y, tgt_z, ...rest] = controls.target;
+            // this.center;
+            window.parent.postMessage({
+                // 'message': ' ' + tgt_x + ' ' + tgt_y + ' ' + tgt_z
+                'message': ' ' + controls.position
+            },'*');
+
+            // let old_x = camera.position.x;
+            // let new_x;
+            // if (Math.abs(old_x) >= diff) {
+            //     let x_diff = (old_x < 0) ? -diff: diff;
+            //     new_x = old_x - x_diff;
+            // } else {new_x = old_x;}
+            // let old_y = camera.position.y;
+            // let new_y;
+            // if (Math.abs(old_y) >= diff) {
+            //     let y_diff = (old_y < 0) ? -diff: diff;
+            //     new_y = old_y - y_diff;
+            // } else {new_y = old_y;}
+            // let old_z = camera.position.z;
+            // let new_z;
+            // if (Math.abs(old_z) >= diff) {
+            //     let z_diff = (old_z < 0) ? -diff: diff;
+            //     new_z = old_z - z_diff;
+            // } else {new_z = old_z;}
+            // window.parent.postMessage({
+            //     'message': '' + old_x + ',' + old_y + ',' + old_z
+            // },'*');
+            // window.parent.postMessage({
+            //     'message': '' + new_x + ',' + new_y + ',' + new_z
+            // },'*');
+            // camera.position.set(new_x, new_y, new_z);
+            
+            // camera.updateProjectionMatrix();
+        }
+
+        function zoomInFunction() {
+            // const fov = getFov();
+            // clickZoom("zoomIn");
+            cameraMove('forward');
+            camera.updateProjectionMatrix();
+        }
+
+        function zoomOutFunction() {
+            // const fov = getFov();
+            // clickZoom("zoomOut");
+            cameraMove('backward');
+            camera.updateProjectionMatrix();
+        }
+
+        // function () {
+        //     window.parent.postMessage({
+        //         'message': controls.target.distanceTo(controls.object.position)
+        //     }, '*');
+        //     // camera_pos = camera.position.clone();
+        //     // camera
+        //     // camera.position.zoom;
+        //     // x_pos = camera.position.x;
+        //     var zoom = controls.target.distanceTo(controls.object.position)
+        //     zoom
+        // }
+        let zoom_in_button = document.getElementById('zoom_in_button');
+        zoom_in_button.addEventListener('click', zoomInFunction, false);
+        let zoom_out_button = document.getElementById('zoom_out_button');
+        zoom_out_button.addEventListener('click', zoomOutFunction, false);
+        /*** movement handlers ***/
+        function cameraMove(moveDir) {
+            controls.enabled = false;
+            camera.getWorldDirection(cameraLookDir);
+
+            // const diff = (direction == 'left' ? 10 : -10);
+            const mag = 5;
+            // [x,y,z] = camera.getWorldDirection();
+
+            // let lookDirection = camera.LookDirection;
+            // let lookDirection = camera.getWorldDirection(controls.target);
+            // let position = camera.position;
+            // lookDirection = lookDirection.normalize();
+            // position = position + mag * lookDirection;
+            // camera.Position = position;
+
+            // var lookVector = new THREE.Vector3( 0, 0, - 1 );
+            // camera.getWorldDirection(lookVector);
+
+            if (moveDir == 'forward')
+                // camera.position.addScaledVector(cameraLookDir, mag);
+                camera.translateZ(-mag);
+            else if (moveDir == 'backward')
+                // camera.position.addScaledVector(cameraLookDir, -mag);
+                camera.translateZ(mag);
+            else if (moveDir == 'left')
+                camera.translateX(-mag);
+            else if (moveDir == 'right')
+                camera.translateX(mag);
+            else if (moveDir == 'up')
+                camera.translateY(mag);
+            else if (moveDir == 'down')
+                camera.translateY(-mag);
+            
+            // let smth = camera.position.addScaledVector(cameraLookDir, mag);
+            // camera.position.set(smth);
+
+            // window.parent.postMessage({
+            //     // 'message': '' + lookVector
+            //     'message': '' + smth
+            // },'*');
+            // let old_x = camera.position.x;
+            // let new_x;
+            // if (Math.abs(old_x) >= diff) {
+            //     let x_diff = (old_x < 0) ? -diff: diff;
+            //     new_x = old_x - x_diff;
+            // } else {new_x = old_x;}
+            // let old_y = camera.position.y;
+            // let new_y;
+            // if (Math.abs(old_y) >= diff) {
+            //     let y_diff = (old_y < 0) ? -diff: diff;
+            //     new_y = old_y - y_diff;
+            // } else {new_y = old_y;}
+            // let old_z = camera.position.z;
+            // let new_z;
+            // if (Math.abs(old_z) >= diff) {
+            //     let z_diff = (old_z < 0) ? -diff: diff;
+            //     new_z = old_z - z_diff;
+            // } else {new_z = old_z;}
+            // window.parent.postMessage({
+            //     'message': '' + old_x + ',' + old_y + ',' + old_z
+            // },'*');
+            // window.parent.postMessage({
+            //     'message': '' + new_x + ',' + new_y + ',' + new_z
+            // },'*');
+            // camera.position.set(new_x, new_y, new_z);
+            // camera.position.set(position);
+            // controls.update();
+            camera.lookAt(controls.target);
+            controls.enabled = true;
+        }
+
+        function leftFunction() {
+            cameraMove('left');
+        }
+        let left_button = document.getElementById('left_button');
+        left_button.addEventListener('click', leftFunction, false);
+
+        function rightFunction() {
+            cameraMove('right');
+        }
+        let right_button = document.getElementById('right_button');
+        right_button.addEventListener('click', rightFunction, false);
+        
+        function upFunction() {
+            cameraMove('up');
+        }
+        let up_button = document.getElementById('up_button');
+        up_button.addEventListener('click', upFunction, false);
+        
+        function downFunction() {
+            cameraMove('down');
+        }
+        let down_button = document.getElementById('down_button');
+        down_button.addEventListener('click', downFunction, false);
+        
+        // function rotateLeft() { camera.rotation.x += Math.PI / 8; }
+        // let rotate_left_button = document.getElementById('rotate_left_button');
+        // rotate_left_button.addEventListener('click', rotateLeft, false);
 
         ///////////////////////////////////////////////////
 

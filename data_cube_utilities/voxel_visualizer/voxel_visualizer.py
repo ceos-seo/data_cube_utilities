@@ -160,7 +160,7 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
       
       window.addEventListener("message", onMessage, false);
       function onMessage(event) {
-          console.log('message:' + event.data.message)
+          console.log('message:' + event.data.message);
       } 
     </script>
     """)
