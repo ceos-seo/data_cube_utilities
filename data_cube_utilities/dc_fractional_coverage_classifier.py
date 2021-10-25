@@ -11,7 +11,7 @@ from . import dc_utilities as utilities
 import argparse
 import os
 import collections
-import gdal
+from osgeo import gdal
 from datetime import datetime
 
 # Author: KMF

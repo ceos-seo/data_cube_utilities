@@ -18,6 +18,23 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
     """
     Show a 3D visualization of a boolean xarray `xr`.
 
+    It creates an `iframe` DOM element in the cell's output in Jupyter.
+
+    The camera can be controlled with either:
+    1. The mouse and arrow keys OR
+    2. Buttons on the right side (hideable)
+
+    There is a slider on the left side with 2 modes - Range and Select.
+    * Range: This mode shows layers (time slices) after the selected time
+             (shown as text above the slider) at opacity `voxel_opacity`.
+             Layers before the selected time are shown in a lower opacity 
+             (more translucent).
+    * Select: This mode shows only the selected layer at opacity `voxel_opacity`.
+              Layers other than the selected time are shown in a lower opacity 
+              (more translucent).
+    
+    The visualization is created with Three.js.
+
     Parameters
     ----------
     da: xr.DataArray
@@ -128,27 +145,14 @@ def voxel_visualize(da: xr.DataArray, **kwargs):
     filled_template_sngl_lne_esc_fmt = \
         " + ".join(filled_template_sngl_lne_esc_split_fmt)
 
-    # <div id='wrap' style='position:fixed; width:100%;'>
-    # overflow:hidden; width:100%; height:100%;
-    # <!-- <div id='wrap' style=''>
-    # </div> -->
-    # style='display:block;'
-    # width=600, height=350
     vox_vis_server_port = os.environ['VOXEL_VISUALIZER_PORT']
     iframe = HTML(f"""
-    <!-- display:table-cell; -->
     <div id='wrap', style='width:100%; aspect-ratio:2;'>
-    <iframe id='voxel_vis_iframe', sandbox='allow-same-origin allow-scripts',
-        style='display: block; 
-            height:100%; width:99%;' scrolling='no';
-            transform-origin: top left;
-            ></iframe>
-            <!-- resize: both; 
-            overflow: hidden; -->
-            <!-- padding-top: 75%; -->
-            <!-- transform: scale(0.50); -->
-            <!-- onload='this.contentWindow.document.body.height=iframe.offsetHeight;'; -->
-            <!-- frameborder=\"0\"; -->
+        <iframe id='voxel_vis_iframe', sandbox='allow-same-origin allow-scripts',
+            style='display: block; 
+                height:100%; width:99%;' scrolling='no';
+                transform-origin: top left>
+        </iframe>
     </div>
     <script>
       var hostname = window.location.hostname;

@@ -37,7 +37,7 @@ Last modified: March 2021
 
 # Import required packages
 import os
-import gdal
+from osgeo import gdal
 import zipfile
 import numexpr
 import datetime
@@ -448,7 +448,6 @@ def array_to_geotiff(fname, data, geo_transform, projection,
     (in "WKT" format) for the output raster. These are typically
     obtained from an existing raster using the following GDAL calls:
 
-        import gdal
         gdal_dataset = gdal.Open(raster_path)
         geotrans = gdal_dataset.GetGeoTransform()
         prj = gdal_dataset.GetProjection()

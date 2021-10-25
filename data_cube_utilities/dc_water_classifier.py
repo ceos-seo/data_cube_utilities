@@ -33,7 +33,7 @@ import warnings
 # Command line tool imports
 import argparse
 import collections
-import gdal
+from osgeo import gdal
 from datetime import datetime
 
 

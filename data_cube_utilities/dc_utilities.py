@@ -19,7 +19,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-import gdal
+from osgeo import gdal
 import numpy as np
 import xarray as xr
 import os
